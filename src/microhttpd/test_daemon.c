@@ -26,6 +26,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -40,7 +41,7 @@ testStartError ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG, 0, NULL, NULL, NULL, NULL);
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG, 0, NULL, NULL, NULL, NULL);
   if (NULL != d)
   {
     MHD_stop_daemon (d);
@@ -96,7 +97,7 @@ testStartStop ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         0,
                         &apc_nothing, NULL,
                         &ahc_nothing, NULL,
@@ -121,7 +122,7 @@ testExternalRun ()
   MHD_socket maxfd;
   int i;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -165,7 +166,7 @@ testThread ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -194,7 +195,7 @@ testMultithread ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_THREAD_PER_CONNECTION,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_THREAD_PER_CONNECTION,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -223,7 +224,9 @@ main (int argc,
       char *const *argv)
 {
   int errorCount = 0;
-  (void)argc; (void)argv; /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 0);
 
   errorCount += testStartError ();
   errorCount += testStartStop ();

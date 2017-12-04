@@ -56,6 +56,10 @@
 #endif /* MHD_HTTPS_REQUIRE_GRYPT */
 #endif /* HTTPS_SUPPORT */
 
+#ifdef HTTP2_SUPPORT
+#include "connection_http2.h"
+#endif /* HTTP2_SUPPORT */
+
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -2476,7 +2480,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
 #if (GNUTLS_VERSION_NUMBER+0 >= 0x030605)
       if (0 != (daemon->options & MHD_USE_INSECURE_TLS_EARLY_DATA))
 	flags |= GNUTLS_ENABLE_EARLY_DATA;
-#endif      
+#endif
       connection->tls_state = MHD_TLS_CONN_INIT;
       MHD_set_https_callbacks (connection);
       gnutls_init (&connection->tls_session,
@@ -2485,6 +2489,12 @@ internal_add_connection (struct MHD_Daemon *daemon,
 			   daemon->priority_cache);
       gnutls_session_set_ptr (connection->tls_session,
 			      connection);
+
+#ifdef HAS_ALPN
+      /* Set ALPN protocols */
+      MHD_tls_set_alpn_protocols (connection);
+#endif /* HAS_ALPN */
+
       switch (daemon->cred_type)
         {
           /* set needed credentials for certificate authentication. */
@@ -2537,6 +2547,23 @@ internal_add_connection (struct MHD_Daemon *daemon,
       goto cleanup;
 #endif /* ! HTTPS_SUPPORT */
     }
+
+#ifdef HTTP2_SUPPORT
+  /* Set http version  */
+  if (0 != (daemon->options & MHD_USE_HTTP2))
+    {
+      /*
+       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+       * only HTTP/2 connections will be handled.
+       */
+      connection->http_version = HTTP_VERSION(2, 0);
+      connection->state = MHD_CONNECTION_HTTP2_INIT;
+    }
+  else
+    {
+      connection->http_version = HTTP_VERSION(1, 1);
+    }
+#endif /* ! HTTP2_SUPPORT */
 
 #if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
@@ -2728,6 +2755,13 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_suspend_stream (connection);
+    }
+#endif /* HTTP2_SUPPORT */
+
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
     {
@@ -2762,7 +2796,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
  * select, internal select or thread pool; not applicable to
  * thread-per-connection!) for a while.
  *
- * If you use this API in conjunction with a internal select or a
+ * If you use this API in conjunction with an internal select or a
  * thread pool, you must set the option #MHD_USE_ITC to
  * ensure that a resumed connection is immediately processed by MHD.
  *
@@ -5193,6 +5227,14 @@ parse_options_va (struct MHD_Daemon *daemon,
             }
 #endif /* HAVE_MESSAGES */
 	  break;
+#ifdef HTTP2_SUPPORT
+        case MHD_OPTION_H2_SETTINGS:
+          daemon->h2_settings_len = va_arg (ap,
+                                        size_t);
+          daemon->h2_settings = va_arg (ap,
+                                        nghttp2_settings_entry *);
+          break;
+#endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
 	  i = 0;
@@ -5290,6 +5332,9 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  break;
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
+#ifdef HTTP2_SUPPORT
+		case MHD_OPTION_H2_SETTINGS:
+#endif /* ! HTTP2_SUPPORT */
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
 						opt,
@@ -5529,6 +5574,11 @@ MHD_start_daemon_va (unsigned int flags,
       return NULL;
 #endif /* ! UPGRADE_SUPPORT */
     }
+#ifndef HTTP2_SUPPORT
+  if (0 != (*pflags & MHD_USE_HTTP2))
+    return NULL;
+#endif /* ! HTTP2_SUPPORT */
+
   if (NULL == dh)
     return NULL;
 
@@ -5591,6 +5641,9 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+#ifdef HTTP2_SUPPORT
+  gettimeofday(&tm_start, NULL);
+#endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;

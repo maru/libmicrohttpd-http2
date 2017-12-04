@@ -37,7 +37,19 @@
 #if GNUTLS_VERSION_MAJOR >= 3
 #include <gnutls/abstract.h>
 #endif
+#if defined(GNUTLS_VERSION_NUMBER)
+#  if (GNUTLS_VERSION_NUMBER >= 0x030200)
+#    define HAS_ALPN
+#    define ALPN_HTTP_1_1_LENGTH 8
+#    define ALPN_HTTP_1_1 "http/1.1"
+#  endif
+#endif
 #endif /* HTTPS_SUPPORT */
+
+#ifdef USE_NGHTTP2
+#include <nghttp2/nghttp2.h>
+struct timeval tm_start;
+#endif /* USE_NGHTTP2 */
 
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
@@ -526,8 +538,47 @@ enum MHD_CONNECTION_STATE
    * Connection was "upgraded" and socket is now under the
    * control of the application.
    */
-  MHD_CONNECTION_UPGRADE
+  MHD_CONNECTION_UPGRADE,
 #endif /* UPGRADE_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+  /** States in a state machine for an HTTP/2 connection. **/
+
+  /**
+   * Connection just started (no preface sent or received).
+   */
+  MHD_CONNECTION_HTTP2_INIT = 128,
+
+  /**
+   * Expecting incoming data.
+   */
+  MHD_CONNECTION_HTTP2_IDLE,
+
+  /**
+   * Reading/writing in process.
+   */
+  MHD_CONNECTION_HTTP2_BUSY,
+
+  /**
+   * Client sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_REMOTE,
+
+  /**
+   * Server sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_LOCAL,
+
+  /**
+   * Connection closed.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED,
+
+  /**
+   * This connection is finished (only to be freed)
+   */
+  MHD_CONNECTION_HTTP2_IN_CLEANUP,
+#endif /* HTTP2_SUPPORT */
 
 };
 
@@ -559,6 +610,8 @@ enum MHD_TLS_CONN_STATE
 #if DEBUG_STATES
 const char *
 MHD_state_to_string (enum MHD_CONNECTION_STATE state);
+const char *
+MHD_event_state_to_string (enum MHD_ConnectionEventLoopInfo state);
 #endif
 #endif
 
@@ -1021,6 +1074,20 @@ struct MHD_Connection
    * Is the connection wanting to resume?
    */
   bool resuming;
+
+  /**
+   * HTTP version number; 1.1 = 1001
+   */
+  int http_version;
+
+#ifdef HTTP2_SUPPORT
+
+  /**
+   * HTTP/2 connection details
+   */
+  struct http2_conn *h2;
+
+#endif /* HTTP2_SUPPORT */
 };
 
 
@@ -1744,6 +1811,19 @@ struct MHD_Daemon
    * The size of queue for listen socket.
    */
   unsigned int listen_backlog_size;
+
+#ifdef HTTP2_SUPPORT
+  /**
+   * HTTP/2 settings.
+   */
+  nghttp2_settings_entry *h2_settings;
+
+  /**
+   * Number of entries in h2_settings.
+   */
+  size_t h2_settings_len;
+#endif /* HTTP2_SUPPORT */
+
 };
 
 

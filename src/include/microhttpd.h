@@ -191,6 +191,10 @@ typedef SOCKET MHD_socket;
 #define MHD_SOCKET_DEFINED 1
 #endif /* MHD_SOCKET_DEFINED */
 
+#ifdef HTTP2_SUPPORT
+#include <nghttp2/nghttp2.h>
+#endif /* HTTP2_SUPPORT */
+
 /**
  * Define MHD_NO_DEPRECATION before including "microhttpd.h" to disable deprecation messages
  */
@@ -741,6 +745,9 @@ MHD_get_reason_phrase_for (unsigned int code);
  */
 #define MHD_HTTP_VERSION_1_0 "HTTP/1.0"
 #define MHD_HTTP_VERSION_1_1 "HTTP/1.1"
+#define MHD_HTTP_VERSION_2_0 "HTTP/2"
+
+#define HTTP_VERSION(major, minor) (1000*(major) + (minor))
 
 /** @} */ /* end of group versions */
 

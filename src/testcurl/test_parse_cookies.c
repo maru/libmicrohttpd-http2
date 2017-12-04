@@ -27,6 +27,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -37,7 +38,6 @@
 #include <unistd.h>
 #endif
 
-static int oneone;
 
 struct CBC
 {
@@ -134,7 +134,7 @@ testExternalGet ()
   else
     {
       port = 1340;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 5;
     }
 
@@ -142,7 +142,7 @@ testExternalGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -165,10 +165,7 @@ testExternalGet ()
      parser! Do not change! */
   curl_easy_setopt (c, CURLOPT_COOKIE,
                     "name1=var1; name2=var2,name3 ;name4=\"var4 with spaces\";");
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
@@ -274,8 +271,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  set_http_version(argv[0], 1);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testExternalGet ();

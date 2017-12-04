@@ -25,6 +25,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -128,7 +129,7 @@ ServeOneRequest(void *param)
 
   fd = (MHD_socket) (intptr_t) param;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         0, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_LISTEN_SOCKET, fd,
                         MHD_OPTION_NOTIFY_COMPLETED, &request_completed, &done,
@@ -164,6 +165,7 @@ ServeOneRequest(void *param)
         }
       MHD_run (d);
     }
+
   fd = MHD_quiesce_daemon (d);
   if (MHD_INVALID_SOCKET == fd)
     {
@@ -188,7 +190,8 @@ setupCURL (void *cbc)
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, 150L);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
+  curl_easy_setopt (c, CURLOPT_FORBID_REUSE, 1L);
   /* NOTE: use of CONNECTTIMEOUT without also
      setting NOSIGNAL results in really weird
      crashes on my system!*/
@@ -218,13 +221,14 @@ testGet (int type, int pool_count, int poll_flag)
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
+  memset(cbc.buf, 0, cbc.size);
   if (pool_count > 0) {
-    d = MHD_start_daemon (type | MHD_USE_ERROR_LOG | MHD_USE_ITC | poll_flag,
+    d = MHD_start_daemon (use_http2 | type | MHD_USE_ERROR_LOG | MHD_USE_ITC | poll_flag,
                           port, NULL, NULL, &ahc_echo, "GET",
                           MHD_OPTION_THREAD_POOL_SIZE, pool_count, MHD_OPTION_END);
 
   } else {
-    d = MHD_start_daemon (type | MHD_USE_ERROR_LOG | MHD_USE_ITC | poll_flag,
+    d = MHD_start_daemon (use_http2 | type | MHD_USE_ERROR_LOG | MHD_USE_ITC | poll_flag,
                           port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   }
   if (d == NULL)
@@ -279,7 +283,10 @@ testGet (int type, int pool_count, int poll_flag)
     }
 
   cbc.pos = 0;
-  if (CURLE_OK != (errornum = curl_easy_perform (c)))
+  memset(cbc.buf, 0, cbc.size);
+  errornum = curl_easy_perform (c);
+  if (((errornum != CURLE_OK) && (http_version < CURL_HTTP_VERSION_2)) ||
+      ((errornum != CURLE_OK) && (errornum != CURLE_RECV_ERROR) && (http_version >= CURL_HTTP_VERSION_2)))
     {
       fprintf (stderr,
                "curl_easy_perform failed: `%s'\n",
@@ -374,7 +381,7 @@ testExternalGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port,
                         NULL, NULL,
                         &ahc_echo, "GET",
@@ -526,7 +533,9 @@ int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
-  (void)argc; (void)argv; /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

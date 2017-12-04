@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -38,14 +39,13 @@
 
 #include "socat.c"
 
+
 /**
  * We will set the memory available per connection to
  * half of this value, so the actual value does not have
  * to be big at all...
  */
 #define VERY_LONG (1024*10)
-
-static int oneone;
 
 static int
 apc_all (void *cls, const struct sockaddr *addr, socklen_t addrlen)
@@ -107,7 +107,7 @@ testLongUrlGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080,
                         &apc_all,
                         NULL,
@@ -135,10 +135,7 @@ testLongUrlGet ()
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
        *   crashes on my system! */
@@ -169,7 +166,7 @@ testLongHeaderGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080,
                         &apc_all,
                         NULL,
@@ -198,10 +195,7 @@ testLongHeaderGet ()
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
        *   crashes on my system! */
@@ -227,8 +221,18 @@ main (int argc, char *const *argv)
   (void) argc;   /* Unused. Silent compiler warning. */
   const char *sl;
 
-  sl = strrchr (argv[0], (int) '/');
-  oneone = (NULL != sl) ? (NULL != strstr (sl, "11")) : 0;
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_1;
+
+  set_http_version(argv[0], 1);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testLongUrlGet ();

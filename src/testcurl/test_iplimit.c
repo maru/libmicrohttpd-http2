@@ -27,6 +27,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -51,7 +52,6 @@
 #define CPU_COUNT 2
 #endif
 
-static int oneone;
 
 struct CBC
 {
@@ -120,15 +120,15 @@ testMultithreadedGet ()
   else
     {
       port = 1260;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 5;
     }
 
   /* Test only valid for HTTP/1.1 (uses persistent connections) */
-  if (!oneone)
+  if (http_version == CURL_HTTP_VERSION_1_0)
     return 0;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL,
                         &ahc_echo, "GET",
                         MHD_OPTION_PER_IP_CONNECTION_LIMIT, 2,
@@ -169,7 +169,7 @@ testMultithreadedGet ()
           curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
           curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
           curl_easy_setopt (c, CURLOPT_FORBID_REUSE, 0L);
-          curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+          curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
           curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
           /* NOTE: use of CONNECTTIMEOUT without also
            *   setting NOSIGNAL results in really weird
@@ -229,15 +229,15 @@ testMultithreadedPoolGet ()
   else
     {
       port = 1261;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 5;
     }
 
   /* Test only valid for HTTP/1.1 (uses persistent connections) */
-  if (!oneone)
+  if (http_version == CURL_HTTP_VERSION_1_0)
     return 0;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_PER_IP_CONNECTION_LIMIT, 2,
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT,
@@ -276,7 +276,7 @@ testMultithreadedPoolGet ()
           curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
           curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
           curl_easy_setopt (c, CURLOPT_FORBID_REUSE, 0L);
-          curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+          curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
           curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
           /* NOTE: use of CONNECTTIMEOUT without also
            *   setting NOSIGNAL results in really weird
@@ -339,8 +339,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  set_http_version(argv[0], 0);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount |= testMultithreadedGet ();

@@ -8,6 +8,7 @@
 /test_post11
 /test_post
 /test_long_header
+/test_long_header11
 /test_get_chunked
 /test_get11
 /test_get
@@ -41,3 +42,4 @@
 /daemontest_get_chunked
 /daemontest_get11
 *.exe
+*_http2

@@ -187,25 +187,29 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *TLS_daemon;
-  int port;
+  int use_http2 = 0;
+  uint16_t port;
 
-  if (argc != 2)
+  switch (argc)
     {
-      printf ("%s PORT\n", argv[0]);
-      return 1;
-    }
-  port = atoi (argv[1]);
-  if ( (1 > port) ||
-       (port > UINT16_MAX) )
-    {
-      fprintf (stderr,
-               "Port must be a number between 1 and 65535\n");
+    case 2:
+      port = atoi (argv[1]);
+      break;
+    case 3:
+      if (strcmp(argv[1], "-h2") == 0)
+        {
+          use_http2 = MHD_USE_HTTP2;
+          port = atoi (argv[2]);
+          break;
+        }
+    default:
+      printf ("%s [-h2] PORT\n", argv[0]);
       return 1;
     }
 
   TLS_daemon =
     MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG |
-                      MHD_USE_TLS,
+                      MHD_USE_TLS | use_http2,
                       (uint16_t) port,
                       NULL, NULL,
                       &http_ahc, NULL,

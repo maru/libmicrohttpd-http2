@@ -45,7 +45,6 @@
 #define CPU_COUNT 2
 #endif
 
-static int oneone;
 static int incr_read; /* Use incremental read */
 static int verbose; /* Be verbose */
 
@@ -143,7 +142,6 @@ ahc_echo (void *cls,
 
       if (0 == *upload_data_size)
         return MHD_YES; /* No data to process. */
-
       if (*pproc + *upload_data_size > PUT_SIZE)
         {
           fprintf (stderr, "Incoming data larger than expected.\n");
@@ -190,7 +188,7 @@ testPutInternalThread (unsigned int add_flag)
   else
     {
       port = 1270;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
       if (incr_read)
         port += 20;
@@ -199,7 +197,7 @@ testPutInternalThread (unsigned int add_flag)
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | add_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | add_flag,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
 			MHD_OPTION_CONNECTION_MEMORY_LIMIT, (size_t)(incr_read ? 1024 : (PUT_SIZE * 4)),
@@ -225,10 +223,7 @@ testPutInternalThread (unsigned int add_flag)
   curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -269,7 +264,7 @@ testPutThreadPerConn (unsigned int add_flag)
   else
     {
       port = 1271;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
       if (incr_read)
         port += 20;
@@ -278,7 +273,7 @@ testPutThreadPerConn (unsigned int add_flag)
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD |
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD |
                           MHD_USE_ERROR_LOG | add_flag,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
@@ -305,10 +300,7 @@ testPutThreadPerConn (unsigned int add_flag)
   curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -352,7 +344,7 @@ testPutThreadPool (unsigned int add_flag)
   else
     {
       port = 1272;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
       if (incr_read)
         port += 20;
@@ -361,7 +353,7 @@ testPutThreadPool (unsigned int add_flag)
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | add_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | add_flag,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT,
@@ -388,10 +380,7 @@ testPutThreadPool (unsigned int add_flag)
   curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -449,7 +438,7 @@ testPutExternal (void)
   else
     {
       port = 1273;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
       if (incr_read)
         port += 20;
@@ -459,7 +448,7 @@ testPutExternal (void)
   cbc.size = 2048;
   cbc.pos = 0;
   multi = NULL;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
                         MHD_OPTION_CONNECTION_MEMORY_LIMIT, (size_t)(incr_read ? 1024 : (PUT_SIZE * 4)),
@@ -485,10 +474,7 @@ testPutExternal (void)
   curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -597,7 +583,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   unsigned int lastErr;
 
-  oneone = has_in_name(argv[0], "11");
+  set_http_version(argv[0], 1);
+
   incr_read = has_in_name(argv[0], "_inc");
   verbose = has_param(argc, argv, "-v");
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))

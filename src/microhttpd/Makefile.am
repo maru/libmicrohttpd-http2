@@ -149,6 +149,11 @@ libmicrohttpd_la_SOURCES += \
   connection_https.c connection_https.h
 endif
 
+if ENABLE_HTTP2
+libmicrohttpd_la_SOURCES += \
+  connection_http2.c connection_http2.h
+endif
+
 
 
 check_PROGRAMS = \
@@ -161,6 +166,13 @@ check_PROGRAMS = \
   test_start_stop \
   test_daemon \
   test_options
+
+if ENABLE_HTTP2
+check_PROGRAMS += \
+  test_start_stop_http2 \
+  test_daemon_http2 \
+  test_options_http2
+endif
 
 if HAVE_POSIX_THREADS
 if ENABLE_UPGRADE
@@ -330,4 +342,19 @@ test_sha256_SOURCES = \
 test_options_SOURCES = \
   test_options.c
 test_options_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+  
+test_start_stop_http2_SOURCES = \
+  test_start_stop.c
+test_start_stop_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+test_daemon_http2_SOURCES = \
+  test_daemon.c
+test_daemon_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+test_options_http2_SOURCES = \
+  test_options.c
+test_options_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la

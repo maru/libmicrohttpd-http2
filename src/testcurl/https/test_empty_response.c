@@ -25,6 +25,7 @@
  */
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <limits.h>
 #include <sys/stat.h>
 #include <curl/curl.h>
@@ -35,8 +36,6 @@
 
 extern const char srv_key_pem[];
 extern const char srv_self_signed_cert_pem[];
-
-static int oneone;
 
 static int
 ahc_echo (void *cls,
@@ -88,7 +87,7 @@ testInternalSelectGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_TLS | MHD_USE_INTERNAL_POLLING_THREAD,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | MHD_USE_TLS | MHD_USE_INTERNAL_POLLING_THREAD,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_HTTPS_MEM_KEY, srv_key_pem,
                         MHD_OPTION_HTTPS_MEM_CERT, srv_self_signed_cert_pem,
@@ -121,10 +120,7 @@ testInternalSelectGet ()
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYPEER, 0);
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYHOST, 0);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
@@ -221,6 +217,8 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
   if (!testsuite_curl_global_init ())
     return 99;

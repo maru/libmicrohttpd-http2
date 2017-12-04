@@ -884,14 +884,23 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
-  unsigned int port;
+  int use_http2 = 0;
+  uint16_t port;
 
-  if ( (argc != 2) ||
-       (1 != sscanf (argv[1], "%u", &port)) ||
-       (UINT16_MAX < port) )
+  switch (argc)
     {
-      fprintf (stderr,
-	       "%s PORT\n", argv[0]);
+    case 2:
+      port = atoi (argv[1]);
+      break;
+    case 3:
+      if (strcmp(argv[1], "-h2") == 0)
+        {
+          use_http2 = MHD_USE_HTTP2;
+          port = atoi (argv[2]);
+          break;
+        }
+    default:
+      printf ("%s [-h2] PORT\n", argv[0]);
       return 1;
     }
 #ifndef MINGW
@@ -916,7 +925,7 @@ main (int argc, char *const *argv)
 							     MHD_RESPMEM_PERSISTENT);
   mark_as_html (internal_error_response);
   update_directory ();
-  d = MHD_start_daemon (MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | use_http2,
                         port,
                         NULL, NULL,
 			&generate_page, NULL,

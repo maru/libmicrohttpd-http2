@@ -2190,7 +2190,7 @@ MHD_daemon_tls_mem_dhparams (struct MHD_Daemon *daemon,
  * @param psk[out] to be set to the pre-shared-key; should be allocated with malloc(),
  *                 will be freed by MHD
  * @param psk_size[out] to be set to the number of bytes in @a psk
- * @return 0 on success, -1 on errors 
+ * @return 0 on success, -1 on errors
  */
 typedef int
 (*MHD_PskServerCredentialsCallback)(void *cls,

@@ -25,6 +25,7 @@
  */
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -51,9 +52,8 @@
 #define PAR CPU_COUNT
 
 /**
- * Do we use HTTP 1.1?
+ * HTTP version, daemon flags
  */
-static int oneone;
 
 /**
  * Response to return (re-used).
@@ -142,10 +142,7 @@ thread_gets (void *param)
       curl_easy_setopt (c, CURLOPT_WRITEDATA, NULL);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 5L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 5L);
       /* NOTE: use of CONNECTTIMEOUT without also
          setting NOSIGNAL results in really weird
@@ -216,7 +213,7 @@ testMultithreadedGet (int port,
   struct MHD_Daemon *d;
   pthread_t p;
 
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
                         port,
                         NULL, NULL,
                         &ahc_echo, "GET",
@@ -246,7 +243,7 @@ testMultithreadedPoolGet (int port,
   struct MHD_Daemon *d;
   pthread_t p;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
                         port,
                         NULL, NULL,
                         &ahc_echo, "GET",
@@ -277,14 +274,14 @@ main (int argc, char *const *argv)
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  set_http_version(argv[0], 1);
+
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     port = 1142;
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
-  if (0 != port && oneone)
+  if ((0 != port) && (http_version == CURL_HTTP_VERSION_1_1))
     port += 5;
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

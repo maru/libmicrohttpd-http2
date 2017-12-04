@@ -38,6 +38,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -64,9 +65,8 @@
 #define ROUNDS 500
 
 /**
- * Do we use HTTP 1.1?
+ * HTTP version, daemon flags
  */
-static int oneone;
 
 /**
  * Response to return (re-used).
@@ -195,7 +195,7 @@ testInternalGet (int port, int poll_flag)
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -222,10 +222,7 @@ testInternalGet (int port, int poll_flag)
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
-      if (oneone)
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       /* NOTE: use of CONNECTTIMEOUT without also
 	 setting NOSIGNAL results in really weird
 	 crashes on my system!*/
@@ -269,7 +266,7 @@ testMultithreadedGet (int port, int poll_flag)
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 16;
@@ -295,10 +292,7 @@ testMultithreadedGet (int port, int poll_flag)
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
 	 setting NOSIGNAL results in really weird
@@ -343,7 +337,7 @@ testMultithreadedPoolGet (int port, int poll_flag)
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -370,10 +364,7 @@ testMultithreadedPoolGet (int port, int poll_flag)
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
 	 setting NOSIGNAL results in really weird
@@ -432,7 +423,7 @@ testExternalGet (int port)
   multi = NULL;
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL,
                         &ahc_echo, "GET",
                         MHD_OPTION_END);
@@ -465,10 +456,7 @@ testExternalGet (int port)
       curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
-      if (oneone)
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-	curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
@@ -579,9 +567,9 @@ main (int argc, char *const *argv)
   int port = 1130;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
-  if (oneone)
+  set_http_version(argv[0], 1);
+
+  if (http_version == CURL_HTTP_VERSION_1_1)
     port += 15;
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

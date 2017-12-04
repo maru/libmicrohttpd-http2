@@ -62,7 +62,7 @@ ahc_echo (void *cls,
       if (0 == strcmp (method, "POST"))
         {
           response = MHD_create_response_from_buffer (strlen (BUSYPAGE),
-						      (void *) BUSYPAGE, 
+						      (void *) BUSYPAGE,
 						      MHD_RESPMEM_PERSISTENT);
           ret =
             MHD_queue_response (connection, MHD_HTTP_SERVICE_UNAVAILABLE,
@@ -85,14 +85,27 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
+  int use_http2 = 0;
+  uint16_t port;
 
-  if (argc != 2)
+  switch (argc)
     {
-      printf ("%s PORT\n", argv[0]);
+    case 2:
+      port = atoi (argv[1]);
+      break;
+    case 3:
+      if (strcmp(argv[1], "-h2") == 0)
+        {
+          use_http2 = MHD_USE_HTTP2;
+          port = atoi (argv[2]);
+          break;
+        }
+    default:
+      printf ("%s [-h2] PORT\n", argv[0]);
       return 1;
     }
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
-                        atoi (argv[1]),
+  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | use_http2,
+                        port,
                         NULL, NULL, &ahc_echo, (void *) askpage,
                         MHD_OPTION_END);
   if (d == NULL)

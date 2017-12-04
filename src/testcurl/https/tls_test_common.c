@@ -26,6 +26,8 @@
 #include "tls_test_common.h"
 #include "tls_test_keys.h"
 
+extern int http_version;
+extern int use_http2;
 
 FILE *
 setup_ca_cert ()
@@ -92,7 +94,7 @@ test_daemon_get (void *cls,
   curl_easy_setopt (c, CURLOPT_VERBOSE, 1);
 #endif
   curl_easy_setopt (c, CURLOPT_URL, url);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
@@ -223,7 +225,7 @@ send_curl_req (char *url, struct CBC * cbc, const char *cipher_suite,
   curl_easy_setopt (c, CURLOPT_VERBOSE, CURL_VERBOS_LEVEL);
 #endif
   curl_easy_setopt (c, CURLOPT_URL, url);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 60L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 60L);
 
@@ -394,7 +396,7 @@ cleanup:
 int
 setup_testcase (struct MHD_Daemon **d, int port, int daemon_flags, va_list arg_list)
 {
-  *d = MHD_start_daemon_va (daemon_flags, port,
+  *d = MHD_start_daemon_va (use_http2 | daemon_flags, port,
                             NULL, NULL, &http_ahc, NULL, arg_list);
 
   if (*d == NULL)

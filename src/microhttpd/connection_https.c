@@ -34,6 +34,9 @@
 #include "mhd_mono_clock.h"
 #include <gnutls/gnutls.h>
 
+#ifdef HTTP2_SUPPORT
+#include "connection_http2.h"
+#endif /* HTTP2_SUPPORT */
 
 /**
  * Callback for receiving data from the socket.
@@ -135,6 +138,53 @@ send_tls_adapter (struct MHD_Connection *connection,
 }
 
 
+#ifdef HAS_ALPN
+/**
+ * Set ALPN protocols.
+ *
+ * @param connection connection to use
+ * @return true on success, false otherwise
+ */
+bool
+MHD_tls_set_alpn_protocols (struct MHD_Connection *connection)
+{
+  int ret;
+
+  int cur = 0;
+  gnutls_datum_t protocols[2];
+
+#ifdef HTTP2_SUPPORT
+/*
+ * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+ * only HTTP/2 connections will be handled.
+ */
+  if (0 != (connection->daemon->options & MHD_USE_HTTP2))
+    {
+      protocols[cur].data = (unsigned char *)NGHTTP2_PROTO_VERSION_ID;
+      protocols[cur].size = NGHTTP2_PROTO_VERSION_ID_LEN;
+      cur++;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    {
+      protocols[cur].data = (unsigned char *)ALPN_HTTP_1_1;
+      protocols[cur].size = ALPN_HTTP_1_1_LENGTH;
+      cur++;
+    }
+
+  ret = gnutls_alpn_set_protocols (connection->tls_session, protocols,
+     cur, GNUTLS_ALPN_SERVER_PRECEDENCE);
+
+  if (ret < 0)
+    {
+      gnutls_perror (ret);
+      return false;
+    }
+  return true;
+}
+#endif /* HAS_ALPN */
+
+
 /**
  * Give gnuTLS chance to work on the TLS handshake.
  *
@@ -158,6 +208,37 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
 	  /* set connection TLS state to enable HTTP processing */
 	  connection->tls_state = MHD_TLS_CONN_CONNECTED;
 	  MHD_update_last_activity_ (connection);
+
+#ifdef HAS_ALPN
+	  gnutls_datum_t selected;
+	  ret = gnutls_alpn_get_selected_protocol(connection->tls_session, &selected);
+#ifdef HTTP2_SUPPORT
+/*
+ * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+ * only HTTP/2 connections will be handled.
+ */
+    if (0 != (connection->daemon->options & MHD_USE_HTTP2))
+    // if ( (0 == ret) && (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+    //      (selected.size == NGHTTP2_PROTO_VERSION_ID_LEN) &&
+    //      (0 == memcmp(NGHTTP2_PROTO_VERSION_ID, selected.data,
+    //              NGHTTP2_PROTO_VERSION_ID_LEN))) )
+      {
+        selected.data = (unsigned char *)NGHTTP2_PROTO_VERSION_ID;
+        connection->http_version = HTTP_VERSION(2, 0);
+      }
+    else
+#endif /* HTTP2_SUPPORT */
+      {
+        /* Default HTTP version */
+        selected.data = (unsigned char *)ALPN_HTTP_1_1;
+        connection->http_version = HTTP_VERSION(1, 1);
+      }
+
+#ifdef HAVE_MESSAGES
+    MHD_DLOG (connection->daemon,
+              _("The negotiated protocol: %s\n"), selected.data);
+#endif /* HAVE_MESSAGES */
+#endif /* HAS_ALPN */
 	  return true;
 	}
       if ( (GNUTLS_E_AGAIN == ret) ||
@@ -167,6 +248,7 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
 	  /* handshake not done */
 	  return false;
 	}
+
       /* handshake failed */
       connection->tls_state = MHD_TLS_CONN_TLS_FAILED;
 #ifdef HAVE_MESSAGES

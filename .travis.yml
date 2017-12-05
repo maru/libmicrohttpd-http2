@@ -1,14 +1,25 @@
 language: c
 env:
   matrix:
-    - CI_BUILD=cmake
     - CI_BUILD=autotools
 compiler:
   - gcc
+addons:
+  apt:
+    packages:
+      - texinfo
 before_script:
-  - if [ "$CI_BUILD" = "autotools" ]; then autoreconf -i; fi
-  - if [ "$CI_BUILD" = "autotools" ]; then ./configure ; fi
+  - autoreconf -fi
+  - ./configure
+
+install:
+  - if [ $TRAVIS_OS_NAME = linux ]; then
+      curl -L https://github.com/nghttp2/nghttp2/releases/download/v1.24.0/nghttp2-1.24.0.tar.gz |
+         tar xzf - &&
+         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --disable-threads --enable-app && make && sudo make install);
+    fi
+
 branches:
-    only:
-        - master
+  only:
+    - master
 

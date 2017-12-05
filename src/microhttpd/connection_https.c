@@ -35,7 +35,7 @@
 #include <gnutls/gnutls.h>
 
 #ifdef HTTP2_SUPPORT
-#include <nghttp2/nghttp2.h>
+#include "connection_http2.h"
 #endif /* HTTP2_SUPPORT */
 
 /**

@@ -44,8 +44,8 @@
 test_upgrade_tls
 test_http_reasons
 /test_daemon.trs
-/test_shutdown_poll_ignore
-/test_shutdown_select_ignore
+/test_shutdown_poll
+/test_shutdown_select
 /test_str_compare
 /test_str_to_value
 /test_upgrade

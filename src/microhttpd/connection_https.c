@@ -227,7 +227,7 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
           connection->tls_state = MHD_TLS_CONN_HANDSHAKING;
 	  /* handshake not done */
 	  return false;
-  }
+	}
 
       /* handshake failed */
       connection->tls_state = MHD_TLS_CONN_TLS_FAILED;

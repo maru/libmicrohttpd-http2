@@ -1,0 +1,14 @@
+language: c
+env:
+  matrix:
+    - CI_BUILD=cmake
+    - CI_BUILD=autotools
+compiler:
+  - gcc
+before_script:
+  - if [ "$CI_BUILD" = "autotools" ]; then autoreconf -i; fi
+  - if [ "$CI_BUILD" = "autotools" ]; then ./configure ; fi
+branches:
+    only:
+        - master
+

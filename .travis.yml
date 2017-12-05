@@ -1,7 +1,5 @@
 language: c
-env:
-  matrix:
-    - CI_BUILD=autotools
+env: CI_BUILD=autotools
 compiler:
   - gcc
 addons:
@@ -28,6 +26,8 @@ script:
   - ./configure --enable-https --enable-http2 --with-nghttp2
   - make
   - make check
+after_failure:
+  - cat src/microhttpd/test-suite.log
 branches:
   only:
     - master

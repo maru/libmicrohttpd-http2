@@ -1,7 +1,6 @@
 language: c
-env: CI_BUILD=autotools
-compiler:
-  - gcc
+compiler: gcc
+sudo: required
 addons:
   apt:
     packages:

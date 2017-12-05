@@ -35,8 +35,18 @@
  *
  * @param connection which callbacks should be modified
  */
-void 
+void
 MHD_set_https_callbacks (struct MHD_Connection *connection);
+
+
+/**
+ * Set ALPN protocols.
+ *
+ * @param connection connection to use
+ * @return true on success, false otherwise
+ */
+bool
+MHD_tls_set_alpn_protocols (struct MHD_Connection *connection);
 
 
 /**

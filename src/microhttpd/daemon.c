@@ -52,6 +52,10 @@
 #endif /* MHD_HTTPS_REQUIRE_GRYPT */
 #endif /* HTTPS_SUPPORT */
 
+#ifdef HTTP2_SUPPORT
+#include "connection_http2.h"
+#endif /* HTTP2_SUPPORT */
+
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -2367,6 +2371,12 @@ internal_add_connection (struct MHD_Daemon *daemon,
                   );
       gnutls_priority_set (connection->tls_session,
 			   daemon->priority_cache);
+
+#ifdef HAS_ALPN
+      /* Set ALPN protocols */
+      MHD_tls_set_alpn_protocols (connection);
+#endif /* HAS_ALPN */
+
       switch (daemon->cred_type)
         {
           /* set needed credentials for certificate authentication. */
@@ -5286,6 +5296,10 @@ MHD_start_daemon_va (unsigned int flags,
 #else  /* ! UPGRADE_SUPPORT */
       return NULL;
 #endif /* ! UPGRADE_SUPPORT */
+#ifndef HTTP2_SUPPORT
+  if (0 != (*pflags & MHD_USE_HTTP2))
+    return NULL;
+#endif /* ! HTTP2_SUPPORT */
     }
   if (NULL == dh)
     return NULL;

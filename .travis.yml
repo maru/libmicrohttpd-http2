@@ -24,7 +24,7 @@ before_script:
 script:
   - ./configure --enable-https --enable-http2 --with-nghttp2
   - make
-  - make check
+  - sudo make check
 after_failure:
   - cat src/microhttpd/test-suite.log
 branches:

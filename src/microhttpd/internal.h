@@ -37,6 +37,13 @@
 #if GNUTLS_VERSION_MAJOR >= 3
 #include <gnutls/abstract.h>
 #endif
+#if defined(GNUTLS_VERSION_NUMBER)
+#  if (GNUTLS_VERSION_NUMBER >= 0x030200)
+#    define HAS_ALPN
+#    define ALPN_HTTP_1_1_LENGTH 8
+#    define ALPN_HTTP_1_1 "http/1.1"
+#  endif
+#endif
 #endif /* HTTPS_SUPPORT */
 
 #ifdef HAVE_STDBOOL_H

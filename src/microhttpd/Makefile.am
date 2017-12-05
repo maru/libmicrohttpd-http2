@@ -137,6 +137,11 @@ libmicrohttpd_la_SOURCES += \
   connection_https.c connection_https.h
 endif
 
+if ENABLE_HTTP2
+libmicrohttpd_la_SOURCES += \
+  connection_http2.c connection_http2.h
+endif
+
 
 
 check_PROGRAMS = \

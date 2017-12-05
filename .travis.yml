@@ -22,4 +22,4 @@ install:
 branches:
   only:
     - master
-
+    - travis_script

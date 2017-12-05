@@ -16,17 +16,18 @@ addons:
       - libjansson-dev
       - libjemalloc-dev
       - libc-ares-dev
-before_script:
-  - autoreconf -fi
-  - ./configure
-
 install:
   - if [ $TRAVIS_OS_NAME = linux ]; then
       curl -L https://github.com/nghttp2/nghttp2/releases/download/v1.24.0/nghttp2-1.24.0.tar.gz |
          tar xzf - &&
-         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --disable-threads --enable-app && make && sudo make install);
+         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --disable-threads && make && sudo make install);
     fi
-
+before_script:
+  - autoreconf -fi
+script:
+  - ./configure --enable-https --enable-http2 --with-nghttp2
+  - make
+  - make check
 branches:
   only:
     - master

@@ -1,14 +1,30 @@
 language: c
-env:
-  matrix:
-    - CI_BUILD=cmake
-    - CI_BUILD=autotools
-compiler:
-  - gcc
+compiler: gcc
+sudo: false
+addons:
+  apt:
+    packages:
+      - texinfo
+      - libcunit1-dev
+      - libssl-dev
+      - libxml2-dev
+      - libev-dev
+      - libevent-dev
+      - libjansson-dev
+      - libjemalloc-dev
+      - libc-ares-dev
+install:
+  - if [ $TRAVIS_OS_NAME = linux ]; then
+      curl -L https://github.com/nghttp2/nghttp2/releases/download/v1.24.0/nghttp2-1.24.0.tar.gz |
+         tar xzf - &&
+         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only && make && sudo make install);
+    fi
 before_script:
-  - if [ "$CI_BUILD" = "autotools" ]; then autoreconf -i; fi
-  - if [ "$CI_BUILD" = "autotools" ]; then ./configure ; fi
-branches:
-    only:
-        - master
-
+  - autoreconf -fi
+script:
+  - ./configure --enable-https --enable-http2 --with-nghttp2
+  - echo '#undef HAVE_INET6' >> MHD_config.h
+  - make
+  - make check
+after_failure:
+  - cat src/microhttpd/test-suite.log

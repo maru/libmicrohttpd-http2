@@ -28,7 +28,3 @@ script:
   - make check
 after_failure:
   - cat src/microhttpd/test-suite.log
-branches:
-  only:
-    - master
-    - travis_script

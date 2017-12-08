@@ -206,17 +206,25 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
 #ifdef HAS_ALPN
 	  gnutls_datum_t selected;
 	  ret = gnutls_alpn_get_selected_protocol(connection->tls_session, &selected);
-    if (ret < 0)
+#ifdef HTTP2_SUPPORT
+    if ( (0 == ret) && (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+         (selected.size == NGHTTP2_PROTO_VERSION_ID_LEN) &&
+         (0 == memcmp(NGHTTP2_PROTO_VERSION_ID, selected.data,
+                 NGHTTP2_PROTO_VERSION_ID_LEN)))
       {
-        /* handshake failed */
-        connection->tls_state = MHD_TLS_CONN_TLS_FAILED;
-        gnutls_perror (ret);
-        return false;
+        connection->http_version = HTTP_VERSION(2, 0);
       }
+    else
+#endif /* HTTP2_SUPPORT */
+      {
+        /* Default HTTP version */
+        selected.data = (unsigned char *)ALPN_HTTP_1_1;
+        connection->http_version = HTTP_VERSION(1, 1);
+      }
+
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-                _("The negotiated protocol: %s\n"),
-                selected.data);
+    MHD_DLOG (connection->daemon,
+              _("The negotiated protocol: %s\n"), selected.data);
 #endif /* HAVE_MESSAGES */
 #endif /* HAS_ALPN */
 	  return true;

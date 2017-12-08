@@ -734,6 +734,8 @@ MHD_get_reason_phrase_for (unsigned int code);
 #define MHD_HTTP_VERSION_1_0 "HTTP/1.0"
 #define MHD_HTTP_VERSION_1_1 "HTTP/1.1"
 
+#define HTTP_VERSION(major,minor) (1000*(major)+(minor))
+
 /** @} */ /* end of group versions */
 
 /**

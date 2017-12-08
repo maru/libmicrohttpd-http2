@@ -38,7 +38,7 @@
 void
 MHD_set_https_callbacks (struct MHD_Connection *connection);
 
-
+#ifdef HAS_ALPN
 /**
  * Set ALPN protocols.
  *
@@ -48,6 +48,7 @@ MHD_set_https_callbacks (struct MHD_Connection *connection);
 bool
 MHD_tls_set_alpn_protocols (struct MHD_Connection *connection);
 
+#endif /* HAS_ALPN */
 
 /**
  * Give gnuTLS chance to work on the TLS handshake.

@@ -716,6 +716,11 @@ struct MHD_Connection
   char *version;
 
   /**
+   * HTTP version number; 1.1 = 1001
+   */
+  int http_version;
+
+  /**
    * Close connection after sending response?
    * Functions may change value from "Unknown" or "KeepAlive" to "Must close",
    * but no functions reset value "Must Close" to any other value.

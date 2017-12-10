@@ -154,17 +154,23 @@ MHD_tls_set_alpn_protocols (struct MHD_Connection *connection)
   gnutls_datum_t protocols[2];
 
 #ifdef HTTP2_SUPPORT
+/*
+ * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+ * only HTTP/2 connections will be handled.
+ */
   if (0 != (connection->daemon->options & MHD_USE_HTTP2))
     {
       protocols[cur].data = (unsigned char *)NGHTTP2_PROTO_VERSION_ID;
       protocols[cur].size = NGHTTP2_PROTO_VERSION_ID_LEN;
       cur++;
     }
+  else
 #endif /* HTTP2_SUPPORT */
-
-  protocols[cur].data = (unsigned char *)ALPN_HTTP_1_1;
-  protocols[cur].size = ALPN_HTTP_1_1_LENGTH;
-  cur++;
+    {
+      protocols[cur].data = (unsigned char *)ALPN_HTTP_1_1;
+      protocols[cur].size = ALPN_HTTP_1_1_LENGTH;
+      cur++;
+    }
 
   ret = gnutls_alpn_set_protocols (connection->tls_session, protocols,
      cur, GNUTLS_ALPN_SERVER_PRECEDENCE);
@@ -207,11 +213,17 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
 	  gnutls_datum_t selected;
 	  ret = gnutls_alpn_get_selected_protocol(connection->tls_session, &selected);
 #ifdef HTTP2_SUPPORT
-    if ( (0 == ret) && (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
-         (selected.size == NGHTTP2_PROTO_VERSION_ID_LEN) &&
-         (0 == memcmp(NGHTTP2_PROTO_VERSION_ID, selected.data,
-                 NGHTTP2_PROTO_VERSION_ID_LEN)))
+/*
+ * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+ * only HTTP/2 connections will be handled.
+ */
+    if (0 != (connection->daemon->options & MHD_USE_HTTP2))
+    // if ( (0 == ret) && (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+    //      (selected.size == NGHTTP2_PROTO_VERSION_ID_LEN) &&
+    //      (0 == memcmp(NGHTTP2_PROTO_VERSION_ID, selected.data,
+    //              NGHTTP2_PROTO_VERSION_ID_LEN))) )
       {
+        selected.data = (unsigned char *)NGHTTP2_PROTO_VERSION_ID;
         connection->http_version = HTTP_VERSION(2, 0);
       }
     else

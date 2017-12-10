@@ -749,11 +749,6 @@ struct MHD_Connection
   char *version;
 
   /**
-   * HTTP version number; 1.1 = 1001
-   */
-  int http_version;
-
-  /**
    * Close connection after sending response?
    * Functions may change value from "Unknown" or "KeepAlive" to "Must close",
    * but no functions reset value "Must Close" to any other value.
@@ -987,23 +982,6 @@ struct MHD_Connection
    */
   TransmitCallback send_cls;
 
-#ifdef HTTP2_SUPPORT
-  /**
-   * Function used for reading data from the socket.
-   */
-  ConnectionReadCallback read_cls;
-
-  /**
-   * Function used for data processing.
-   */
-  ConnectionIdleCallback idle_cls;
-
-  /**
-   * Function used for writing data to the socket.
-   */
-  ConnectionWriteCallback write_cls;
-#endif /* HTTP2_SUPPORT */
-
 #ifdef UPGRADE_SUPPORT
   /**
    * If this connection was upgraded, this points to
@@ -1057,6 +1035,35 @@ struct MHD_Connection
    * Is the connection wanting to resume?
    */
   bool resuming;
+
+  /**
+   * HTTP version number; 1.1 = 1001
+   */
+  int http_version;
+
+#ifdef HTTP2_SUPPORT
+
+  /**
+   * Function used for reading data from the socket.
+   */
+  ConnectionReadCallback read_cls;
+
+  /**
+   * Function used for data processing.
+   */
+  ConnectionIdleCallback idle_cls;
+
+  /**
+   * Function used for writing data to the socket.
+   */
+  ConnectionWriteCallback write_cls;
+
+  /**
+   * HTTP/2 connection details
+   */
+  struct http2_conn *h2;
+
+#endif /* HTTP2_SUPPORT */
 };
 
 

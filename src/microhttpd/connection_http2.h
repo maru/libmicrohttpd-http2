@@ -35,6 +35,20 @@
 #include <nghttp2/nghttp2.h>
 #endif /* USE_NGHTTP2 */
 
+struct http2_conn {
+
+};
+
+
+/**
+ * Initialize HTTP2 structures.
+ *
+ * @param connection connection to handle
+ */
+int
+MHD_http2_session_init (struct MHD_Connection *connection);
+
+
 /**
  * Set HTTP/2 read/idle/write callbacks for this connection.
  * Handle data from/to socket.

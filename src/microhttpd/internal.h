@@ -46,9 +46,9 @@
 #endif
 #endif /* HTTPS_SUPPORT */
 
-#ifdef HTTP2_SUPPORT
-#include "connection_http2.h"
-#endif /* HTTP2_SUPPORT */
+#ifdef USE_NGHTTP2
+#include <nghttp2/nghttp2.h>
+#endif /* USE_NGHTTP2 */
 
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
@@ -1765,6 +1765,19 @@ struct MHD_Daemon
    * The size of queue for listen socket.
    */
   unsigned int listen_backlog_size;
+
+#ifdef HTTP2_SUPPORT
+  /**
+   * HTTP/2 settings.
+   */
+  const nghttp2_settings_entry *h2_settings;
+
+  /**
+   * Number of entries in h2_settings.
+   */
+  size_t h2_settings_len;
+#endif /* HTTP2_SUPPORT */
+
 };
 
 

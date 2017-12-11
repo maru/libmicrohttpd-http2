@@ -46,6 +46,10 @@
 #endif
 #endif /* HTTPS_SUPPORT */
 
+#ifdef HTTP2_SUPPORT
+#include "connection_http2.h"
+#endif /* HTTP2_SUPPORT */
+
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
 #endif
@@ -588,6 +592,35 @@ typedef ssize_t
                      size_t max_bytes);
 
 
+#ifdef HTTP2_SUPPORT
+/**
+ * Function used for reading data from the socket.
+ *
+ * @param conn the connection struct
+ */
+typedef void
+(*ConnectionReadCallback) (struct MHD_Connection *conn);
+
+/**
+ * Function used for data processing.
+ *
+ * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+typedef int
+(*ConnectionIdleCallback) (struct MHD_Connection *conn);
+
+/**
+ * Function used for writing data to the socket.
+ *
+ * @param conn the connection struct
+ */
+typedef void
+(*ConnectionWriteCallback) (struct MHD_Connection *conn);
+#endif /* HTTP2_SUPPORT */
+
+
 /**
  * Ability to use same connection for next request
  */
@@ -714,11 +747,6 @@ struct MHD_Connection
    * in pool.
    */
   char *version;
-
-  /**
-   * HTTP version number; 1.1 = 1001
-   */
-  int http_version;
 
   /**
    * Close connection after sending response?
@@ -1007,6 +1035,35 @@ struct MHD_Connection
    * Is the connection wanting to resume?
    */
   bool resuming;
+
+  /**
+   * HTTP version number; 1.1 = 1001
+   */
+  int http_version;
+
+#ifdef HTTP2_SUPPORT
+
+  /**
+   * Function used for reading data from the socket.
+   */
+  ConnectionReadCallback read_cls;
+
+  /**
+   * Function used for data processing.
+   */
+  ConnectionIdleCallback idle_cls;
+
+  /**
+   * Function used for writing data to the socket.
+   */
+  ConnectionWriteCallback write_cls;
+
+  /**
+   * HTTP/2 connection details
+   */
+  struct http2_conn *h2;
+
+#endif /* HTTP2_SUPPORT */
 };
 
 

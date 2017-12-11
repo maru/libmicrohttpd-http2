@@ -26,5 +26,9 @@ script:
   - echo '#undef HAVE_INET6' >> MHD_config.h
   - make
   - make check
+  - sudo sh -c 'echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6'
+  - ./configure --enable-https
+  - make
+  - make check
 after_failure:
   - cat src/microhttpd/test-suite.log

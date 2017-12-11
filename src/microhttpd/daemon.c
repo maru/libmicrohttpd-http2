@@ -2420,6 +2420,24 @@ internal_add_connection (struct MHD_Daemon *daemon,
 #endif /* ! HTTPS_SUPPORT */
     }
 
+#ifdef HTTP2_SUPPORT
+  /* Set connection handlers  */
+  if ( (0 != (daemon->options & MHD_USE_HTTP2)) /* &&
+       (connection->http_version == HTTP_VERSION(2, 0)) */ )
+    {
+/*
+ * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+ * only HTTP/2 connections will be handled.
+ */
+      /* set HTTP/2 connection handlers  */
+      MHD_set_http2_callbacks (connection);
+    }
+  else
+    {
+      /* set default HTTP/1 connection handlers  */
+      MHD_set_http1_callbacks (connection);
+    }
+#endif /* ! HTTP2_SUPPORT */
 
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
   /* Firm check under lock. */
@@ -5296,11 +5314,12 @@ MHD_start_daemon_va (unsigned int flags,
 #else  /* ! UPGRADE_SUPPORT */
       return NULL;
 #endif /* ! UPGRADE_SUPPORT */
+    }
 #ifndef HTTP2_SUPPORT
   if (0 != (*pflags & MHD_USE_HTTP2))
     return NULL;
 #endif /* ! HTTP2_SUPPORT */
-    }
+
   if (NULL == dh)
     return NULL;
 

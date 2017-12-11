@@ -2431,11 +2431,13 @@ internal_add_connection (struct MHD_Daemon *daemon,
  */
       /* set HTTP/2 connection handlers  */
       MHD_set_http2_callbacks (connection);
+      connection->http_version = HTTP_VERSION(2, 0);
     }
   else
     {
       /* set default HTTP/1 connection handlers  */
       MHD_set_http1_callbacks (connection);
+      connection->http_version = HTTP_VERSION(1, 1);
     }
 #endif /* ! HTTP2_SUPPORT */
 

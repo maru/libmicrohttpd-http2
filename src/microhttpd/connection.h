@@ -180,4 +180,15 @@ MHD_connection_epoll_update_ (struct MHD_Connection *connection);
 void
 MHD_update_last_activity_ (struct MHD_Connection *connection);
 
+#ifdef HTTP2_SUPPORT
+/**
+ * Set HTTP/1 read/idle/write callbacks for this connection.
+ * Handle data from/to socket.
+ *
+ * @param connection connection to initialize
+ */
+void
+MHD_set_http1_callbacks (struct MHD_Connection *connection);
+#endif /* ! HTTP2_SUPPORT */
+
 #endif

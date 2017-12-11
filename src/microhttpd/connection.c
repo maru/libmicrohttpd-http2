@@ -2841,7 +2841,11 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 
 #ifdef HTTP2_SUPPORT
   if ( (MHD_CONNECTION_INIT == connection->state) &&
-       (MHD_YES != MHD_http2_session_init (connection)) )
+       (connection->http_version == HTTP_VERSION(2, 0)) &&
+       !((MHD_YES == MHD_http2_session_init (connection)) &&
+         (MHD_YES == MHD_http2_send_preface (connection,
+                            connection->daemon->h2_settings,
+                            connection->daemon->h2_settings_len))) )
     {
       return;
     }

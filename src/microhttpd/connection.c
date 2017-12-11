@@ -47,6 +47,9 @@
 #ifdef HTTPS_SUPPORT
 #include "connection_https.h"
 #endif /* HTTPS_SUPPORT */
+#ifdef HTTP2_SUPPORT
+#include "connection_http2.h"
+#endif /* HTTP2_SUPPORT */
 
 
 /**

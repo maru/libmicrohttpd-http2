@@ -4998,6 +4998,14 @@ parse_options_va (struct MHD_Daemon *daemon,
             }
 #endif /* HAVE_MESSAGES */
 	  break;
+#ifdef HTTP2_SUPPORT
+        case MHD_OPTION_H2_SETTINGS:
+          daemon->h2_settings_len = va_arg (ap,
+                                        size_t);
+          daemon->h2_settings = va_arg (ap,
+                                        const nghttp2_settings_entry *);
+          break;
+#endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
 	  i = 0;
@@ -5094,6 +5102,7 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  break;
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
+		case MHD_OPTION_H2_SETTINGS:
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
 						opt,
@@ -6711,6 +6720,12 @@ MHD_is_feature_supported(enum MHD_FEATURE feature)
 #endif
     case MHD_FEATURE_SENDFILE:
 #ifdef _MHD_HAVE_SENDFILE
+      return MHD_YES;
+#else
+      return MHD_NO;
+#endif
+    case MHD_FEATURE_HTTP2:
+#ifdef HTTP2_SUPPORT
       return MHD_YES;
 #else
       return MHD_NO;

@@ -35,8 +35,17 @@
 #include <nghttp2/nghttp2.h>
 #endif /* USE_NGHTTP2 */
 
-struct http2_conn {
+struct http2_stream_data
+{
+  struct http2_stream_data *prev, *next;
+  int32_t stream_id;
+};
 
+struct http2_conn
+{
+  struct http2_stream_data head;
+  nghttp2_session *session;
+  bool preface_sent;
 };
 
 
@@ -47,6 +56,18 @@ struct http2_conn {
  */
 int
 MHD_http2_session_init (struct MHD_Connection *connection);
+
+
+/**
+ * Send HTTP/2 preface.
+ *
+ * @param connection connection to handle
+ * @param iv http2 settings array
+ * @param niv number of entries
+ */
+int
+MHD_http2_send_preface (struct MHD_Connection *connection,
+                        const nghttp2_settings_entry *iv, size_t niv);
 
 
 /**

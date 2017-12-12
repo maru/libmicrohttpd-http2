@@ -49,6 +49,7 @@
 #endif /* HTTPS_SUPPORT */
 #ifdef HTTP2_SUPPORT
 #include "connection_http2.h"
+#define ENTER(format, args...) fprintf(stderr, "\e[32;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
 #endif /* HTTP2_SUPPORT */
 
 
@@ -1805,7 +1806,7 @@ transmit_error_response (struct MHD_Connection *connection,
  *
  * @param connection connection to get poll set for
  */
-static void
+void
 MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 {
   /* Do not update states of suspended connection */
@@ -1960,6 +1961,15 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
         }
       break;
     }
+
+    #if DEBUG_STATES
+          MHD_DLOG (connection->daemon,
+                    _("In function %s handling connection at state: %s\n"),
+                    __FUNCTION__,
+                     (connection->event_loop_info==MHD_EVENT_LOOP_INFO_READ?"READ":
+                     (connection->event_loop_info==MHD_EVENT_LOOP_INFO_WRITE?"WRITE":
+                      connection->event_loop_info==MHD_EVENT_LOOP_INFO_BLOCK?"BLOCK":"CLEANUP")));
+    #endif
 }
 
 
@@ -2823,6 +2833,7 @@ MHD_update_last_activity_ (struct MHD_Connection *connection)
 void
 MHD_connection_handle_read (struct MHD_Connection *connection)
 {
+  ENTER();
   ssize_t bytes_read;
 
   if ( (MHD_CONNECTION_CLOSED == connection->state) ||
@@ -2847,6 +2858,9 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
                             connection->daemon->h2_settings,
                             connection->daemon->h2_settings_len))) )
     {
+      /* Error, close connection */
+      CONNECTION_CLOSE_ERROR (connection,
+          _("Closing connection (failed to send server connection preface)\n"));
       return;
     }
 #endif /* HTTP2_SUPPORT */
@@ -2944,6 +2958,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 void
 MHD_connection_handle_write (struct MHD_Connection *connection)
 {
+  ENTER();
   struct MHD_Response *response;
   ssize_t ret;
   if (connection->suspended)
@@ -3277,6 +3292,16 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
                 __FUNCTION__,
                 MHD_state_to_string (connection->state));
 #endif
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      connection->idle_cls (connection);
+    }
+  else
+    {
+#endif /* HTTP2_SUPPORT */
+ENTER("idle: switch (connection->state)");
       switch (connection->state)
         {
         case MHD_CONNECTION_INIT:
@@ -3721,8 +3746,11 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           mhd_assert (0);
           break;
         }
-      break;
     }
+      break;
+    } /* while (! connection->suspended) */
+
+    ENTER("idle: if (! connection->suspended)");
   if (! connection->suspended)
     {
       time_t timeout;

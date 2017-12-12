@@ -54,6 +54,7 @@
 
 #ifdef HTTP2_SUPPORT
 #include "connection_http2.h"
+#define ENTER(format, args...) fprintf(stderr, "\e[35;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
 #endif /* HTTP2_SUPPORT */
 
 #if defined(_WIN32) && ! defined(__CYGWIN__)
@@ -1137,6 +1138,7 @@ call_handlers (struct MHD_Connection *con,
   if (!states_info_processed)
     { /* Connection is not read or write ready, but external conditions
        * may be changed and need to be processed. */
+      ENTER("idle !states_info_processed");
       ret = MHD_connection_handle_idle (con);
     }
   /* Fast track for fast connections. */

@@ -2830,7 +2830,6 @@ MHD_update_last_activity_ (struct MHD_Connection *connection)
 void
 MHD_connection_handle_read (struct MHD_Connection *connection)
 {
-  ENTER();
   ssize_t bytes_read;
 
   if ( (MHD_CONNECTION_CLOSED == connection->state) ||
@@ -2848,6 +2847,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
 
 #ifdef HTTP2_SUPPORT
+  ENTER();
   if ( (MHD_CONNECTION_INIT == connection->state) &&
        (connection->http_version == HTTP_VERSION(2, 0)) &&
        !((MHD_YES == MHD_http2_session_init (connection)) &&

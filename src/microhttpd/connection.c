@@ -3308,8 +3308,8 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
       connection->idle_cls (connection);
     }
   else
-    {
 #endif /* HTTP2_SUPPORT */
+    {
       switch (connection->state)
         {
         case MHD_CONNECTION_INIT:

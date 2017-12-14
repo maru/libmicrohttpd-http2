@@ -467,7 +467,7 @@ sendfile_adapter (struct MHD_Connection *connection)
  * data in socket buffer to push last partial packet to client after
  * sending logical completed part of data (for example: after sending
  * full response header or full response message).
- * If flushing IS NOT possible than MHD activates no buffering (no
+ * If flushing IS NOT possible then MHD activates no buffering (no
  * delay sending) when it going to send formed fully completed logical
  * part of data and activate normal buffering after sending.
  * For idled keep-alive connection MHD always activate normal
@@ -2958,7 +2958,6 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 void
 MHD_connection_handle_write (struct MHD_Connection *connection)
 {
-  ENTER();
   struct MHD_Response *response;
   ssize_t ret;
   if (connection->suspended)
@@ -2981,6 +2980,18 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
             __FUNCTION__,
             MHD_state_to_string (connection->state));
 #endif
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      ENTER();
+      connection->write_cls (connection);
+      return;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+  {
+
   switch (connection->state)
     {
     case MHD_CONNECTION_INIT:
@@ -3184,6 +3195,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
                               _("Internal error\n"));
       break;
     }
+  }
   return;
 }
 

@@ -3310,7 +3310,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
   else
     {
 #endif /* HTTP2_SUPPORT */
-ENTER("idle: switch (connection->state)");
       switch (connection->state)
         {
         case MHD_CONNECTION_INIT:
@@ -3759,7 +3758,6 @@ ENTER("idle: switch (connection->state)");
       break;
     } /* while (! connection->suspended) */
 
-    ENTER("idle: if (! connection->suspended)");
   if (! connection->suspended)
     {
       time_t timeout;

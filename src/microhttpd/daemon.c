@@ -1138,7 +1138,6 @@ call_handlers (struct MHD_Connection *con,
   if (!states_info_processed)
     { /* Connection is not read or write ready, but external conditions
        * may be changed and need to be processed. */
-      ENTER("idle !states_info_processed");
       ret = MHD_connection_handle_idle (con);
     }
   /* Fast track for fast connections. */

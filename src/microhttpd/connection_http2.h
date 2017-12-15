@@ -43,14 +43,52 @@ struct http2_stream_data
 
 struct http2_conn
 {
-  struct http2_stream_data head;
+  /**
+   * Pointer to connection.
+   */
   nghttp2_session *session;
-  bool preface_sent;
+
+  /**
+   * Pointer to connection.
+   */
+  struct MHD_Connection *connection;
+
+  /**
+   * Callback invoked to receive data from remote peer.
+   */
+  ReceiveCallback recv_cls;
+
+  /**
+  * Callback invoked to send data to remote peer.
+   */
+  TransmitCallback send_cls;
+
+  /**
+   * Session settings.
+   */
+  nghttp2_settings_entry *settings;
+
+  /**
+   * Number of entries in settings.
+   */
+  size_t settings_len;
+
+  /**
+   * Head of doubly-linked list of current, active streams.
+   */
+  struct http2_stream_data head;
+
+  /**
+   * Tail of doubly-linked list of current, active streams.
+   */
+  struct http2_stream_data *tail;
+
 };
 
 
 /**
- * Initialize HTTP2 structures.
+ * Initialize HTTP2 structures, set the initial local settings for the session,
+ * and send server preface.
  *
  * @param connection connection to handle
  */
@@ -59,15 +97,12 @@ MHD_http2_session_init (struct MHD_Connection *connection);
 
 
 /**
- * Send HTTP/2 preface.
+ * Delete HTTP2 structures.
  *
  * @param connection connection to handle
- * @param iv http2 settings array
- * @param niv number of entries
  */
-int
-MHD_http2_send_preface (struct MHD_Connection *connection,
-                        const nghttp2_settings_entry *iv, size_t niv);
+void
+MHD_http2_session_delete (struct MHD_Connection *connection);
 
 
 /**

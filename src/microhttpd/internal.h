@@ -1770,7 +1770,7 @@ struct MHD_Daemon
   /**
    * HTTP/2 settings.
    */
-  const nghttp2_settings_entry *h2_settings;
+  nghttp2_settings_entry *h2_settings;
 
   /**
    * Number of entries in h2_settings.

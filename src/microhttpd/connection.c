@@ -2851,17 +2851,20 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 
 #ifdef HTTP2_SUPPORT
   ENTER();
+  /* This function should be called when the connection is added */
   if ( (MHD_CONNECTION_INIT == connection->state) &&
-       (connection->http_version == HTTP_VERSION(2, 0)) &&
-       !((MHD_YES == MHD_http2_session_init (connection)) &&
-         (MHD_YES == MHD_http2_send_preface (connection,
-                            connection->daemon->h2_settings,
-                            connection->daemon->h2_settings_len))) )
+       (connection->http_version == HTTP_VERSION(2, 0)) )
     {
-      /* Error, close connection */
-      CONNECTION_CLOSE_ERROR (connection,
-          _("Closing connection (failed to send server connection preface)\n"));
-      return;
+      if (MHD_YES != MHD_http2_session_init (connection))
+        {
+          /* Error, close connection */
+          CONNECTION_CLOSE_ERROR (connection,
+              _("Closing connection (failed to send server connection preface)\n"));
+          return;
+        }
+      /* Temporary fix to avoid resending the preface */
+      connection->state = MHD_CONNECTION_URL_RECEIVED;
+      MHD_update_last_activity_ (connection);
     }
 #endif /* HTTP2_SUPPORT */
 
@@ -2982,9 +2985,9 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
+  ENTER();
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      ENTER();
       connection->write_cls (connection);
       return;
     }
@@ -3306,8 +3309,16 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
+  ENTER();
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
+      if (connection->state == MHD_CONNECTION_CLOSED)
+        {
+          MHD_http2_session_delete (connection);
+          cleanup_connection (connection);
+          connection->in_idle = false;
+          return MHD_NO;
+        }
       connection->idle_cls (connection);
     }
   else

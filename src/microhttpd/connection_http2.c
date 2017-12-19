@@ -191,7 +191,7 @@ on_request_recv(nghttp2_session *session,
   return 0;
 }
 
-#define FRAME_TYPE(x) (x==0?"DATA":(x==1?"HEADERS":(x==2?"PRIORITY":(x==4?"SETTINGS":(x==NGHTTP2_GOAWAY?"GOAWAY":"-")))))
+#define FRAME_TYPE(x) (x==NGHTTP2_DATA?"DATA":(x==NGHTTP2_HEADERS?"HEADERS":(x==NGHTTP2_PRIORITY?"PRIORITY":(x==NGHTTP2_RST_STREAM?"RST_STREAM":(x==NGHTTP2_SETTINGS?"SETTINGS":(x==NGHTTP2_PUSH_PROMISE?"PUSH_PROMISE":(x==NGHTTP2_PING?"PING":(x==NGHTTP2_GOAWAY?"GOAWAY":(x==NGHTTP2_WINDOW_UPDATE?"WINDOW_UPDATE":(x==NGHTTP2_CONTINUATION?"CONTINUATION":(x==NGHTTP2_ALTSVC?"ALTSVC":"-")))))))))))
 
 static int
 on_frame_recv_callback(nghttp2_session *session,
@@ -331,9 +331,9 @@ send_callback(nghttp2_session *session, const uint8_t *data,
 
 
 /**
+ * Set local session settings and callbacks.
  *
- *
- * @param h2
+ * @param connection connection of the session
  */
 static int
 http2_init_session (struct MHD_Connection *connection)
@@ -358,6 +358,7 @@ http2_init_session (struct MHD_Connection *connection)
   rv = nghttp2_session_callbacks_new (&callbacks);
   if (rv != 0)
   {
+    // NGHTTP2_ERR_NOMEM
     return rv;
   }
 
@@ -379,13 +380,13 @@ http2_init_session (struct MHD_Connection *connection)
   rv = nghttp2_session_server_new (&h2->session, callbacks, h2);
   if (rv != 0)
   {
+    // NGHTTP2_ERR_NOMEM
     return rv;
   }
 
   nghttp2_session_callbacks_del (callbacks);
   return 0;
 }
-
 
 
 
@@ -456,8 +457,11 @@ http2_session_recv(struct MHD_Connection *connection)
 void
 MHD_http2_session_delete (struct MHD_Connection *connection)
 {
+  ENTER();
   struct http2_conn *h2 = connection->h2;
   struct http2_stream_data *stream_data;
+
+  if (h2 == NULL) return;
 
   nghttp2_session_del (h2->session);
 
@@ -562,6 +566,7 @@ http2_handle_write (struct MHD_Connection *connection)
   ENTER();
   struct http2_conn *h2 = connection->h2;
   mhd_assert(h2 != NULL);
+
   if (nghttp2_session_want_read (h2->session) == 0 &&
       nghttp2_session_want_write (h2->session) == 0)
   {
@@ -592,32 +597,11 @@ http2_handle_write (struct MHD_Connection *connection)
 int
 http2_handle_idle (struct MHD_Connection *connection)
 {
-  struct MHD_Daemon *daemon = connection->daemon;
-  char *line;
-  size_t line_len;
-  int ret;
   ENTER();
 
-  connection->in_idle = true;
-  while (! connection->suspended)
-    {
-#ifdef HTTPS_SUPPORT
-      if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
-        { /* HTTPS connection. */
-          if ((MHD_TLS_CONN_INIT <= connection->tls_state) &&
-              (MHD_TLS_CONN_CONNECTED > connection->tls_state))
-            break;
-        }
-#endif /* HTTPS_SUPPORT */
-#if DEBUG_STATES
-      MHD_DLOG (daemon,
-                _("In function %s handling connection at state: %s\n"),
-                __FUNCTION__,
-                MHD_state_to_string (connection->state));
-#endif
-    http2_session_recv (connection);
-    break;
-  }
+  http2_session_recv (connection);
+
+  return MHD_YES;
 }
 
 

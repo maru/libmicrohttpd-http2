@@ -44,75 +44,113 @@
   }
 
 /**
- * Add stream to the list of streams belonging to a session.
+ * Add a stream to the end of the stream list.
  *
- * @param h2 h2 session
- * @param stream_data stream to add to the h2 session
+ * @param h2 HTTP/2 session
+ * @param stream new stream to add to the session
  */
 static void
 add_stream (struct http2_conn *h2,
-            struct http2_stream_data *stream_data)
+            struct http2_stream *stream)
 {
-  mhd_assert(h2 != NULL && stream_data != NULL);
-  stream_data->next = h2->head.next;
-  h2->head.next = stream_data;
-  stream_data->prev = &h2->head;
-  if (stream_data->next) {
-    stream_data->next->prev = stream_data;
+  mhd_assert(h2 != NULL && stream != NULL);
+
+  // First element
+  if (h2->streams == NULL)
+  {
+    h2->streams = stream;
+    stream->prev = NULL;
   }
+  else
+  {
+    mhd_assert(h2->streams != NULL);
+    mhd_assert(h2->streams_tail != NULL);
+
+    h2->streams_tail->next = stream;
+    stream->prev = h2->streams_tail;
+  }
+
+  h2->streams_tail = stream;
+  stream->next = NULL;
 }
 
 
 /**
+ * Remove a stream from the stream list.
  *
- *
- * @param h2
- * @param stream_data
+ * @param h2 HTTP/2 session
+ * @param stream stream to remove from the session
  */
 static void
 remove_stream (struct http2_conn *h2,
-               struct http2_stream_data *stream_data)
+               struct http2_stream *stream)
 {
-  (void)h2;
+  mhd_assert(h2 != NULL && stream != NULL);
 
-  stream_data->prev->next = stream_data->next;
-  if (stream_data->next) {
-    stream_data->next->prev = stream_data->prev;
+  // Only one element
+  if (h2->streams == h2->streams_tail)
+  {
+    mhd_assert(h2->streams != NULL);
+    h2->streams = NULL;
+    h2->streams_tail = NULL;
+  }
+  else
+  {
+    if (stream->prev != NULL)
+      stream->prev->next = stream->next;
+    if (stream->next != NULL)
+      stream->next->prev = stream->prev;
+  }
+
+  if (h2->streams == stream)
+  {
+    h2->streams = stream->next;
+  }
+
+  if (h2->streams_tail == stream)
+  {
+    h2->streams_tail = stream->prev;
   }
 }
 
 
 /**
+ * Create a new stream structure and add it to the session.
  *
- *
- * @param h2
- * @param stream_data
+ * @param h2 HTTP/2 session
+ * @param stream_id stream identifier
  */
-static struct http2_stream_data*
-create_http2_stream_data (struct http2_conn *h2, int32_t stream_id)
+static struct http2_stream*
+create_http2_stream (struct http2_conn *h2,
+                     int32_t stream_id)
 {
-  struct http2_stream_data *stream_data;
-  stream_data = malloc ( sizeof (struct http2_stream_data));
-  if (NULL == stream_data)
-    {
-      return NULL;
-    }
-  memset (stream_data, 0, sizeof (struct http2_stream_data));
-  stream_data->stream_id = stream_id;
+  struct http2_stream *stream;
+  stream = calloc(1, sizeof(struct http2_stream));
+  if (NULL == stream)
+  {
+    return NULL;
+  }
 
-  add_stream (h2, stream_data);
-  return stream_data;
+  stream->stream_id = stream_id;
+  h2->num_streams++;
+  add_stream (h2, stream);
+  return stream;
 }
 
 /**
+ * Delete a stream from HTTP/2 session.
  *
- *
- * @param stream_data
+ * @param h2 HTTP/2 session
+ * @param stream stream to remove from the session
  */
 static void
-delete_http2_stream_data (struct http2_stream_data *stream_data)
+delete_http2_stream (struct http2_conn *h2,
+                     struct http2_stream *stream)
 {
-  free (stream_data);
+  mhd_assert(h2->num_streams > 0);
+  h2->num_streams--;
+  remove_stream (h2, stream);
+  free (stream);
 }
 
 
@@ -150,40 +188,40 @@ send_response(nghttp2_session *session, int32_t stream_id,
 static int
 on_request_recv(nghttp2_session *session,
                            struct http2_conn *h2,
-                           struct http2_stream_data *stream_data)
+                           struct http2_stream *stream)
 {
   int fd;
   nghttp2_nv hdrs[] = {MAKE_NV(":status", "200")};
   char *rel_path;
   ENTER();
 
-  // if (!stream_data->request_path) {
-  //   if (error_reply(session, stream_data) != 0) {
+  // if (!stream->request_path) {
+  //   if (error_reply(session, stream) != 0) {
   //     return NGHTTP2_ERR_CALLBACK_FAILURE;
   //   }
   //   return 0;
   // }
   // fprintf(stderr, "%s GET %s\n", h2->client_addr,
-  //         stream_data->request_path);
-  // if (!check_path(stream_data->request_path)) {
-  //   if (error_reply(session, stream_data) != 0) {
+  //         stream->request_path);
+  // if (!check_path(stream->request_path)) {
+  //   if (error_reply(session, stream) != 0) {
   //     return NGHTTP2_ERR_CALLBACK_FAILURE;
   //   }
   //   return 0;
   // }
-  // for (rel_path = stream_data->request_path; *rel_path == '/'; ++rel_path)
+  // for (rel_path = stream->request_path; *rel_path == '/'; ++rel_path)
   //   ;
   // fd = open(rel_path, O_RDONLY);
   // if (fd == -1) {
-  //   if (error_reply(session, stream_data) != 0) {
+  //   if (error_reply(session, stream) != 0) {
   //     return NGHTTP2_ERR_CALLBACK_FAILURE;
   //   }
   //   return 0;
   // }
-  // stream_data->fd = fd;
+  // stream->fd = fd;
   //
   char *page = "<html><head><title>libmicrohttpd demo</title></head><body>libmicrohttpd demo</body></html>\n";
-  if (send_response(session, stream_data->stream_id, hdrs, ARRLEN(hdrs), page) !=
+  if (send_response(session, stream->stream_id, hdrs, ARRLEN(hdrs), page) !=
       0) {
     close(fd);
     return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -198,21 +236,21 @@ on_frame_recv_callback(nghttp2_session *session,
                                   const nghttp2_frame *frame, void *user_data)
 {
   struct http2_conn *h2 = (struct http2_conn *) user_data;
-  struct http2_stream_data *stream_data;
+  struct http2_stream *stream;
   ENTER("frame->hd.type %s", FRAME_TYPE(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_DATA:
   case NGHTTP2_HEADERS:
     /* Check that the client request has finished */
     if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-      stream_data =
+      stream =
           nghttp2_session_get_stream_user_data(session, frame->hd.stream_id);
       /* For DATA and HEADERS frame, this callback may be called after
          on_stream_close_callback. Check that stream still alive. */
-      if (!stream_data) {
+      if (!stream) {
         return 0;
       }
-      return on_request_recv(session, h2, stream_data);
+      return on_request_recv(session, h2, stream);
     }
     break;
   default:
@@ -225,16 +263,16 @@ static int on_begin_headers_callback(nghttp2_session *session,
                                      const nghttp2_frame *frame,
                                      void *user_data) {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
-  struct http2_stream_data *stream_data;
+  struct http2_stream *stream;
   ENTER();
 
   if (frame->hd.type != NGHTTP2_HEADERS ||
       frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
     return 0;
   }
-  stream_data = create_http2_stream_data(h2, frame->hd.stream_id);
+  stream = create_http2_stream(h2, frame->hd.stream_id);
   nghttp2_session_set_stream_user_data(session, frame->hd.stream_id,
-                                       stream_data);
+                                       stream);
   return 0;
 }
 
@@ -244,7 +282,7 @@ static int on_header_callback(nghttp2_session *session,
                               const nghttp2_frame *frame, const uint8_t *name,
                               size_t namelen, const uint8_t *value,
                               size_t valuelen, uint8_t flags, void *user_data) {
-  struct http2_stream_data *stream_data;
+  struct http2_stream *stream;
   const char PATH[] = ":path";
   (void)flags;
   (void)user_data;
@@ -255,16 +293,16 @@ static int on_header_callback(nghttp2_session *session,
     if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
       break;
     }
-    stream_data =
+    stream =
         nghttp2_session_get_stream_user_data(session, frame->hd.stream_id);
-    // if (!stream_data || stream_data->request_path) {
+    // if (!stream || stream->request_path) {
     //   break;
     // }
     // if (namelen == sizeof(PATH) - 1 && memcmp(PATH, name, namelen) == 0) {
     //   size_t j;
     //   for (j = 0; j < valuelen && value[j] != '?'; ++j)
     //     ;
-    //   stream_data->request_path = percent_decode(value, j);
+    //   stream->request_path = percent_decode(value, j);
     // }
     break;
   }
@@ -276,16 +314,15 @@ on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
                                     uint32_t error_code, void *user_data)
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
-  struct http2_stream_data *stream_data;
+  struct http2_stream *stream;
   (void)error_code;
   ENTER();
 
-  stream_data = nghttp2_session_get_stream_user_data(session, stream_id);
-  if (!stream_data) {
+  stream = nghttp2_session_get_stream_user_data(session, stream_id);
+  if (!stream) {
     return 0;
   }
-  remove_stream(h2, stream_data);
-  delete_http2_stream_data(stream_data);
+  delete_http2_stream (h2, stream);
   return 0;
 }
 
@@ -457,21 +494,19 @@ http2_session_recv(struct MHD_Connection *connection)
 void
 MHD_http2_session_delete (struct MHD_Connection *connection)
 {
-  ENTER();
   struct http2_conn *h2 = connection->h2;
-  struct http2_stream_data *stream_data;
+  struct http2_stream *stream;
 
   if (h2 == NULL) return;
 
-  nghttp2_session_del (h2->session);
-
-  for (stream_data = h2->head.next; stream_data; )
+  for (stream = h2->streams; h2->num_streams > 0 && stream != NULL; )
   {
-      struct http2_stream_data *next = stream_data->next;
-      delete_http2_stream_data (stream_data);
-      stream_data = next;
+      struct http2_stream *next = stream->next;
+      delete_http2_stream (h2, stream);
+      stream = next;
   }
 
+  nghttp2_session_del (h2->session);
   free (h2);
   connection->h2 = NULL;
 }

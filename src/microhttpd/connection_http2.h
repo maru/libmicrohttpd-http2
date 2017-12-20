@@ -35,12 +35,33 @@
 #include <nghttp2/nghttp2.h>
 #endif /* USE_NGHTTP2 */
 
-struct http2_stream_data
+
+/**
+ * HTTP/2 stream.
+ */
+struct http2_stream
 {
-  struct http2_stream_data *prev, *next;
+
+  /**
+   * Next stream in the streams list.
+   */
+  struct http2_stream *next;
+
+  /**
+   * Previous stream in the streams list.
+   */
+  struct http2_stream *prev;
+
+  /**
+   * Identifier.
+   */
   int32_t stream_id;
+
 };
 
+/**
+ * Session for an HTTP/2 connection.
+ */
 struct http2_conn
 {
   /**
@@ -74,14 +95,19 @@ struct http2_conn
   size_t settings_len;
 
   /**
-   * Head of doubly-linked list of current, active streams.
+   * Head of doubly linked list of current, active streams.
    */
-  struct http2_stream_data head;
+  struct http2_stream *streams;
 
   /**
-   * Tail of doubly-linked list of current, active streams.
+   * Tail of doubly linked list of current, active streams.
    */
-  struct http2_stream_data *tail;
+  struct http2_stream *streams_tail;
+
+  /**
+   * Number of streams in a session.
+   */
+  size_t num_streams;
 
 };
 

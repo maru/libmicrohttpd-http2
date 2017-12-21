@@ -43,6 +43,10 @@
         NGHTTP2_NV_FLAG_NONE                                                   \
   }
 
+/* ================================================================ */
+/*                         Stream operations                        */
+/* ================================================================ */
+
 /**
  * Add a stream to the end of the stream list.
  *
@@ -97,9 +101,13 @@ remove_stream (struct http2_conn *h2,
   else
   {
     if (stream->prev != NULL)
+    {
       stream->prev->next = stream->next;
+    }
     if (stream->next != NULL)
+    {
       stream->next->prev = stream->prev;
+    }
   }
 
   if (h2->streams == stream)
@@ -119,9 +127,10 @@ remove_stream (struct http2_conn *h2,
  *
  * @param h2 HTTP/2 session
  * @param stream_id stream identifier
+ * @return new stream, NULL if error.
  */
 static struct http2_stream*
-create_http2_stream (struct http2_conn *h2,
+http2_stream_create (struct http2_conn *h2,
                      int32_t stream_id)
 {
   struct http2_stream *stream;
@@ -137,6 +146,7 @@ create_http2_stream (struct http2_conn *h2,
   return stream;
 }
 
+
 /**
  * Delete a stream from HTTP/2 session.
  *
@@ -144,7 +154,7 @@ create_http2_stream (struct http2_conn *h2,
  * @param stream stream to remove from the session
  */
 static void
-delete_http2_stream (struct http2_conn *h2,
+http2_stream_delete (struct http2_conn *h2,
                      struct http2_stream *stream)
 {
   mhd_assert(h2->num_streams > 0);
@@ -154,6 +164,22 @@ delete_http2_stream (struct http2_conn *h2,
 }
 
 
+/* ================================================================ */
+/*                             Callbacks                            */
+/* ================================================================ */
+
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static ssize_t str_read_callback(nghttp2_session *session,
                                  int32_t stream_id, uint8_t *buf,
                                  size_t length, uint32_t *data_flags,
@@ -166,6 +192,16 @@ static ssize_t str_read_callback(nghttp2_session *session,
 }
 
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static int
 send_response(nghttp2_session *session, int32_t stream_id,
                          nghttp2_nv *nva, size_t nvlen, void *ptr)
@@ -185,6 +221,14 @@ send_response(nghttp2_session *session, int32_t stream_id,
 }
 
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static int
 on_request_recv(nghttp2_session *session,
                            struct http2_conn *h2,
@@ -231,6 +275,14 @@ on_request_recv(nghttp2_session *session,
 
 #define FRAME_TYPE(x) (x==NGHTTP2_DATA?"DATA":(x==NGHTTP2_HEADERS?"HEADERS":(x==NGHTTP2_PRIORITY?"PRIORITY":(x==NGHTTP2_RST_STREAM?"RST_STREAM":(x==NGHTTP2_SETTINGS?"SETTINGS":(x==NGHTTP2_PUSH_PROMISE?"PUSH_PROMISE":(x==NGHTTP2_PING?"PING":(x==NGHTTP2_GOAWAY?"GOAWAY":(x==NGHTTP2_WINDOW_UPDATE?"WINDOW_UPDATE":(x==NGHTTP2_CONTINUATION?"CONTINUATION":(x==NGHTTP2_ALTSVC?"ALTSVC":"-")))))))))))
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static int
 on_frame_recv_callback(nghttp2_session *session,
                                   const nghttp2_frame *frame, void *user_data)
@@ -259,6 +311,14 @@ on_frame_recv_callback(nghttp2_session *session,
   return 0;
 }
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static int on_begin_headers_callback(nghttp2_session *session,
                                      const nghttp2_frame *frame,
                                      void *user_data) {
@@ -270,12 +330,30 @@ static int on_begin_headers_callback(nghttp2_session *session,
       frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
     return 0;
   }
-  stream = create_http2_stream(h2, frame->hd.stream_id);
+  stream = http2_stream_create(h2, frame->hd.stream_id);
+  if (stream == NULL)
+  {
+    // Out of memory.
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
+  }
   nghttp2_session_set_stream_user_data(session, frame->hd.stream_id,
                                        stream);
   return 0;
 }
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 /* nghttp2_on_header_callback: Called when nghttp2 library emits
    single header name/value pair. */
 static int on_header_callback(nghttp2_session *session,
@@ -309,6 +387,15 @@ static int on_header_callback(nghttp2_session *session,
   return 0;
 }
 
+/**
+ *
+ *
+ * @param
+ * @param
+ * @param
+ * @param
+ * @return
+ */
 static int
 on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
                                     uint32_t error_code, void *user_data)
@@ -322,7 +409,7 @@ on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
   if (!stream) {
     return 0;
   }
-  delete_http2_stream (h2, stream);
+  http2_stream_delete (h2, stream);
   return 0;
 }
 
@@ -371,9 +458,10 @@ send_callback(nghttp2_session *session, const uint8_t *data,
  * Set local session settings and callbacks.
  *
  * @param connection connection of the session
+ * @return
  */
 static int
-http2_init_session (struct MHD_Connection *connection)
+http2_session_init (struct MHD_Connection *connection)
 {
   mhd_assert(connection != NULL && connection->daemon != NULL);
 
@@ -427,6 +515,12 @@ http2_init_session (struct MHD_Connection *connection)
 
 
 
+/**
+ *
+ *
+ * @param h2
+ * @return
+ */
 /* Serialize the frame and send (or buffer) the data to
    bufferevent. */
 static int
@@ -442,6 +536,12 @@ http2_session_send(struct http2_conn *h2)
   return 0;
 }
 
+/**
+ * Read data from input buffer and
+ *
+ * @param connection
+ * @return
+ */
 /* Read the data in the bufferevent and feed them into nghttp2 library
    function. Invocation of nghttp2_session_mem_recv() may make
    additional pending frames, so call session_send() at the end of the
@@ -502,7 +602,7 @@ MHD_http2_session_delete (struct MHD_Connection *connection)
   for (stream = h2->streams; h2->num_streams > 0 && stream != NULL; )
   {
       struct http2_stream *next = stream->next;
-      delete_http2_stream (h2, stream);
+      http2_stream_delete (h2, stream);
       stream = next;
   }
 
@@ -515,9 +615,10 @@ MHD_http2_session_delete (struct MHD_Connection *connection)
  * Send HTTP/2 server connection preface.
  *
  * @param connection connection to handle
+ * @return
  */
 int
-http2_send_preface (struct http2_conn *h2)
+http2_session_send_preface (struct http2_conn *h2)
 {
   int rv;
   ENTER();
@@ -547,7 +648,7 @@ http2_send_preface (struct http2_conn *h2)
  *         #MHD_NO otherwise, connection must be closed.
  */
 int
-MHD_http2_session_init (struct MHD_Connection *connection)
+MHD_http2_session_start (struct MHD_Connection *connection)
 {
   int rv;
   mhd_assert(connection->h2 == NULL);
@@ -558,7 +659,7 @@ MHD_http2_session_init (struct MHD_Connection *connection)
   }
 
   /* Create session and fill callbacks */
-  rv = http2_init_session (connection);
+  rv = http2_session_init (connection);
   if (rv != 0)
   {
     MHD_http2_session_delete (connection);
@@ -566,7 +667,7 @@ MHD_http2_session_init (struct MHD_Connection *connection)
   }
 
   /* Send server preface */
-  rv = http2_send_preface (connection->h2);
+  rv = http2_session_send_preface (connection->h2);
   if (rv == MHD_NO)
   {
     MHD_http2_session_delete (connection);
@@ -615,7 +716,6 @@ http2_handle_write (struct MHD_Connection *connection)
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
     return;
   }
-
 }
 
 

@@ -2855,7 +2855,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
   if ( (MHD_CONNECTION_INIT == connection->state) &&
        (connection->http_version == HTTP_VERSION(2, 0)) )
     {
-      if (MHD_YES != MHD_http2_session_init (connection))
+      if (MHD_YES != MHD_http2_session_start (connection))
         {
           /* Error, close connection */
           CONNECTION_CLOSE_ERROR (connection,

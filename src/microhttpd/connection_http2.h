@@ -119,7 +119,7 @@ struct http2_conn
  * @param connection connection to handle
  */
 int
-MHD_http2_session_init (struct MHD_Connection *connection);
+MHD_http2_session_start (struct MHD_Connection *connection);
 
 
 /**

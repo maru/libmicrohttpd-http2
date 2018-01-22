@@ -77,6 +77,20 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state)
       return "footers sent";
     case MHD_CONNECTION_CLOSED:
       return "closed";
+#ifdef HTTP2_SUPPORT
+    case MHD_CONNECTION_HTTP2_INIT:
+      return "http2 init";
+    case MHD_CONNECTION_HTTP2_OPEN:
+      return "http2 open";
+    case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
+      return "http2 closed remote";
+    case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:
+      return "http2 closed local";
+    case MHD_CONNECTION_HTTP2_CLOSED:
+      return "http2 closed";
+    case MHD_CONNECTION_HTTP2_IN_CLEANUP:
+      return "http2 in cleanup";
+#endif /* HTTP2_SUPPORT */
     default:
       return "unrecognized connection state";
     }

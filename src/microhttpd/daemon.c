@@ -54,7 +54,7 @@
 
 #ifdef HTTP2_SUPPORT
 #include "connection_http2.h"
-#define ENTER(format, args...) fprintf(stderr, "\e[35;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
+#define ENTER(format, args...) fprintf(stderr, "\e[33;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
 #endif /* HTTP2_SUPPORT */
 
 #if defined(_WIN32) && ! defined(__CYGWIN__)
@@ -2433,6 +2433,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
       /* set HTTP/2 connection handlers  */
       MHD_set_http2_callbacks (connection);
       connection->http_version = HTTP_VERSION(2, 0);
+      connection->state = MHD_CONNECTION_HTTP2_INIT;
     }
   else
     {

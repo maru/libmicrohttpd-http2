@@ -528,8 +528,42 @@ enum MHD_CONNECTION_STATE
    * Connection was "upgraded" and socket is now under the
    * control of the application.
    */
-  MHD_CONNECTION_UPGRADE
+  MHD_CONNECTION_UPGRADE,
 #endif /* UPGRADE_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+  /** States in a state machine for an HTTP/2 connection. **/
+
+  /**
+   * Connection just started (no preface sent or received).
+   */
+  MHD_CONNECTION_HTTP2_INIT = 128,
+
+  /**
+   * Client and server preface exchanged.
+   */
+  MHD_CONNECTION_HTTP2_OPEN,
+
+  /**
+   * Client sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_REMOTE,
+
+  /**
+   * Server sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_LOCAL,
+
+  /**
+   * Connection closed.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED,
+
+  /**
+   * This connection is finished (only to be freed)
+   */
+  MHD_CONNECTION_HTTP2_IN_CLEANUP,
+#endif /* HTTP2_SUPPORT */
 
 };
 
@@ -597,8 +631,10 @@ typedef ssize_t
  * Function used for reading data from the socket.
  *
  * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
  */
-typedef void
+typedef int
 (*ConnectionReadCallback) (struct MHD_Connection *conn);
 
 /**
@@ -615,8 +651,10 @@ typedef int
  * Function used for writing data to the socket.
  *
  * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
  */
-typedef void
+typedef int
 (*ConnectionWriteCallback) (struct MHD_Connection *conn);
 #endif /* HTTP2_SUPPORT */
 

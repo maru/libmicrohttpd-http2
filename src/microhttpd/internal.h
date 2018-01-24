@@ -626,39 +626,6 @@ typedef ssize_t
                      size_t max_bytes);
 
 
-#ifdef HTTP2_SUPPORT
-/**
- * Function used for reading data from the socket.
- *
- * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
- */
-typedef int
-(*ConnectionReadCallback) (struct MHD_Connection *conn);
-
-/**
- * Function used for data processing.
- *
- * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
- */
-typedef int
-(*ConnectionIdleCallback) (struct MHD_Connection *conn);
-
-/**
- * Function used for writing data to the socket.
- *
- * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
- */
-typedef int
-(*ConnectionWriteCallback) (struct MHD_Connection *conn);
-#endif /* HTTP2_SUPPORT */
-
-
 /**
  * Ability to use same connection for next request
  */
@@ -1080,21 +1047,6 @@ struct MHD_Connection
   int http_version;
 
 #ifdef HTTP2_SUPPORT
-
-  /**
-   * Function used for reading data from the socket.
-   */
-  ConnectionReadCallback read_cls;
-
-  /**
-   * Function used for data processing.
-   */
-  ConnectionIdleCallback idle_cls;
-
-  /**
-   * Function used for writing data to the socket.
-   */
-  ConnectionWriteCallback write_cls;
 
   /**
    * HTTP/2 connection details

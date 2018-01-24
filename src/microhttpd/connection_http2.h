@@ -55,7 +55,105 @@ struct http2_stream
   /**
    * Identifier.
    */
-  int32_t stream_id;
+  size_t stream_id;
+
+  /**
+   * Linked list of parsed headers.
+   */
+  struct MHD_HTTP_Header *headers_received;
+
+  /**
+   * Tail of linked list of parsed headers.
+   */
+  struct MHD_HTTP_Header *headers_received_tail;
+
+  /**
+   * Response to transmit (initially NULL).
+   */
+  struct MHD_Response *response;
+
+  /**
+   * The memory pool is created whenever we first read from the TCP
+   * stream and destroyed at the end of each request (and re-created
+   * for the next request).  In the meantime, this pointer is NULL.
+   * The pool is used for all connection-related data except for the
+   * response (which maybe shared between connections) and the IP
+   * address (which persists across individual requests).
+   */
+  struct MemoryPool *pool;
+
+  /**
+   * We allow the main application to associate some pointer with the
+   * HTTP request, which is passed to each #MHD_AccessHandlerCallback
+   * and some other API calls.  Here is where we store it.  (MHD does
+   * not know or care what it is).
+   */
+  void *client_context;
+
+  /**
+   * Request method.  Should be GET/POST/etc.
+   */
+  char *method;
+
+  /**
+   * Requested URL.
+   */
+  char *url;
+
+  /**
+   * Buffer for reading requests.  Allocated in pool.  Actually one
+   * byte larger than @e read_buffer_size (if non-NULL) to allow for
+   * 0-termination.
+   */
+  char *read_buffer;
+
+  /**
+   * Buffer for writing response (headers only).  Allocated
+   * in pool.
+   */
+  char *write_buffer;
+
+  /**
+   * Number of bytes we had in the HTTP header, set once we
+   * pass #MHD_CONNECTION_HEADERS_RECEIVED.
+   */
+  size_t header_size;
+
+  /**
+   * Did we ever call the "default_handler" on this stream?  (this
+   * flag will determine if we call the #MHD_OPTION_NOTIFY_COMPLETED
+   * handler when the connection closes down).
+   */
+  bool client_aware;
+
+  /**
+   * HTTP response code.  Only valid if response object
+   * is already set.
+   */
+  unsigned int responseCode;
+
+  /**
+   * Are we receiving with chunked encoding?  This will be set to
+   * #MHD_YES after we parse the headers and are processing the body
+   * with chunks.  After we are done with the body and we are
+   * processing the footers; once the footers are also done, this will
+   * be set to #MHD_NO again (before the final call to the handler).
+   */
+  bool have_chunked_upload;
+
+  /**
+   * If we are receiving with chunked encoding, where are we right
+   * now?  Set to 0 if we are waiting to receive the chunk size;
+   * otherwise, this is the size of the current chunk.  A value of
+   * zero is also used when we're at the end of the chunks.
+   */
+  uint64_t current_chunk_size;
+
+  /**
+   * If we are receiving with chunked encoding, where are we currently
+   * with respect to the current chunk (at what offset / position)?
+   */
+  uint64_t current_chunk_offset;
 
 };
 
@@ -70,19 +168,14 @@ struct http2_conn
   nghttp2_session *session;
 
   /**
+   * Identifier.
+   */
+  size_t session_id;
+
+  /**
    * Pointer to connection.
    */
   struct MHD_Connection *connection;
-
-  /**
-   * Callback invoked to receive data from remote peer.
-   */
-  ReceiveCallback recv_cls;
-
-  /**
-  * Callback invoked to send data to remote peer.
-   */
-  TransmitCallback send_cls;
 
   /**
    * Session settings.
@@ -123,6 +216,39 @@ MHD_http2_session_start (struct MHD_Connection *connection);
 
 
 /**
+ * Function used for reading data from the socket.
+ *
+ * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+int
+MHD_http2_handle_read (struct MHD_Connection *connection);
+
+
+/**
+ * Function used for writing data to the socket.
+ *
+ * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+int
+MHD_http2_handle_write (struct MHD_Connection *connection);
+
+
+/**
+ * Function used for data processing.
+ *
+ * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+int
+MHD_http2_handle_idle (struct MHD_Connection *connection);
+
+
+/**
  * Delete HTTP2 structures.
  *
  * @param connection connection to handle
@@ -130,15 +256,6 @@ MHD_http2_session_start (struct MHD_Connection *connection);
 void
 MHD_http2_session_delete (struct MHD_Connection *connection);
 
-
-/**
- * Set HTTP/2 read/idle/write callbacks for this connection.
- * Handle data from/to socket.
- *
- * @param connection connection to initialize
- */
-void
-MHD_set_http2_callbacks (struct MHD_Connection *connection);
 
 #endif /* HTTP2_SUPPORT */
 

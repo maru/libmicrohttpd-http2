@@ -43,6 +43,8 @@
         NGHTTP2_NV_FLAG_NONE                                                   \
   }
 
+static size_t num_sessions = 0;
+
 /* ================================================================ */
 /*                         Stream operations                        */
 /* ================================================================ */
@@ -184,7 +186,8 @@ static ssize_t str_read_callback(nghttp2_session *session,
                                  int32_t stream_id, uint8_t *buf,
                                  size_t length, uint32_t *data_flags,
                                  nghttp2_data_source *source,
-                                 void *user_data) {
+                                 void *user_data)
+{
   ssize_t len = strlen(source->ptr);
   memcpy(buf, source->ptr, len);
   *data_flags |= NGHTTP2_DATA_FLAG_EOF;
@@ -210,7 +213,6 @@ send_response(nghttp2_session *session, int32_t stream_id,
   nghttp2_data_provider data_prd;
   data_prd.source.ptr = ptr;
   data_prd.read_callback = str_read_callback;
-  ENTER();
 
   rv = nghttp2_submit_response(session, stream_id, nva, nvlen, &data_prd);
   if (rv != 0) {
@@ -220,6 +222,36 @@ send_response(nghttp2_session *session, int32_t stream_id,
   return 0;
 }
 
+
+/**
+ * Call the handler of the application for this
+ * connection.  Handles chunking of the upload
+ * as well as normal uploads.
+ *
+ * @param connection connection we are processing
+ * @param stream     stream we are processing
+ */
+static void
+http2_call_connection_handler (struct MHD_Connection *connection, struct http2_stream *stream)
+{
+  size_t processed;
+
+  if (NULL != stream->response)
+    return;                     /* already queued a response */
+  processed = 0;
+  stream->client_aware = true;
+  if (MHD_NO ==
+      connection->daemon->default_handler (connection->daemon->default_handler_cls,
+					   connection, stream->url, stream->method, MHD_HTTP_VERSION_2_0,
+             /* upload_data */ NULL, &processed,
+					   &stream->client_context))
+    {
+      /* serious internal error, close connection */
+      connection_close_error (connection,
+			      _("Application reported internal error, closing connection.\n"));
+      return;
+    }
+}
 
 /**
  *
@@ -239,31 +271,8 @@ on_request_recv(nghttp2_session *session,
   char *rel_path;
   ENTER();
 
-  // if (!stream->request_path) {
-  //   if (error_reply(session, stream) != 0) {
-  //     return NGHTTP2_ERR_CALLBACK_FAILURE;
-  //   }
-  //   return 0;
-  // }
-  // fprintf(stderr, "%s GET %s\n", h2->client_addr,
-  //         stream->request_path);
-  // if (!check_path(stream->request_path)) {
-  //   if (error_reply(session, stream) != 0) {
-  //     return NGHTTP2_ERR_CALLBACK_FAILURE;
-  //   }
-  //   return 0;
-  // }
-  // for (rel_path = stream->request_path; *rel_path == '/'; ++rel_path)
-  //   ;
-  // fd = open(rel_path, O_RDONLY);
-  // if (fd == -1) {
-  //   if (error_reply(session, stream) != 0) {
-  //     return NGHTTP2_ERR_CALLBACK_FAILURE;
-  //   }
-  //   return 0;
-  // }
-  // stream->fd = fd;
-  //
+  http2_call_connection_handler (h2->connection, stream);
+  return 0;
   char *page = "<html><head><title>libmicrohttpd demo</title></head><body>libmicrohttpd demo</body></html>\n";
   if (send_response(session, stream->stream_id, hdrs, ARRLEN(hdrs), page) !=
       0) {
@@ -289,7 +298,7 @@ on_frame_recv_callback(nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *) user_data;
   struct http2_stream *stream;
-  ENTER("frame->hd.type %s", FRAME_TYPE(frame->hd.type));
+  ENTER("[id=%d] frame->hd.type %s", h2->session_id, FRAME_TYPE(frame->hd.type));
   switch (frame->hd.type) {
   case NGHTTP2_DATA:
   case NGHTTP2_HEADERS:
@@ -324,7 +333,7 @@ static int on_begin_headers_callback(nghttp2_session *session,
                                      void *user_data) {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  ENTER();
+  ENTER("[id=%d]", h2->session_id);
 
   if (frame->hd.type != NGHTTP2_HEADERS ||
       frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
@@ -359,30 +368,40 @@ static int on_begin_headers_callback(nghttp2_session *session,
 static int on_header_callback(nghttp2_session *session,
                               const nghttp2_frame *frame, const uint8_t *name,
                               size_t namelen, const uint8_t *value,
-                              size_t valuelen, uint8_t flags, void *user_data) {
-  struct http2_stream *stream;
-  const char PATH[] = ":path";
+                              size_t valuelen, uint8_t flags, void *user_data)
+{
   (void)flags;
-  (void)user_data;
-  ENTER();
+  struct http2_conn *h2 = (struct http2_conn *)user_data;
+
+  char buf[10000]; int j = 0;
+  for (int i = 0; i < namelen; i++) {
+    buf[j++] = name[i];
+  }
+  buf[j++] = ' ';
+  for (int i = 0; i < valuelen; i++) {
+    buf[j++] = value[i];
+  }
+  buf[j++] = '\0';
+  ENTER("%s", buf);
 
   switch (frame->hd.type) {
   case NGHTTP2_HEADERS:
     if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
       break;
     }
-    stream =
+    struct http2_stream *stream =
         nghttp2_session_get_stream_user_data(session, frame->hd.stream_id);
-    // if (!stream || stream->request_path) {
-    //   break;
-    // }
-    // if (namelen == sizeof(PATH) - 1 && memcmp(PATH, name, namelen) == 0) {
-    //   size_t j;
-    //   for (j = 0; j < valuelen && value[j] != '?'; ++j)
-    //     ;
-    //   stream->request_path = percent_decode(value, j);
-    // }
+
+    if (namelen == 7 && memcmp(name, ":method", namelen) == 0) {
+      stream->method = malloc(valuelen+1);
+      strncpy(stream->method, value, valuelen);
+    } else if (namelen == 5 && memcmp(name, ":path", namelen) == 0) {
+      stream->url = malloc(valuelen+1);
+      strncpy(stream->url, value, valuelen);
+    }
+
     break;
+  default: mhd_assert(0);
   }
   return 0;
 }
@@ -403,7 +422,7 @@ on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
   (void)error_code;
-  ENTER();
+  ENTER("[id=%d]", h2->session_id);
 
   stream = nghttp2_session_get_stream_user_data(session, stream_id);
   if (!stream) {
@@ -436,11 +455,12 @@ send_callback(nghttp2_session *session, const uint8_t *data,
   const struct http2_conn *h2 = (struct http2_conn *) user_data;
   (void) session;
   (void) flags;
-  ENTER();
 
   mhd_assert(h2 != NULL);
   mhd_assert(length > 0);
-  const ssize_t ret = h2->send_cls (h2->connection, data, length);
+  struct MHD_Connection *connection = h2->connection;
+  const ssize_t ret = connection->send_cls (connection, data, length);
+  ENTER("[id=%d] ret=%d", h2->session_id, ret);
   if (ret < 0)
   {
     if (ret == MHD_ERR_AGAIN_)
@@ -468,14 +488,14 @@ http2_session_init (struct MHD_Connection *connection)
   struct http2_conn *h2 = connection->h2;
   mhd_assert(h2 != NULL);
 
+  h2->session_id = num_sessions++;
+
   /* Set initial local session settings */
   h2->settings = connection->daemon->h2_settings;
   h2->settings_len = connection->daemon->h2_settings_len;
 
-  /* Set recv and send callbacks */
+  /* Set reference to connection */
   h2->connection = connection;
-  h2->recv_cls = connection->recv_cls;
-  h2->send_cls = connection->send_cls;
 
   int rv;
   nghttp2_session_callbacks *callbacks;
@@ -526,7 +546,7 @@ http2_session_init (struct MHD_Connection *connection)
 static int
 http2_session_send(struct http2_conn *h2)
 {
-  ENTER();
+  ENTER("[id=%d]", h2->session_id);
   int rv;
   rv = nghttp2_session_send(h2->session);
   if (rv != 0) {
@@ -549,18 +569,20 @@ http2_session_send(struct http2_conn *h2)
 static int
 http2_session_recv(struct MHD_Connection *connection)
 {
-  ENTER();
-  ssize_t readlen;
-
   mhd_assert(connection);
-  if (0 == connection->read_buffer_offset)
-    return -1;
+  if (0 == connection->read_buffer_offset) {
+    return 0;
+  }
+
+  ssize_t readlen;
 
   struct http2_conn *h2 = connection->h2;
   size_t datalen = connection->read_buffer_offset;
   unsigned char *data = connection->read_buffer;
-  mhd_assert(data);
 
+  ENTER("[id=%d]", h2->session_id);
+
+  mhd_assert(data);
   mhd_assert(datalen <= connection->read_buffer_size);
   mhd_assert(datalen <= connection->read_buffer_offset);
 
@@ -568,20 +590,20 @@ http2_session_recv(struct MHD_Connection *connection)
   connection->read_buffer_size -= datalen;
   connection->read_buffer_offset -= datalen;
 
-  // for (int i = 0; i < datalen; i++) {
-  //   printf("%02X ", data[i]);
-  // } printf("\n");
-
   mhd_assert(h2 && h2->session);
   readlen = nghttp2_session_mem_recv (h2->session, data, datalen);
   if (readlen < 0) {
     warnx("Fatal error: %s", nghttp2_strerror((int)readlen));
     return -1;
   }
-  if (http2_session_send(h2) != 0) {
-    return -1;
-  }
-  return 0;
+  h2->connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+#ifdef EPOLL_SUPPORT
+  MHD_connection_epoll_update_ (h2->connection);
+#endif /* EPOLL_SUPPORT */
+// -  if (http2_session_send(h2) != 0) {
+// -    return -1;
+// -  }
+// -  return 0;
 }
 
 
@@ -609,6 +631,7 @@ MHD_http2_session_delete (struct MHD_Connection *connection)
   nghttp2_session_del (h2->session);
   free (h2);
   connection->h2 = NULL;
+  connection->state = MHD_CONNECTION_HTTP2_CLOSED;
 }
 
 /**
@@ -621,18 +644,13 @@ int
 http2_session_send_preface (struct http2_conn *h2)
 {
   int rv;
-  ENTER();
+  ENTER("[id=%d]", h2->session_id);
 
   rv = nghttp2_submit_settings (h2->session, NGHTTP2_FLAG_NONE,
                                 h2->settings, h2->settings_len);
   if (rv != 0)
   {
     ENTER("Fatal error: %s", nghttp2_strerror(rv));
-    return MHD_NO;
-  }
-
-  if (http2_session_send (h2) != 0)
-  {
     return MHD_NO;
   }
   return MHD_YES;
@@ -651,10 +669,14 @@ int
 MHD_http2_session_start (struct MHD_Connection *connection)
 {
   int rv;
-  mhd_assert(connection->h2 == NULL);
+  ENTER();
+  connection->state = MHD_CONNECTION_HTTP2_INIT;
+
+  if (connection->h2 != NULL) return MHD_YES;
   connection->h2 = calloc(1, sizeof(struct http2_conn));
   if (connection->h2 == NULL)
   {
+    connection->state = MHD_CONNECTION_HTTP2_CLOSED;
     return MHD_NO;
   }
 
@@ -674,6 +696,8 @@ MHD_http2_session_start (struct MHD_Connection *connection)
     return MHD_NO;
   }
 
+  connection->state = MHD_CONNECTION_HTTP2_OPEN;
+
   return MHD_YES;
 }
 
@@ -682,12 +706,79 @@ MHD_http2_session_start (struct MHD_Connection *connection)
  * Callback: invoked when there is data to be read from the connection.
  *
  * @param connection connection to handle
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
  */
-void
-http2_handle_read (struct MHD_Connection *connection)
+int
+MHD_http2_handle_read (struct MHD_Connection *connection)
 {
   ENTER();
-  /* MHD_connection_handle_read does all the work */
+  if (connection->state == MHD_CONNECTION_HTTP2_INIT)
+    {
+      return MHD_NO;
+    }
+
+  int rv;
+
+  for (;;) {
+    /* make sure "read" has a reasonable number of bytes
+       in buffer to use per system call (if possible) */
+    // if (connection->read_buffer_offset + connection->daemon->pool_increment >
+    //     connection->read_buffer_size)
+    //   try_grow_read_buffer (connection);
+
+    // if (connection->read_buffer_size == connection->read_buffer_offset) {
+    //   ENTER("No space");
+    //   exit(0);
+    //   return MHD_NO; /* No space for receiving data. */
+    // }
+
+    ssize_t bytes_read;
+    size_t read_buffer_size = 1 << 13;
+    uint8_t *read_buffer = (uint8_t *) malloc(read_buffer_size*sizeof(uint8_t));
+    bytes_read = connection->recv_cls (connection,
+                                       read_buffer,
+                                       read_buffer_size);
+ENTER("read %d", bytes_read);
+    if (bytes_read < 0)
+      {
+        if (MHD_ERR_AGAIN_ == bytes_read)
+            return MHD_NO; /* No new data to process. */
+        if (MHD_ERR_CONNRESET_ == bytes_read)
+          {
+             connection_close_error (connection,
+                                       _("Socket is unexpectedly disconnected when reading request.\n"));
+             return MHD_NO;
+          }
+        connection_close_error (connection,
+                                  _("Connection socket is closed due to unexpected error when reading request.\n"));
+        return MHD_NO;
+      }
+
+    if (0 == bytes_read)
+      { /* Remote side closed connection. */
+        connection->read_closed = true;
+        MHD_connection_close_ (connection,
+                               MHD_REQUEST_TERMINATED_CLIENT_ABORT);
+        return MHD_NO;
+      }
+
+    rv = nghttp2_session_mem_recv(connection->h2->session, read_buffer, bytes_read);
+    if (rv < 0) {
+      if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC) {
+        fprintf(stderr, "nghttp2_session_mem_recv() returned error: %d\n", nghttp2_strerror(rv));
+      }
+      connection_close_error (connection,
+                                _("Connection socket is closed due to unexpected error when parsing request.\n"));
+      return MHD_NO;
+    }
+    connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+  #ifdef EPOLL_SUPPORT
+    MHD_connection_epoll_update_ (connection);
+  #endif /* EPOLL_SUPPORT */
+    MHD_update_last_activity_ (connection);
+  }
+  return MHD_YES;
 }
 
 
@@ -695,11 +786,13 @@ http2_handle_read (struct MHD_Connection *connection)
  * Callback: invoked when there is data to be written to the connection.
  *
  * @param connection connection to handle
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
  */
-void
-http2_handle_write (struct MHD_Connection *connection)
+int
+MHD_http2_handle_write (struct MHD_Connection *connection)
 {
-  ENTER();
+  ENTER("connection->responseCode %d", connection->responseCode);
   struct http2_conn *h2 = connection->h2;
   mhd_assert(h2 != NULL);
 
@@ -708,14 +801,31 @@ http2_handle_write (struct MHD_Connection *connection)
   {
     MHD_http2_session_delete (connection);
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
-    return;
+    return MHD_NO;
   }
-  if (http2_session_send (h2) != 0)
+
+  ssize_t ret;
+  ret = http2_session_send (h2);
+  if (ret < 0)
   {
+    if (MHD_ERR_AGAIN_ == ret)
+      return MHD_NO;
     MHD_http2_session_delete (connection);
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-    return;
+    return MHD_NO;
   }
+  connection->write_buffer_send_offset += ret;
+  MHD_update_last_activity_ (connection);
+  if (1) // check_write_done (connection, MHD_CONNECTION_HTTP2_OPEN) == MHD_YES)
+  {
+    h2->connection->event_loop_info = MHD_EVENT_LOOP_INFO_READ;
+#ifdef EPOLL_SUPPORT
+    MHD_connection_epoll_update_ (h2->connection);
+#endif /* EPOLL_SUPPORT */
+  } else {
+    mhd_assert(0);
+  }
+  return MHD_YES;
 }
 
 
@@ -730,29 +840,20 @@ http2_handle_write (struct MHD_Connection *connection)
  *         connection (not dead yet), #MHD_NO if it died
  */
 int
-http2_handle_idle (struct MHD_Connection *connection)
+MHD_http2_handle_idle (struct MHD_Connection *connection)
 {
-  ENTER();
+  ENTER("enter: %d", connection->event_loop_info);
 
-  http2_session_recv (connection);
-
+  // if (0 != http2_session_recv (connection))
+  // {
+  //   MHD_http2_session_delete (connection);
+  //   MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+  //   return MHD_NO;
+  // }
+// ENTER("exit: %d", connection->event_loop_info);
   return MHD_YES;
 }
 
-
-/**
- * Set HTTP/2 read/idle/write callbacks for this connection.
- * Handle data from/to socket.
- *
- * @param connection connection to initialize
- */
-void
-MHD_set_http2_callbacks (struct MHD_Connection *connection)
-{
-  connection->read_cls = &http2_handle_read;
-  connection->idle_cls = &http2_handle_idle;
-  connection->write_cls = &http2_handle_write;
-}
 
 #endif /* HTTP2_SUPPORT */
 

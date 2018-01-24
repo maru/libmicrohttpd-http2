@@ -1032,7 +1032,7 @@ MHD_connection_finish_forward_ (struct MHD_Connection *connection)
  * @param connection connection to close with error
  * @param emsg error message (can be NULL)
  */
-static void
+void
 connection_close_error (struct MHD_Connection *connection,
 			const char *emsg)
 {
@@ -1803,7 +1803,7 @@ transmit_error_response (struct MHD_Connection *connection,
  *
  * @param connection connection to get poll set for
  */
-void
+static void
 MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 {
   /* Do not update states of suspended connection */
@@ -1953,20 +1953,25 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
           mhd_assert (0);
           break;
 #endif /* UPGRADE_SUPPORT */
+#ifdef HTTP2_SUPPORT
+        case MHD_CONNECTION_HTTP2_INIT:
+        case MHD_CONNECTION_HTTP2_OPEN:
+        case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
+        case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:
+          break;
+        case MHD_CONNECTION_HTTP2_CLOSED:
+    connection->event_loop_info = MHD_EVENT_LOOP_INFO_CLEANUP;
+          return;       /* do nothing, not even reading */
+        case MHD_CONNECTION_HTTP2_IN_CLEANUP:
+          mhd_assert (0);
+          break;
+#endif /* HTTP2_SUPPORT */
         default:
           mhd_assert (0);
         }
       break;
     }
 
-    #if DEBUG_STATES
-          MHD_DLOG (connection->daemon,
-                    _("In function %s handling connection at state: %s\n"),
-                    __FUNCTION__,
-                     (connection->event_loop_info==MHD_EVENT_LOOP_INFO_READ?"READ":
-                     (connection->event_loop_info==MHD_EVENT_LOOP_INFO_WRITE?"WRITE":
-                      connection->event_loop_info==MHD_EVENT_LOOP_INFO_BLOCK?"BLOCK":"CLEANUP")));
-    #endif
 }
 
 
@@ -2847,21 +2852,15 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
 
 #ifdef HTTP2_SUPPORT
-  ENTER();
-  /* This function should be called when the connection is added */
-  if ( (MHD_CONNECTION_INIT == connection->state) &&
-       (connection->http_version == HTTP_VERSION(2, 0)) )
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      if (MHD_YES != MHD_http2_session_start (connection))
+      MHD_http2_handle_read (connection);
+      if (connection->read_closed)
         {
-          /* Error, close connection */
-          CONNECTION_CLOSE_ERROR (connection,
-              _("Closing connection (failed to send server connection preface)\n"));
-          return;
+          MHD_connection_close_ (connection,
+                                 MHD_REQUEST_TERMINATED_READ_ERROR);
         }
-      /* Temporary fix to avoid resending the preface */
-      connection->state = MHD_CONNECTION_URL_RECEIVED;
-      MHD_update_last_activity_ (connection);
+      return;
     }
 #endif /* HTTP2_SUPPORT */
 
@@ -2887,13 +2886,13 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
            CONNECTION_CLOSE_ERROR (connection,
                                    (MHD_CONNECTION_INIT == connection->state) ?
                                      NULL :
-                                     _("Socket is unexpectedly disconnected when reading request.\n"));
+                                     _("Socket disconnected while reading request.\n"));
            return;
         }
       CONNECTION_CLOSE_ERROR (connection,
                               (MHD_CONNECTION_INIT == connection->state) ?
                                 NULL :
-                                _("Connection socket is closed due to unexpected error when reading request.\n"));
+                                _("Connection socket is closed due to error when reading request.\n"));
       return;
     }
 
@@ -2982,15 +2981,12 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
-  ENTER();
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      connection->write_cls (connection);
+      MHD_http2_handle_write (connection);
       return;
     }
-  else
 #endif /* HTTP2_SUPPORT */
-  {
 
   switch (connection->state)
     {
@@ -3195,7 +3191,6 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
                               _("Internal error\n"));
       break;
     }
-  }
   return;
 }
 
@@ -3306,7 +3301,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
-  ENTER();
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
       if (connection->state == MHD_CONNECTION_CLOSED)
@@ -3316,7 +3310,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           connection->in_idle = false;
           return MHD_NO;
         }
-      connection->idle_cls (connection);
+      MHD_http2_handle_idle (connection);
     }
   else
 #endif /* HTTP2_SUPPORT */
@@ -3858,62 +3852,6 @@ MHD_set_http_callbacks_ (struct MHD_Connection *connection)
 }
 
 
-#ifdef HTTP2_SUPPORT
-
-/**
- * There is data to be read off a socket.
- *
- * @param connection connection to handle
- */
-void
-http1_handle_read (struct MHD_Connection *connection)
-{
-}
-
-
-/**
- * Handle writes to sockets.
- *
- * @param connection connection to handle
- */
-void
-http1_handle_write (struct MHD_Connection *connection)
-{
-}
-
-
-/**
- * Handle per-connection processing.
- *
- * @param connection connection to handle
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
- */
-int
-http1_handle_idle (struct MHD_Connection *connection)
-{
-  int ret;
-  return ret;
-}
-
-
-/**
- * Set HTTP/1 read/idle/write callbacks for this connection.
- * Handle data from/to socket.
- *
- * @param connection connection to initialize
- */
-void
-MHD_set_http1_callbacks (struct MHD_Connection *connection)
-{
-  connection->read_cls = &http1_handle_read;
-  connection->idle_cls = &http1_handle_idle;
-  connection->write_cls = &http1_handle_write;
-}
-
-#endif /* ! HTTP2_SUPPORT */
-
-
 /**
  * Obtain information about the given connection.
  *
@@ -4055,7 +3993,8 @@ MHD_queue_response (struct MHD_Connection *connection,
   if ( (NULL == connection) ||
        (NULL == response) ||
        (NULL != connection->response) ||
-       ( (MHD_CONNECTION_HEADERS_PROCESSED != connection->state) &&
+       ( (connection->http_version < HTTP_VERSION(2, 0)) &&
+         (MHD_CONNECTION_HEADERS_PROCESSED != connection->state) &&
 	 (MHD_CONNECTION_FOOTERS_RECEIVED != connection->state) ) )
     return MHD_NO;
   daemon = connection->daemon;

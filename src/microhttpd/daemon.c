@@ -2422,23 +2422,24 @@ internal_add_connection (struct MHD_Daemon *daemon,
     }
 
 #ifdef HTTP2_SUPPORT
-  /* Set connection handlers  */
-  if ( (0 != (daemon->options & MHD_USE_HTTP2)) /* &&
-       (connection->http_version == HTTP_VERSION(2, 0)) */ )
+  /* Set http version  */
+  if (0 != (daemon->options & MHD_USE_HTTP2))
     {
-/*
- * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
- * only HTTP/2 connections will be handled.
- */
-      /* set HTTP/2 connection handlers  */
-      MHD_set_http2_callbacks (connection);
+      /*
+       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+       * only HTTP/2 connections will be handled.
+       */
       connection->http_version = HTTP_VERSION(2, 0);
-      connection->state = MHD_CONNECTION_HTTP2_INIT;
+      if (MHD_YES != MHD_http2_session_start (connection))
+      {
+        /* Error, close connection */
+        connection_close_error (connection,
+            _("Closing connection (failed to send server connection preface)\n"));
+        goto cleanup;
+      }
     }
   else
     {
-      /* set default HTTP/1 connection handlers  */
-      MHD_set_http1_callbacks (connection);
       connection->http_version = HTTP_VERSION(1, 1);
     }
 #endif /* ! HTTP2_SUPPORT */

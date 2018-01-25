@@ -2430,13 +2430,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
        * only HTTP/2 connections will be handled.
        */
       connection->http_version = HTTP_VERSION(2, 0);
-      if (MHD_YES != MHD_http2_session_start (connection))
-      {
-        /* Error, close connection */
-        connection_close_error (connection,
-            _("Closing connection (failed to send server connection preface)\n"));
-        goto cleanup;
-      }
+      connection->state = MHD_CONNECTION_HTTP2_INIT;
     }
   else
     {

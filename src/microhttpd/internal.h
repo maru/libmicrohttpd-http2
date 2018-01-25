@@ -595,6 +595,8 @@ enum MHD_TLS_CONN_STATE
 #if DEBUG_STATES
 const char *
 MHD_state_to_string (enum MHD_CONNECTION_STATE state);
+const char *
+MHD_event_state_to_string (enum MHD_ConnectionEventLoopInfo state);
 #endif
 #endif
 

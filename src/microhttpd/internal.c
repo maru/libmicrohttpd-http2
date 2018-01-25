@@ -95,6 +95,27 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state)
       return "unrecognized connection state";
     }
 }
+
+/**
+ * Event state to string dictionary.
+ */
+const char *
+MHD_event_state_to_string (enum MHD_ConnectionEventLoopInfo state)
+{
+  switch (state)
+    {
+    case MHD_EVENT_LOOP_INFO_READ:
+      return "READ";
+    case MHD_EVENT_LOOP_INFO_WRITE:
+      return "WRITE";
+    case MHD_EVENT_LOOP_INFO_BLOCK:
+      return "BLOCK";
+    case MHD_EVENT_LOOP_INFO_CLEANUP:
+      return "CLEANUP";
+    default:
+      return "unrecognized connection state";
+    }
+}
 #endif
 #endif
 

@@ -1835,9 +1835,9 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
     {
 #if DEBUG_STATES
       MHD_DLOG (connection->daemon,
-                _("In function %s handling connection at state: %s\n"),
+                _("In function %s handling connection at state: %s %s\n"),
                 __FUNCTION__,
-                MHD_state_to_string (connection->state));
+                MHD_state_to_string (connection->state), MHD_event_state_to_string (connection->event_loop_info));
 #endif
       switch (connection->state)
         {

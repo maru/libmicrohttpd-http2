@@ -210,39 +210,41 @@ struct http2_conn
  * and send server preface.
  *
  * @param connection connection to handle
+ * @return #MHD_YES if no error
+ *         #MHD_NO otherwise, connection must be closed.
  */
 int
 MHD_http2_session_start (struct MHD_Connection *connection);
 
 
 /**
- * Function used for reading data from the socket.
+ * Read data from the connection.
  *
  * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
+ * @return #MHD_YES if no error
+ *         #MHD_NO otherwise, connection must be closed.
  */
 int
 MHD_http2_handle_read (struct MHD_Connection *connection);
 
 
 /**
- * Function used for writing data to the socket.
+ * Write data to the connection.
  *
  * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
+ * @return #MHD_YES if no error
+ *         #MHD_NO otherwise, connection must be closed.
  */
 int
 MHD_http2_handle_write (struct MHD_Connection *connection);
 
 
 /**
- * Function used for data processing.
+ * Process data.
  *
  * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
+ * @return #MHD_YES if no error
+ *         #MHD_NO otherwise, connection must be closed.
  */
 int
 MHD_http2_handle_idle (struct MHD_Connection *connection);

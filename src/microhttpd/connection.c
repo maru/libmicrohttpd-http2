@@ -1806,6 +1806,7 @@ transmit_error_response (struct MHD_Connection *connection,
 static void
 MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 {
+  // ENTER();
   /* Do not update states of suspended connection */
   if (connection->suspended)
     return; /* States will be updated after resume. */
@@ -1830,7 +1831,7 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
   while (1)
     {
-#if DEBUG_STATES
+#if 0&&DEBUG_STATES
       MHD_DLOG (connection->daemon,
                 _("In function %s handling connection at state: %s %s\n"),
                 __FUNCTION__,
@@ -1955,7 +1956,8 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 #endif /* UPGRADE_SUPPORT */
 #ifdef HTTP2_SUPPORT
         case MHD_CONNECTION_HTTP2_INIT:
-        case MHD_CONNECTION_HTTP2_OPEN:
+        case MHD_CONNECTION_HTTP2_IDLE:
+        case MHD_CONNECTION_HTTP2_BUSY:
         case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
         case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:
           break;
@@ -1972,6 +1974,12 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
       break;
     }
 
+    #if 0&&DEBUG_STATES
+          MHD_DLOG (connection->daemon,
+                    _("In function %s handling connection at state: %s %s\n"),
+                    __FUNCTION__,
+                    MHD_state_to_string (connection->state), MHD_event_state_to_string (connection->event_loop_info));
+    #endif
 }
 
 
@@ -2290,6 +2298,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
 static void
 call_connection_handler (struct MHD_Connection *connection)
 {
+  // ENTER();
   size_t processed;
 
   if (NULL != connection->response)
@@ -2799,6 +2808,7 @@ parse_connection_headers (struct MHD_Connection *connection)
 void
 MHD_update_last_activity_ (struct MHD_Connection *connection)
 {
+  // ENTER();
   struct MHD_Daemon *daemon = connection->daemon;
 
   if (0 == connection->connection_timeout)
@@ -2835,6 +2845,7 @@ MHD_update_last_activity_ (struct MHD_Connection *connection)
 void
 MHD_connection_handle_read (struct MHD_Connection *connection)
 {
+  // ENTER("connection->epoll_state %d", connection->epoll_state);
   ssize_t bytes_read;
 
   if ( (MHD_CONNECTION_CLOSED == connection->state) ||
@@ -2905,7 +2916,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     }
   connection->read_buffer_offset += bytes_read;
   MHD_update_last_activity_ (connection);
-#if DEBUG_STATES
+#if 0&&DEBUG_STATES
   MHD_DLOG (connection->daemon,
             _("In function %s handling connection at state: %s\n"),
             __FUNCTION__,
@@ -2957,6 +2968,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 void
 MHD_connection_handle_write (struct MHD_Connection *connection)
 {
+  // ENTER("connection->epoll_state %d", connection->epoll_state);
   struct MHD_Response *response;
   ssize_t ret;
   if (connection->suspended)
@@ -2973,7 +2985,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
     }
 #endif /* HTTPS_SUPPORT */
 
-#if DEBUG_STATES
+#if 0&&DEBUG_STATES
   MHD_DLOG (connection->daemon,
             _("In function %s handling connection at state: %s\n"),
             __FUNCTION__,
@@ -3277,6 +3289,7 @@ cleanup_connection (struct MHD_Connection *connection)
 int
 MHD_connection_handle_idle (struct MHD_Connection *connection)
 {
+  // ENTER("connection->epoll_state %d", connection->epoll_state);
   struct MHD_Daemon *daemon = connection->daemon;
   char *line;
   size_t line_len;
@@ -3293,7 +3306,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
             break;
         }
 #endif /* HTTPS_SUPPORT */
-#if DEBUG_STATES
+#if 0&&DEBUG_STATES
       MHD_DLOG (daemon,
                 _("In function %s handling connection at state: %s\n"),
                 __FUNCTION__,
@@ -3766,9 +3779,10 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
   if (! connection->suspended)
     {
       time_t timeout;
+      // ENTER("connection->connection_timeout %d MHD_monotonic_sec_counter() %d connection->last_activity %d = %d", connection->connection_timeout, MHD_monotonic_sec_counter(), connection->last_activity, MHD_monotonic_sec_counter() - connection->last_activity);
       timeout = connection->connection_timeout;
       if ( (0 != timeout) &&
-           (timeout < (MHD_monotonic_sec_counter() - connection->last_activity)) )
+           (timeout <= (MHD_monotonic_sec_counter() - connection->last_activity)) )
         {
           MHD_connection_close_ (connection,
                                  MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
@@ -3802,6 +3816,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 int
 MHD_connection_epoll_update_ (struct MHD_Connection *connection)
 {
+  // ENTER("enter: connection->epoll_state %d", connection->epoll_state);
   struct MHD_Daemon *daemon = connection->daemon;
 
   if ( (0 != (daemon->options & MHD_USE_EPOLL)) &&
@@ -3833,6 +3848,7 @@ MHD_connection_epoll_update_ (struct MHD_Connection *connection)
 	  return MHD_NO;
 	}
       connection->epoll_state |= MHD_EPOLL_STATE_IN_EPOLL_SET;
+      // ENTER("exit: connection->epoll_state %d", connection->epoll_state);
     }
   return MHD_YES;
 }
@@ -3988,6 +4004,7 @@ MHD_queue_response (struct MHD_Connection *connection,
                     unsigned int status_code,
                     struct MHD_Response *response)
 {
+  // ENTER();
   struct MHD_Daemon *daemon;
 
   if ( (NULL == connection) ||

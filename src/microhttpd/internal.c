@@ -80,8 +80,10 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state)
 #ifdef HTTP2_SUPPORT
     case MHD_CONNECTION_HTTP2_INIT:
       return "http2 init";
-    case MHD_CONNECTION_HTTP2_OPEN:
-      return "http2 open";
+    case MHD_CONNECTION_HTTP2_IDLE:
+      return "http2 idle";
+    case MHD_CONNECTION_HTTP2_BUSY:
+      return "http2 bussy";
     case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
       return "http2 closed remote";
     case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:

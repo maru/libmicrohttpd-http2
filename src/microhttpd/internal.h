@@ -540,9 +540,14 @@ enum MHD_CONNECTION_STATE
   MHD_CONNECTION_HTTP2_INIT = 128,
 
   /**
-   * Client and server preface exchanged.
+   * Expecting incoming data.
    */
-  MHD_CONNECTION_HTTP2_OPEN,
+  MHD_CONNECTION_HTTP2_IDLE,
+
+  /**
+   * Reading/writing in process.
+   */
+  MHD_CONNECTION_HTTP2_BUSY,
 
   /**
    * Client sent GOAWAY frame.

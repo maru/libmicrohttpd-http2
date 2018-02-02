@@ -35,6 +35,14 @@
 #include <nghttp2/nghttp2.h>
 #endif /* USE_NGHTTP2 */
 
+#define H2_HEADER_METHOD     ":method"
+#define H2_HEADER_METHOD_LEN 7
+#define H2_HEADER_SCHEME     ":scheme"
+#define H2_HEADER_SCHEME_LEN 7
+#define H2_HEADER_AUTH       ":authority"
+#define H2_HEADER_AUTH_LEN   10
+#define H2_HEADER_PATH       ":path"
+#define H2_HEADER_PATH_LEN   5
 
 /**
  * HTTP/2 stream.
@@ -98,7 +106,19 @@ struct http2_stream
   /**
    * Requested URL.
    */
-  char *url;
+  char *path;
+
+  /**
+   * Scheme (e.g., http).
+   * https://tools.ietf.org/html/rfc3986#section-3.1
+   */
+  char *scheme;
+
+  /**
+   * Authority (e.g., host).
+   * https://tools.ietf.org/html/rfc3986#section-3.2
+   */
+  char *authority;
 
   /**
    * Buffer for reading requests.  Allocated in pool.  Actually one
@@ -155,6 +175,18 @@ struct http2_stream
    */
   uint64_t current_chunk_offset;
 
+  /**
+   * How many more bytes of the body do we expect
+   * to read? #MHD_SIZE_UNKNOWN for unknown.
+   */
+  uint64_t remaining_upload_size;
+
+  /**
+   * Current write position in the actual response
+   * (excluding headers, content only; should be 0
+   * while sending headers).
+   */
+  uint64_t response_write_position;
 };
 
 /**
@@ -201,6 +233,11 @@ struct http2_conn
    * Number of streams in a session.
    */
   size_t num_streams;
+
+  /**
+   * Current processing stream identifier.
+   */
+  size_t current_stream_id;
 
 };
 
@@ -258,6 +295,22 @@ MHD_http2_handle_idle (struct MHD_Connection *connection);
 void
 MHD_http2_session_delete (struct MHD_Connection *connection);
 
+
+/**
+ * Queue a response to be transmitted to the client (as soon as
+ * possible but after #MHD_AccessHandlerCallback returns).
+ *
+ * @param connection the connection identifying the client
+ * @param status_code HTTP status code (i.e. #MHD_HTTP_OK)
+ * @param response response to transmit
+ * @return #MHD_NO on error (i.e. reply already sent),
+ *         #MHD_YES on success or if message has been queued
+ * @ingroup response
+ */
+int
+MHD_http2_queue_response (struct MHD_Connection *connection,
+                          unsigned int status_code,
+                          struct MHD_Response *response);
 
 #endif /* HTTP2_SUPPORT */
 

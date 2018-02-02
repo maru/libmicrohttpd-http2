@@ -182,7 +182,7 @@ MHD_update_last_activity_ (struct MHD_Connection *connection);
 
 #ifdef HTTP2_SUPPORT
 /**
- * Function declaration for http2
+ * Function declaration for http2 module.
  */
 
 void
@@ -194,6 +194,9 @@ MHD_connection_close_ (struct MHD_Connection *connection,
 
 int
 MHD_connection_epoll_update_ (struct MHD_Connection *connection);
+
+void
+get_date_string (char *date, size_t date_len, char *header, char *end_of_line);
 
 #endif /* ! HTTP2_SUPPORT */
 #endif

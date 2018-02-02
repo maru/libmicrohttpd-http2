@@ -49,7 +49,6 @@
 #endif /* HTTPS_SUPPORT */
 #ifdef HTTP2_SUPPORT
 #include "connection_http2.h"
-#define ENTER(format, args...) fprintf(stderr, "\e[32;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
 #endif /* HTTP2_SUPPORT */
 
 
@@ -706,6 +705,12 @@ MHD_get_connection_values (struct MHD_Connection *connection,
                            MHD_KeyValueIterator iterator,
                            void *iterator_cls)
 {
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    /* Future implementation */
+    mhd_assert(0);
+#endif /* HTTP2_SUPPORT */
+
   int ret;
   struct MHD_HTTP_Header *pos;
 
@@ -758,6 +763,12 @@ MHD_set_connection_value (struct MHD_Connection *connection,
                           const char *key,
                           const char *value)
 {
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    /* Future implementation */
+    mhd_assert(0);
+#endif /* HTTP2_SUPPORT */
+
   struct MHD_HTTP_Header *pos;
 
   pos = MHD_pool_allocate (connection->pool,
@@ -799,6 +810,12 @@ MHD_lookup_connection_value (struct MHD_Connection *connection,
                              enum MHD_ValueKind kind,
                              const char *key)
 {
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    /* Future implementation */
+    mhd_assert(0);
+#endif /* HTTP2_SUPPORT */
+
   struct MHD_HTTP_Header *pos;
 
   if (NULL == connection)
@@ -1272,6 +1289,11 @@ keepalive_possible (struct MHD_Connection *connection)
        (0 != (connection->response->flags & MHD_RF_HTTP_VERSION_1_0_ONLY) ) )
     return MHD_NO;
 
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    return MHD_YES;
+#endif /* HTTP2_SUPPORT */
+
   if (MHD_str_equal_caseless_(connection->version,
                               MHD_HTTP_VERSION_1_1))
     {
@@ -1307,10 +1329,13 @@ keepalive_possible (struct MHD_Connection *connection)
  * @param date where to write the header, with
  *        at least 128 bytes available space.
  * @param date_len number of bytes in @a date
+ * @param header "Date: " or empty
+ * @param end_of_line "\r\n" or empty
  */
-static void
+void
 get_date_string (char *date,
-		 size_t date_len)
+		 size_t date_len,
+		 char *header, char *end_of_line)
 {
   static const char *const days[] = {
     "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
@@ -1347,14 +1372,16 @@ get_date_string (char *date,
 #endif
   MHD_snprintf_ (date,
 		 date_len,
-		 "Date: %3s, %02u %3s %04u %02u:%02u:%02u GMT\r\n",
+		 "%s%3s, %02u %3s %04u %02u:%02u:%02u GMT%s",
+		 header,
 		 days[now.tm_wday % 7],
 		 (unsigned int) now.tm_mday,
 		 mons[now.tm_mon % 12],
 		 (unsigned int) (1900 + now.tm_year),
 		 (unsigned int) now.tm_hour,
 		 (unsigned int) now.tm_min,
-		 (unsigned int) now.tm_sec);
+		 (unsigned int) now.tm_sec,
+		 end_of_line);
 }
 
 
@@ -1459,7 +1486,7 @@ build_header_response (struct MHD_Connection *connection)
 	   (NULL == MHD_get_response_header (connection->response,
 					     MHD_HTTP_HEADER_DATE)) )
         get_date_string (date,
-			 sizeof (date));
+			 sizeof (date), "Date: ", "\r\n");
       else
         date[0] = '\0';
       size += strlen (date);
@@ -1806,7 +1833,6 @@ transmit_error_response (struct MHD_Connection *connection,
 static void
 MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 {
-  // ENTER();
   /* Do not update states of suspended connection */
   if (connection->suspended)
     return; /* States will be updated after resume. */
@@ -1831,7 +1857,7 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
   while (1)
     {
-#if 0&&DEBUG_STATES
+#if DEBUG_STATES
       MHD_DLOG (connection->daemon,
                 _("In function %s handling connection at state: %s %s\n"),
                 __FUNCTION__,
@@ -1974,7 +2000,7 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
       break;
     }
 
-    #if 0&&DEBUG_STATES
+    #if DEBUG_STATES
           MHD_DLOG (connection->daemon,
                     _("In function %s handling connection at state: %s %s\n"),
                     __FUNCTION__,
@@ -2298,7 +2324,6 @@ parse_initial_message_line (struct MHD_Connection *connection,
 static void
 call_connection_handler (struct MHD_Connection *connection)
 {
-  // ENTER();
   size_t processed;
 
   if (NULL != connection->response)
@@ -2808,7 +2833,6 @@ parse_connection_headers (struct MHD_Connection *connection)
 void
 MHD_update_last_activity_ (struct MHD_Connection *connection)
 {
-  // ENTER();
   struct MHD_Daemon *daemon = connection->daemon;
 
   if (0 == connection->connection_timeout)
@@ -2845,7 +2869,6 @@ MHD_update_last_activity_ (struct MHD_Connection *connection)
 void
 MHD_connection_handle_read (struct MHD_Connection *connection)
 {
-  // ENTER("connection->epoll_state %d", connection->epoll_state);
   ssize_t bytes_read;
 
   if ( (MHD_CONNECTION_CLOSED == connection->state) ||
@@ -2862,19 +2885,6 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     }
 #endif /* HTTPS_SUPPORT */
 
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      MHD_http2_handle_read (connection);
-      if (connection->read_closed)
-        {
-          MHD_connection_close_ (connection,
-                                 MHD_REQUEST_TERMINATED_READ_ERROR);
-        }
-      return;
-    }
-#endif /* HTTP2_SUPPORT */
-
   /* make sure "read" has a reasonable number of bytes
      in buffer to use per system call (if possible) */
   if (connection->read_buffer_offset + connection->daemon->pool_increment >
@@ -2883,6 +2893,15 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 
   if (connection->read_buffer_size == connection->read_buffer_offset)
     return; /* No space for receiving data. */
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_handle_read (connection);
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
+
   bytes_read = connection->recv_cls (connection,
                                      &connection->read_buffer
                                      [connection->read_buffer_offset],
@@ -2916,7 +2935,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     }
   connection->read_buffer_offset += bytes_read;
   MHD_update_last_activity_ (connection);
-#if 0&&DEBUG_STATES
+#if DEBUG_STATES
   MHD_DLOG (connection->daemon,
             _("In function %s handling connection at state: %s\n"),
             __FUNCTION__,
@@ -2968,7 +2987,6 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 void
 MHD_connection_handle_write (struct MHD_Connection *connection)
 {
-  // ENTER("connection->epoll_state %d", connection->epoll_state);
   struct MHD_Response *response;
   ssize_t ret;
   if (connection->suspended)
@@ -2985,7 +3003,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
     }
 #endif /* HTTPS_SUPPORT */
 
-#if 0&&DEBUG_STATES
+#if DEBUG_STATES
   MHD_DLOG (connection->daemon,
             _("In function %s handling connection at state: %s\n"),
             __FUNCTION__,
@@ -3215,7 +3233,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
  *
  * @param connection handle for the connection to clean up
  */
-static void
+void
 cleanup_connection (struct MHD_Connection *connection)
 {
   struct MHD_Daemon *daemon = connection->daemon;
@@ -3289,7 +3307,6 @@ cleanup_connection (struct MHD_Connection *connection)
 int
 MHD_connection_handle_idle (struct MHD_Connection *connection)
 {
-  // ENTER("connection->epoll_state %d", connection->epoll_state);
   struct MHD_Daemon *daemon = connection->daemon;
   char *line;
   size_t line_len;
@@ -3306,7 +3323,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
             break;
         }
 #endif /* HTTPS_SUPPORT */
-#if 0&&DEBUG_STATES
+#if DEBUG_STATES
       MHD_DLOG (daemon,
                 _("In function %s handling connection at state: %s\n"),
                 __FUNCTION__,
@@ -3318,7 +3335,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
     {
       if (connection->state == MHD_CONNECTION_CLOSED)
         {
-          MHD_http2_session_delete (connection);
           cleanup_connection (connection);
           connection->in_idle = false;
           return MHD_NO;
@@ -3779,7 +3795,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
   if (! connection->suspended)
     {
       time_t timeout;
-      // ENTER("connection->connection_timeout %d MHD_monotonic_sec_counter() %d connection->last_activity %d = %d", connection->connection_timeout, MHD_monotonic_sec_counter(), connection->last_activity, MHD_monotonic_sec_counter() - connection->last_activity);
       timeout = connection->connection_timeout;
       if ( (0 != timeout) &&
            (timeout <= (MHD_monotonic_sec_counter() - connection->last_activity)) )
@@ -3816,7 +3831,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 int
 MHD_connection_epoll_update_ (struct MHD_Connection *connection)
 {
-  // ENTER("enter: connection->epoll_state %d", connection->epoll_state);
   struct MHD_Daemon *daemon = connection->daemon;
 
   if ( (0 != (daemon->options & MHD_USE_EPOLL)) &&
@@ -3848,7 +3862,6 @@ MHD_connection_epoll_update_ (struct MHD_Connection *connection)
 	  return MHD_NO;
 	}
       connection->epoll_state |= MHD_EPOLL_STATE_IN_EPOLL_SET;
-      // ENTER("exit: connection->epoll_state %d", connection->epoll_state);
     }
   return MHD_YES;
 }
@@ -4004,7 +4017,6 @@ MHD_queue_response (struct MHD_Connection *connection,
                     unsigned int status_code,
                     struct MHD_Response *response)
 {
-  // ENTER();
   struct MHD_Daemon *daemon;
 
   if ( (NULL == connection) ||
@@ -4050,6 +4062,14 @@ MHD_queue_response (struct MHD_Connection *connection,
       return MHD_NO;
     }
 #endif /* UPGRADE_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      return MHD_http2_queue_response (connection, status_code, response);
+    }
+#endif /* HTTP2_SUPPORT */
+
   MHD_increment_response_rc (response);
   connection->response = response;
   connection->responseCode = status_code;

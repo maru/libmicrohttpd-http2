@@ -54,7 +54,6 @@
 
 #ifdef HTTP2_SUPPORT
 #include "connection_http2.h"
-#define ENTER(format, args...) fprintf(stderr, "\e[33;1m[%s]\e[0m " format "\n", __FUNCTION__, ##args)
 #endif /* HTTP2_SUPPORT */
 
 #if defined(_WIN32) && ! defined(__CYGWIN__)
@@ -1111,7 +1110,6 @@ call_handlers (struct MHD_Connection *con,
 #endif /* HTTPS_SUPPORT */
   if (!force_close)
     {
-      // ENTER("con->event_loop_info %s READ %d WRITE %d", MHD_event_state_to_string(con->event_loop_info), read_ready, write_ready);
       if ( (MHD_EVENT_LOOP_INFO_READ == con->event_loop_info) &&
 	   read_ready)
         {
@@ -2647,7 +2645,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
  * select, internal select or thread pool; not applicable to
  * thread-per-connection!) for a while.
  *
- * If you use this API in conjunction with a internal select or a
+ * If you use this API in conjunction with an internal select or a
  * thread pool, you must set the option #MHD_USE_ITC to
  * ensure that a resumed connection is immediately processed by MHD.
  *
@@ -4054,7 +4052,6 @@ static int
 MHD_epoll (struct MHD_Daemon *daemon,
 	   int may_block)
 {
-  // ENTER();
 #if defined(HTTPS_SUPPORT) && defined(UPGRADE_SUPPORT)
   static const char * const upgrade_marker = "upgrade_ptr";
 #endif /* HTTPS_SUPPORT && UPGRADE_SUPPORT */
@@ -4177,7 +4174,6 @@ MHD_epoll (struct MHD_Daemon *daemon,
   while (MAX_EVENTS == num_events)
     {
       /* update event masks */
-      // ENTER("epoll_wait %d", timeout_ms);
       num_events = epoll_wait (daemon->epoll_fd,
 			       events,
                                MAX_EVENTS,
@@ -4194,7 +4190,6 @@ MHD_epoll (struct MHD_Daemon *daemon,
 #endif
 	  return MHD_NO;
 	}
-  // ENTER("num_events %d", num_events);
       for (i=0;i<(unsigned int) num_events;i++)
 	{
           /* First, check for the values of `ptr` that would indicate
@@ -4335,13 +4330,11 @@ MHD_epoll (struct MHD_Daemon *daemon,
   prev = daemon->normal_timeout_tail;
   while (NULL != (pos = prev))
     {
-      // ENTER("normal_timeout_tail");
       prev = pos->prevX;
       MHD_connection_handle_idle (pos);
       if (MHD_CONNECTION_CLOSED != pos->state)
 	break; /* sorted by timeout, no need to visit the rest! */
     }
-  // ENTER("exit");
   return MHD_YES;
 }
 #endif
@@ -5115,7 +5108,9 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  break;
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
+#ifdef HTTP2_SUPPORT
 		case MHD_OPTION_H2_SETTINGS:
+#endif /* ! HTTP2_SUPPORT */
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
 						opt,
@@ -5404,6 +5399,9 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+#ifdef HTTP2_SUPPORT
+  gettimeofday(&tm_start, NULL);
+#endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;

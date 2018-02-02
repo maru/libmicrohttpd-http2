@@ -4400,14 +4400,6 @@ close_connection (struct MHD_Connection *pos)
 {
   struct MHD_Daemon *daemon = pos->daemon;
 
-#ifdef HTTP2_SUPPORT
-  if (pos->http_version == HTTP_VERSION(2, 0))
-    {
-      MHD_http2_session_delete (pos);
-    }
-#endif /* HTTP2_SUPPORT */
-
-
   if (0 != (daemon->options & MHD_USE_THREAD_PER_CONNECTION))
     {
       MHD_connection_mark_closed_ (pos);

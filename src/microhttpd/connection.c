@@ -960,6 +960,13 @@ MHD_connection_close_ (struct MHD_Connection *connection,
   struct MHD_Daemon *daemon = connection->daemon;
   struct MHD_Response *resp = connection->response;
 
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_session_delete (connection);
+    }
+#endif /* HTTP2_SUPPORT */
+
   MHD_connection_mark_closed_ (connection);
   if (NULL != resp)
     {

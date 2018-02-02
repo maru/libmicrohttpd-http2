@@ -733,6 +733,9 @@ MHD_get_reason_phrase_for (unsigned int code);
  */
 #define MHD_HTTP_VERSION_1_0 "HTTP/1.0"
 #define MHD_HTTP_VERSION_1_1 "HTTP/1.1"
+#define MHD_HTTP_VERSION_2_0 "HTTP/2"
+
+#define HTTP_VERSION(major, minor) (1000*(major) + (minor))
 
 #define HTTP_VERSION(major,minor) (1000*(major)+(minor))
 
@@ -1146,7 +1149,9 @@ enum MHD_FLAG
   MHD_USE_AUTO_INTERNAL_THREAD = MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD,
 
   /**
-   * Run in HTTP2 mode.
+   * Run using HTTP2 only (otherwise, MHD will just support HTTP/1).
+   * If you want MHD to support both HTTP/1 and HTTP/2,
+   * see https://github.com/maru/libmicrohttpd-http2/issues/7
    */
   MHD_USE_HTTP2 = 131072
 
@@ -1486,7 +1491,23 @@ enum MHD_OPTION
    * MHD, and 0 in production.
    * This option should be followed by an `int` argument.
    */
-  MHD_OPTION_STRICT_FOR_CLIENT = 29
+  MHD_OPTION_STRICT_FOR_CLIENT = 29,
+
+  /**
+   * HTTP/2 settings of the daemon, which are sent when a new client connection
+   * occurs. This option should be followed by two arguments:
+   *  - An integer of type `size_t`, which indicates the number of
+   *    nghttp2_settings_entry.
+   *  - A pointer to a `nghttp2_settings_entry` structure, an array of http2
+   *    settings.
+   * Note that the application must ensure that the buffer of the
+   * second argument remains allocated and unmodified while the
+   * deamon is running.
+   * Settings parameters and their default values are defined in
+   * https://tools.ietf.org/html/rfc7540#section-6.5.2
+   */
+  MHD_OPTION_H2_SETTINGS = 30
+
 };
 
 
@@ -3492,7 +3513,14 @@ enum MHD_FEATURE
    * file-FD based responses over non-TLS connections.
    * @note Since v0.9.56
    */
-  MHD_FEATURE_SENDFILE = 21
+  MHD_FEATURE_SENDFILE = 21,
+
+  /**
+   * Get whether HTTP/2 is supported. If supported then flag
+   * #MHD_USE_HTTP2 can be used.
+   */
+  MHD_FEATURE_HTTP2 = 22,
+
 };
 
 

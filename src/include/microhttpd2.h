@@ -215,158 +215,158 @@ enum MHD_Method
    * "CONNECT" method.
    */
   MHD_METHOD_CONNECT = 8,
-  
+
   /**
    * "ACL" method.
    */
   MHD_METHOD_ACL = 9,
-  
+
   /**
    * "BASELINE-CONTROL" method.
    */
   MHD_METHOD_BASELINE_CONTROL = 10,
-  
+
   /**
    * "BIND" method.
    */
   MHD_METHOD_BIND = 11,
-  
+
   /**
    * "CHECKIN" method.
    */
   MHD_METHOD_CHECKIN = 12,
-  
+
   /**
    * "CHECKOUT" method.
    */
   MHD_METHOD_CHECKOUT = 13,
-  
+
   /**
    * "COPY" method.
    */
   MHD_METHOD_COPY = 14,
-  
+
   /**
    * "LABEL" method.
    */
   MHD_METHOD_LABEL = 15,
-  
+
   /**
    * "LINK" method.
    */
   MHD_METHOD_LINK = 16,
-  
+
   /**
    * "LOCK" method.
    */
   MHD_METHOD_LOCK = 17,
-  
+
   /**
    * "MERGE" method.
    */
   MHD_METHOD_MERGE = 18,
-  
+
   /**
    * "MKACTIVITY" method.
    */
   MHD_METHOD_MKACTIVITY = 19,
-  
+
   /**
    * "MKCOL" method.
    */
   MHD_METHOD_MKCOL = 20,
-  
+
   /**
    * "MKREDIRECTREF" method.
    */
   MHD_METHOD_MKREDIRECTREF = 21,
-  
+
   /**
    * "MKWORKSPACE" method.
    */
   MHD_METHOD_MKWORKSPACE = 22,
-  
+
   /**
    * "MOVE" method.
    */
   MHD_METHOD_MOVE = 23,
-  
+
   /**
    * "ORDERPATCH" method.
    */
   MHD_METHOD_ORDERPATCH = 24,
-  
+
   /**
    * "PATCH" method.
    */
   MHD_METHOD_PATH = 25,
-  
+
   /**
    * "PRI" method.
    */
   MHD_METHOD_PRI = 26,
-  
+
   /**
    * "PROPFIND" method.
    */
   MHD_METHOD_PROPFIND = 27,
-  
+
   /**
    * "PROPPATCH" method.
    */
   MHD_METHOD_PROPPATCH = 28,
-  
+
   /**
    * "REBIND" method.
    */
   MHD_METHOD_REBIND = 29,
-  
+
   /**
    * "REPORT" method.
    */
   MHD_METHOD_REPORT = 30,
-  
+
   /**
    * "SEARCH" method.
    */
   MHD_METHOD_SEARCH = 31,
-  
+
   /**
    * "UNBIND" method.
    */
   MHD_METHOD_UNBIND = 32,
-  
+
   /**
    * "UNCHECKOUT" method.
    */
   MHD_METHOD_UNCHECKOUT = 33,
-  
+
   /**
    * "UNLINK" method.
    */
   MHD_METHOD_UNLINK = 34,
-  
+
   /**
    * "UNLOCK" method.
    */
   MHD_METHOD_UNLOCK = 35,
-  
+
   /**
    * "UPDATE" method.
    */
   MHD_METHOD_UPDATE = 36,
-  
+
   /**
    * "UPDATEDIRECTREF" method.
    */
   MHD_METHOD_UPDATEDIRECTREF = 37,
-  
+
   /**
    * "VERSION-CONTROL" method.
    */
   MHD_METHOD_VERSION_CONTROL = 38
 
-  /* For more, check: 
+  /* For more, check:
      https://www.iana.org/assignments/http-methods/http-methods.xhtml */
 
 };
@@ -1009,7 +1009,7 @@ typedef void *
 
 /**
  * Register a callback to be called first for every request
- * (before any parsing of the header).  Makes it easy to 
+ * (before any parsing of the header).  Makes it easy to
  * log the full URL.
  *
  * @param daemon daemon for which to set the logger
@@ -1459,7 +1459,7 @@ _MHD_EXTERN void
 MHD_response_option_v10_only (struct MHD_Response *response);
 
 
-/** 
+/**
  * Signature of the callback used by MHD to notify the
  * application about completed requests.
  *
@@ -2330,3 +2330,17 @@ MHD_daemon_get_information_sz (struct MHD_Daemon *daemon,
                                    info_type,    \
                                    return_value) \
 	MHD_daemon_get_information_sz((daemon), (info_type), (return_value), sizeof(union MHD_DaemonInformation));
+
+#ifdef HTTP2_SUPPORT
+
+/**
+ * Set default HTTP/2 settings for the daemon.
+ *
+ * @param daemon daemon to configure
+ * @return #MHD_SC_OK on success
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_set_h2_settings (struct MHD_Daemon *daemon,
+		       const nghttp2_settings_entry *settings);
+
+#endif /* ! HTTP2_SUPPORT */

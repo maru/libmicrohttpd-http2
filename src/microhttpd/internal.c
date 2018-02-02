@@ -83,7 +83,7 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state)
     case MHD_CONNECTION_HTTP2_IDLE:
       return "http2 idle";
     case MHD_CONNECTION_HTTP2_BUSY:
-      return "http2 bussy";
+      return "http2 busy";
     case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
       return "http2 closed remote";
     case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:

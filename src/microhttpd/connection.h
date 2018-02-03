@@ -182,21 +182,13 @@ MHD_update_last_activity_ (struct MHD_Connection *connection);
 
 #ifdef HTTP2_SUPPORT
 /**
- * Function declaration for http2 module.
+ * Set HTTP/1 read/idle/write callbacks for this connection.
+ * Handle data from/to socket.
+ *
+ * @param connection connection to initialize
  */
-
 void
-connection_close_error (struct MHD_Connection *connection, const char *emsg);
-
-void
-MHD_connection_close_ (struct MHD_Connection *connection,
-                       enum MHD_RequestTerminationCode termination_code);
-
-int
-MHD_connection_epoll_update_ (struct MHD_Connection *connection);
-
-void
-get_date_string (char *date, size_t date_len, char *header, char *end_of_line);
-
+MHD_set_http1_callbacks (struct MHD_Connection *connection);
 #endif /* ! HTTP2_SUPPORT */
+
 #endif

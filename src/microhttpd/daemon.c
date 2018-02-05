@@ -2421,21 +2421,19 @@ internal_add_connection (struct MHD_Daemon *daemon,
     }
 
 #ifdef HTTP2_SUPPORT
-  /* Set connection handlers  */
-  if ( (0 != (daemon->options & MHD_USE_HTTP2)) /* &&
-       (connection->http_version == HTTP_VERSION(2, 0)) */ )
+  /* Set http version  */
+  if (0 != (daemon->options & MHD_USE_HTTP2))
     {
-/*
- * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
- * only HTTP/2 connections will be handled.
- */
-      /* set HTTP/2 connection handlers  */
-      MHD_set_http2_callbacks (connection);
+      /*
+       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+       * only HTTP/2 connections will be handled.
+       */
+      connection->http_version = HTTP_VERSION(2, 0);
+      connection->state = MHD_CONNECTION_HTTP2_INIT;
     }
   else
     {
-      /* set default HTTP/1 connection handlers  */
-      MHD_set_http1_callbacks (connection);
+      connection->http_version = HTTP_VERSION(1, 1);
     }
 #endif /* ! HTTP2_SUPPORT */
 
@@ -2647,7 +2645,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
  * select, internal select or thread pool; not applicable to
  * thread-per-connection!) for a while.
  *
- * If you use this API in conjunction with a internal select or a
+ * If you use this API in conjunction with an internal select or a
  * thread pool, you must set the option #MHD_USE_ITC to
  * ensure that a resumed connection is immediately processed by MHD.
  *
@@ -4998,6 +4996,14 @@ parse_options_va (struct MHD_Daemon *daemon,
             }
 #endif /* HAVE_MESSAGES */
 	  break;
+#ifdef HTTP2_SUPPORT
+        case MHD_OPTION_H2_SETTINGS:
+          daemon->h2_settings_len = va_arg (ap,
+                                        size_t);
+          daemon->h2_settings = va_arg (ap,
+                                        nghttp2_settings_entry *);
+          break;
+#endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
 	  i = 0;
@@ -5094,6 +5100,9 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  break;
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
+#ifdef HTTP2_SUPPORT
+		case MHD_OPTION_H2_SETTINGS:
+#endif /* ! HTTP2_SUPPORT */
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
 						opt,
@@ -5382,6 +5391,9 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+#ifdef HTTP2_SUPPORT
+  gettimeofday(&tm_start, NULL);
+#endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;
@@ -6700,6 +6712,12 @@ MHD_is_feature_supported(enum MHD_FEATURE feature)
 #endif
     case MHD_FEATURE_SENDFILE:
 #ifdef _MHD_HAVE_SENDFILE
+      return MHD_YES;
+#else
+      return MHD_NO;
+#endif
+    case MHD_FEATURE_HTTP2:
+#ifdef HTTP2_SUPPORT
       return MHD_YES;
 #else
       return MHD_NO;

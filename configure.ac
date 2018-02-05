@@ -22,7 +22,7 @@
 #
 AC_PREREQ([2.64])
 LT_PREREQ([2.4.0])
-AC_INIT([GNU Libmicrohttpd],[0.9.58],[libmicrohttpd@gnu.org])
+AC_INIT([GNU Libmicrohttpd],[0.9.59],[libmicrohttpd@gnu.org])
 AM_INIT_AUTOMAKE([silent-rules] [subdir-objects])
 AC_CONFIG_HEADERS([MHD_config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -2182,6 +2182,7 @@ po/configure.acT:po/configure.ac.in
 Makefile
 contrib/Makefile
 doc/Makefile
+doc/doxygen/libmicrohttpd.doxy
 doc/doxygen/Makefile
 doc/examples/Makefile
 m4/Makefile

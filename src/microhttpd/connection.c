@@ -1183,6 +1183,7 @@ try_ready_chunked_body (struct MHD_Connection *connection)
           size /= 2;
           if (size < 128)
             {
+              MHD_mutex_unlock_chk_ (&response->mutex);
               /* not enough memory */
               CONNECTION_CLOSE_ERROR (connection,
 				      _("Closing connection (out of memory)\n"));
@@ -1228,6 +1229,7 @@ try_ready_chunked_body (struct MHD_Connection *connection)
     {
       /* error, close socket! */
       response->total_size = connection->response_write_position;
+      MHD_mutex_unlock_chk_ (&response->mutex);
       CONNECTION_CLOSE_ERROR (connection,
 			      _("Closing connection (application error generating response)\n"));
       return MHD_NO;
@@ -1246,6 +1248,7 @@ try_ready_chunked_body (struct MHD_Connection *connection)
   if (0 == ret)
     {
       connection->state = MHD_CONNECTION_CHUNKED_BODY_UNREADY;
+      MHD_mutex_unlock_chk_ (&response->mutex);
       return MHD_NO;
     }
   if (ret > 0xFFFFFF)
@@ -2892,6 +2895,14 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     }
 #endif /* HTTPS_SUPPORT */
 
+#ifdef HTTP2_SUPPORT
+  if ( (MHD_CONNECTION_INIT == connection->state) &&
+       (MHD_YES != MHD_http2_session_init (connection)) )
+    {
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
+
   /* make sure "read" has a reasonable number of bytes
      in buffer to use per system call (if possible) */
   if (connection->read_buffer_offset + connection->daemon->pool_increment >
@@ -3686,7 +3697,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
                 socket_start_no_buffering (connection);
               continue;
             }
-          MHD_mutex_unlock_chk_ (&connection->response->mutex);
+          /* mutex was already unlocked by try_ready_chunked_body */
           break;
         case MHD_CONNECTION_BODY_SENT:
           if (MHD_NO == build_header_response (connection))
@@ -3886,6 +3897,62 @@ MHD_set_http_callbacks_ (struct MHD_Connection *connection)
   connection->recv_cls = &recv_param_adapter;
   connection->send_cls = &send_param_adapter;
 }
+
+
+#ifdef HTTP2_SUPPORT
+
+/**
+ * There is data to be read off a socket.
+ *
+ * @param connection connection to handle
+ */
+void
+http1_handle_read (struct MHD_Connection *connection)
+{
+}
+
+
+/**
+ * Handle writes to sockets.
+ *
+ * @param connection connection to handle
+ */
+void
+http1_handle_write (struct MHD_Connection *connection)
+{
+}
+
+
+/**
+ * Handle per-connection processing.
+ *
+ * @param connection connection to handle
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+int
+http1_handle_idle (struct MHD_Connection *connection)
+{
+  int ret;
+  return ret;
+}
+
+
+/**
+ * Set HTTP/1 read/idle/write callbacks for this connection.
+ * Handle data from/to socket.
+ *
+ * @param connection connection to initialize
+ */
+void
+MHD_set_http1_callbacks (struct MHD_Connection *connection)
+{
+  connection->read_cls = &http1_handle_read;
+  connection->idle_cls = &http1_handle_idle;
+  connection->write_cls = &http1_handle_write;
+}
+
+#endif /* ! HTTP2_SUPPORT */
 
 
 /**

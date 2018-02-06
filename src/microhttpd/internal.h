@@ -46,9 +46,17 @@
 #endif
 #endif /* HTTPS_SUPPORT */
 
-#ifdef HTTP2_SUPPORT
-#include "connection_http2.h"
-#endif /* HTTP2_SUPPORT */
+#ifdef USE_NGHTTP2
+#include <nghttp2/nghttp2.h>
+#define ENTER_COLOR "32;1m"
+struct timeval tm_start;
+#define ENTER(format, args...) {\
+  struct timeval now; gettimeofday(&now, NULL);\
+  long int milli = (now.tv_sec-tm_start.tv_sec)*1000000+(now.tv_usec-tm_start.tv_usec);\
+  fprintf(stderr, "\e[%s[%3ld.%03ld]%s ", "33m", milli/1000000, (milli%1000000)/1000, "\e[0m");\
+  fprintf(stderr, "\e[%s[%s]\e[0m " format "\n", ENTER_COLOR, __FUNCTION__, ##args);\
+}
+#endif /* USE_NGHTTP2 */
 
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
@@ -528,8 +536,47 @@ enum MHD_CONNECTION_STATE
    * Connection was "upgraded" and socket is now under the
    * control of the application.
    */
-  MHD_CONNECTION_UPGRADE
+  MHD_CONNECTION_UPGRADE,
 #endif /* UPGRADE_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+  /** States in a state machine for an HTTP/2 connection. **/
+
+  /**
+   * Connection just started (no preface sent or received).
+   */
+  MHD_CONNECTION_HTTP2_INIT = 128,
+
+  /**
+   * Expecting incoming data.
+   */
+  MHD_CONNECTION_HTTP2_IDLE,
+
+  /**
+   * Reading/writing in process.
+   */
+  MHD_CONNECTION_HTTP2_BUSY,
+
+  /**
+   * Client sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_REMOTE,
+
+  /**
+   * Server sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_LOCAL,
+
+  /**
+   * Connection closed.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED,
+
+  /**
+   * This connection is finished (only to be freed)
+   */
+  MHD_CONNECTION_HTTP2_IN_CLEANUP,
+#endif /* HTTP2_SUPPORT */
 
 };
 
@@ -561,6 +608,8 @@ enum MHD_TLS_CONN_STATE
 #if DEBUG_STATES
 const char *
 MHD_state_to_string (enum MHD_CONNECTION_STATE state);
+const char *
+MHD_event_state_to_string (enum MHD_ConnectionEventLoopInfo state);
 #endif
 #endif
 
@@ -590,35 +639,6 @@ typedef ssize_t
 (*TransmitCallback) (struct MHD_Connection *conn,
                      const void *read_from,
                      size_t max_bytes);
-
-
-#ifdef HTTP2_SUPPORT
-/**
- * Function used for reading data from the socket.
- *
- * @param conn the connection struct
- */
-typedef void
-(*ConnectionReadCallback) (struct MHD_Connection *conn);
-
-/**
- * Function used for data processing.
- *
- * @param conn the connection struct
- * @return #MHD_YES if we should continue to process the
- *         connection (not dead yet), #MHD_NO if it died
- */
-typedef int
-(*ConnectionIdleCallback) (struct MHD_Connection *conn);
-
-/**
- * Function used for writing data to the socket.
- *
- * @param conn the connection struct
- */
-typedef void
-(*ConnectionWriteCallback) (struct MHD_Connection *conn);
-#endif /* HTTP2_SUPPORT */
 
 
 /**
@@ -1042,21 +1062,6 @@ struct MHD_Connection
   int http_version;
 
 #ifdef HTTP2_SUPPORT
-
-  /**
-   * Function used for reading data from the socket.
-   */
-  ConnectionReadCallback read_cls;
-
-  /**
-   * Function used for data processing.
-   */
-  ConnectionIdleCallback idle_cls;
-
-  /**
-   * Function used for writing data to the socket.
-   */
-  ConnectionWriteCallback write_cls;
 
   /**
    * HTTP/2 connection details
@@ -1765,6 +1770,19 @@ struct MHD_Daemon
    * The size of queue for listen socket.
    */
   unsigned int listen_backlog_size;
+
+#ifdef HTTP2_SUPPORT
+  /**
+   * HTTP/2 settings.
+   */
+  nghttp2_settings_entry *h2_settings;
+
+  /**
+   * Number of entries in h2_settings.
+   */
+  size_t h2_settings_len;
+#endif /* HTTP2_SUPPORT */
+
 };
 
 

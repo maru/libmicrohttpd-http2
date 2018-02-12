@@ -150,7 +150,7 @@ struct http2_stream
    * HTTP response code.  Only valid if response object
    * is already set.
    */
-  unsigned int responseCode;
+  unsigned int response_code;
 
   /**
    * Are we receiving with chunked encoding?  This will be set to
@@ -187,6 +187,13 @@ struct http2_stream
    * while sending headers).
    */
   uint64_t response_write_position;
+
+#if defined(_MHD_HAVE_SENDFILE)
+  /**
+   * Type of send file function.
+   */
+  enum MHD_resp_sender_ resp_sender;
+#endif /* _MHD_HAVE_SENDFILE */
 };
 
 /**

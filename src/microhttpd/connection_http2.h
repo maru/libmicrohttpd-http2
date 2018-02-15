@@ -246,6 +246,11 @@ struct http2_conn
    */
   size_t current_stream_id;
 
+  /**
+   * Highest remote stream identifier was handled.
+   */
+  size_t accepted_max;
+
 };
 
 

@@ -36,6 +36,8 @@
 
 #undef ENTER_COLOR
 #define ENTER_COLOR "31;1m"
+#undef HTTP2_DEBUG
+#define HTTP2_DEBUG 1
 
 char status_string[600][4] = {
 "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
@@ -284,6 +286,15 @@ http2_stream_delete (struct http2_conn *h2,
   {
     MHD_destroy_response (stream->response);
     stream->response = NULL;
+
+    struct MHD_Connection *connection = h2->connection;
+    if ((NULL != connection->daemon->notify_completed) && (stream->client_aware))
+    {
+      stream->client_aware = false;
+      connection->daemon->notify_completed (connection->daemon->notify_completed_cls,
+        connection, &stream->client_context,
+        MHD_REQUEST_TERMINATED_COMPLETED_OK);
+    }
   }
   MHD_pool_destroy (stream->pool);
   stream->pool = NULL;
@@ -539,7 +550,7 @@ http2_call_connection_handler (struct MHD_Connection *connection,
   size_t processed;
 
   if (NULL != stream->response)
-    return -1;                     /* already queued a response */
+    return 0;                     /* already queued a response */
   ENTER("[id=%d] method %s path %s", connection->h2->session_id, stream->method, stream->path);
   connection->h2->current_stream_id = stream->stream_id;
   processed = 0;
@@ -648,18 +659,22 @@ on_frame_recv_callback (nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  // ENTER("[id=%d] frame->hd.type %s %X", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.flags);
-  // if (frame->hd.flags) print_flags(frame->hd);
+  ENTER("[id=%d] frame->hd.type %s %X", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.flags);
+  if (frame->hd.flags) print_flags(frame->hd);
   switch (frame->hd.type)
   {
     case NGHTTP2_HEADERS:
-      /* Check that the client request has finished */
-      if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
+      stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+      if (stream != NULL)
       {
-        stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-        if (stream != NULL)
+        if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS)
         {
-          /* Call application handler: case GET, HEAD */
+          /* First call */
+          http2_call_connection_handler (h2->connection, stream);
+        }
+        if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
+        {
+          /* Final call to application handler: GET, HEAD requests */
           return http2_call_connection_handler (h2->connection, stream);
         }
       }
@@ -671,7 +686,7 @@ on_frame_recv_callback (nghttp2_session *session,
         stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
         if (stream != NULL)
         {
-          /* Call application handler: case POST, PUT */
+          /* Final call to application handler: POST, PUT requests */
           return http2_call_connection_handler (h2->connection, stream);
         }
       }
@@ -813,6 +828,16 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
       stream->path = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
       mhd_assert (NULL != stream->path) ;
       strcpy(stream->path, value);
+
+      /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
+      struct MHD_Connection *connection = h2->connection;
+      if (NULL != connection->daemon->uri_log_callback)
+      {
+        stream->client_aware = true;
+        stream->client_context
+            = connection->daemon->uri_log_callback (connection->daemon->uri_log_callback_cls,
+                                                    stream->path, connection);
+      }
   }
   else if ((namelen == H2_HEADER_AUTH_LEN) &&
       (strncmp(H2_HEADER_AUTH, name, namelen) == 0))

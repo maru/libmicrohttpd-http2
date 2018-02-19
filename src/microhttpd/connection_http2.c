@@ -420,26 +420,30 @@ response_read_callback(nghttp2_session *session, int32_t stream_id,
     if ((((ssize_t) MHD_CONTENT_READER_END_OF_STREAM) == ret) ||
         (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret))
     {
-        /* error, close socket! */
       response->total_size = stream->response_write_position;
       MHD_mutex_unlock_chk_ (&response->mutex);
       if (((ssize_t)MHD_CONTENT_READER_END_OF_STREAM) == ret)
-  	    MHD_connection_close_ (h2->connection,
-                                 MHD_REQUEST_TERMINATED_COMPLETED_OK);
+      {
+        *data_flags |= NGHTTP2_DATA_FLAG_EOF;
+        return 0;
+      }
       else
-      	connection_close_error (h2->connection,
+      {
+        /* error, close socket! */
+        connection_close_error (h2->connection,
       				_("Closing connection (application reported error generating data)\n"));
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+      }
     }
     response->data_start = stream->response_write_position;
     response->data_size = ret;
     MHD_mutex_unlock_chk_ (&response->mutex);
-    if (0 == ret)
+    if (0 >= ret)
     {
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-    stream->response_write_position += nread;
-    return nread;
+    stream->response_write_position += ret;
+    return ret;
   }
 
   /* Response is in a buffer */
@@ -482,7 +486,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
       nvlen++;
     }
   }
-  if (response->total_size > 0)
+  if (response->total_size != MHD_SIZE_UNKNOWN)
   {
     nvlen++;
   }
@@ -511,7 +515,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
 
   /* content-lenght */
   char clen[32];
-  if (response->total_size > 0)
+  if (response->total_size != MHD_SIZE_UNKNOWN)
   {
     snprintf(clen, sizeof(clen), "%d", response->total_size);
     add_header(&nva[i++], "content-length", clen);

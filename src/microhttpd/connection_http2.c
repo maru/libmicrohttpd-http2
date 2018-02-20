@@ -418,11 +418,12 @@ response_read_callback(nghttp2_session *session, int32_t stream_id,
                                  stream->response_write_position,
                                  buf, nread);
     if ((((ssize_t) MHD_CONTENT_READER_END_OF_STREAM) == ret) ||
-        (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret))
+        (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret) ||
+        (0 == ret))
     {
       response->total_size = stream->response_write_position;
       MHD_mutex_unlock_chk_ (&response->mutex);
-      if (((ssize_t)MHD_CONTENT_READER_END_OF_STREAM) == ret)
+      if ((((ssize_t)MHD_CONTENT_READER_END_OF_STREAM) == ret) || (0 == ret))
       {
         *data_flags |= NGHTTP2_DATA_FLAG_EOF;
         return 0;

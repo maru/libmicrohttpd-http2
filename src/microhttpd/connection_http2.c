@@ -531,11 +531,19 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
     }
   }
 
+  int r;
   /* Submits response HEADERS frame */
-  nghttp2_data_provider data_prd;
-  data_prd.source.fd = response->fd;
-  data_prd.read_callback = response_read_callback;
-  int r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, &data_prd);
+  if (strcmp(MHD_HTTP_METHOD_HEAD, stream->method) == 0)
+  {
+    r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, NULL);
+  }
+  else
+  {
+    nghttp2_data_provider data_prd;
+    data_prd.source.fd = response->fd;
+    data_prd.read_callback = response_read_callback;
+    r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, &data_prd);
+  }
   return r;
 }
 

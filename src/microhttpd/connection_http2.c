@@ -452,8 +452,8 @@ response_read_callback(nghttp2_session *session, int32_t stream_id,
 
   uint64_t data_write_offset;
   data_write_offset = stream->response_write_position - response->data_start;
-  nread = response->data_size - (size_t) data_write_offset;
-
+  nread = (ssize_t) MHD_MIN((uint64_t) length,
+                            response->data_size - (size_t) data_write_offset);
   /* Copy to buf */
   memcpy(buf, &response->data[(size_t) data_write_offset], nread);
 

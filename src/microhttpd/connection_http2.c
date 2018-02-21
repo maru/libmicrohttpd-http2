@@ -418,28 +418,33 @@ response_read_callback(nghttp2_session *session, int32_t stream_id,
                                  stream->response_write_position,
                                  buf, nread);
     if ((((ssize_t) MHD_CONTENT_READER_END_OF_STREAM) == ret) ||
-        (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret))
+        (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret) ||
+        (0 == ret))
     {
-        /* error, close socket! */
       response->total_size = stream->response_write_position;
       MHD_mutex_unlock_chk_ (&response->mutex);
-      if (((ssize_t)MHD_CONTENT_READER_END_OF_STREAM) == ret)
-  	    MHD_connection_close_ (h2->connection,
-                                 MHD_REQUEST_TERMINATED_COMPLETED_OK);
+      if ((((ssize_t)MHD_CONTENT_READER_END_OF_STREAM) == ret) || (0 == ret))
+      {
+        *data_flags |= NGHTTP2_DATA_FLAG_EOF;
+        return 0;
+      }
       else
-      	connection_close_error (h2->connection,
+      {
+        /* error, close socket! */
+        connection_close_error (h2->connection,
       				_("Closing connection (application reported error generating data)\n"));
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+      }
     }
     response->data_start = stream->response_write_position;
     response->data_size = ret;
     MHD_mutex_unlock_chk_ (&response->mutex);
-    if (0 == ret)
+    if (0 >= ret)
     {
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-    stream->response_write_position += nread;
-    return nread;
+    stream->response_write_position += ret;
+    return ret;
   }
 
   /* Response is in a buffer */
@@ -447,8 +452,8 @@ response_read_callback(nghttp2_session *session, int32_t stream_id,
 
   uint64_t data_write_offset;
   data_write_offset = stream->response_write_position - response->data_start;
-  nread = response->data_size - (size_t) data_write_offset;
-
+  nread = (ssize_t) MHD_MIN((uint64_t) length,
+                            response->data_size - (size_t) data_write_offset);
   /* Copy to buf */
   memcpy(buf, &response->data[(size_t) data_write_offset], nread);
 
@@ -482,7 +487,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
       nvlen++;
     }
   }
-  if (response->total_size > 0)
+  if (response->total_size != MHD_SIZE_UNKNOWN)
   {
     nvlen++;
   }
@@ -511,7 +516,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
 
   /* content-lenght */
   char clen[32];
-  if (response->total_size > 0)
+  if (response->total_size != MHD_SIZE_UNKNOWN)
   {
     snprintf(clen, sizeof(clen), "%d", response->total_size);
     add_header(&nva[i++], "content-length", clen);
@@ -526,11 +531,19 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
     }
   }
 
+  int r;
   /* Submits response HEADERS frame */
-  nghttp2_data_provider data_prd;
-  data_prd.source.fd = response->fd;
-  data_prd.read_callback = response_read_callback;
-  int r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, &data_prd);
+  if (strcmp(MHD_HTTP_METHOD_HEAD, stream->method) == 0)
+  {
+    r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, NULL);
+  }
+  else
+  {
+    nghttp2_data_provider data_prd;
+    data_prd.source.fd = response->fd;
+    data_prd.read_callback = response_read_callback;
+    r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, &data_prd);
+  }
   return r;
 }
 
@@ -777,6 +790,26 @@ error_callback (nghttp2_session *session,
   return 0;
 }
 
+/**
+ * Invalid frame received . Only for debugging purposes.
+ *
+ * @param session    current http2 session
+ * @param frame      frame sent
+ * @param error_code reason of closure
+ * @param user_data  HTTP2 connection of type http2_conn
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+int
+on_invalid_frame_recv_callback(nghttp2_session *session,
+                               const nghttp2_frame *frame,
+                               int error_code,
+                               void *user_data)
+{
+  struct http2_conn *h2 = (struct http2_conn *)user_data;
+  mhd_assert (h2 != NULL);
+  ENTER("[id=%d] INVALID: %s", h2->session_id, nghttp2_strerror(error_code));
+  return 0;
+}
 
 /**
  * A header name/value pair is received for the frame.
@@ -979,6 +1012,9 @@ http2_session_init (struct MHD_Connection *connection)
 
   nghttp2_session_callbacks_set_on_header_callback (
     callbacks, on_header_callback);
+
+  nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (
+    callbacks, on_invalid_frame_recv_callback);
 
   nghttp2_session_callbacks_set_error_callback (
     callbacks, error_callback);
@@ -1228,13 +1264,6 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
   if (h2 == NULL) return MHD_NO;
   // ENTER("[id=%d]", h2->session_id); //, MHD_state_to_string (connection->state));
 
-  if ((nghttp2_session_want_read (h2->session) == 0) &&
-      (nghttp2_session_want_write (h2->session) == 0))
-  {
-    MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
-    return MHD_NO;
-  }
-
   ssize_t ret;
   ret = http2_session_send (h2);
   if (ret < 0)
@@ -1242,6 +1271,13 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
     if (ret == MHD_ERR_AGAIN_)
       return MHD_NO;
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+    return MHD_NO;
+  }
+
+  if ((nghttp2_session_want_read (h2->session) == 0) &&
+      (nghttp2_session_want_write (h2->session) == 0))
+  {
+    MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
     return MHD_NO;
   }
 

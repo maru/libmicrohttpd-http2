@@ -790,6 +790,26 @@ error_callback (nghttp2_session *session,
   return 0;
 }
 
+/**
+ * Invalid frame received . Only for debugging purposes.
+ *
+ * @param session    current http2 session
+ * @param frame      frame sent
+ * @param error_code reason of closure
+ * @param user_data  HTTP2 connection of type http2_conn
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+int
+on_invalid_frame_recv_callback(nghttp2_session *session,
+                               const nghttp2_frame *frame,
+                               int error_code,
+                               void *user_data)
+{
+  struct http2_conn *h2 = (struct http2_conn *)user_data;
+  mhd_assert (h2 != NULL);
+  ENTER("[id=%d] INVALID: %s", h2->session_id, nghttp2_strerror(error_code));
+  return 0;
+}
 
 /**
  * A header name/value pair is received for the frame.
@@ -992,6 +1012,9 @@ http2_session_init (struct MHD_Connection *connection)
 
   nghttp2_session_callbacks_set_on_header_callback (
     callbacks, on_header_callback);
+
+  nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (
+    callbacks, on_invalid_frame_recv_callback);
 
   nghttp2_session_callbacks_set_error_callback (
     callbacks, error_callback);
@@ -1241,13 +1264,6 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
   if (h2 == NULL) return MHD_NO;
   // ENTER("[id=%d]", h2->session_id); //, MHD_state_to_string (connection->state));
 
-  if ((nghttp2_session_want_read (h2->session) == 0) &&
-      (nghttp2_session_want_write (h2->session) == 0))
-  {
-    MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
-    return MHD_NO;
-  }
-
   ssize_t ret;
   ret = http2_session_send (h2);
   if (ret < 0)
@@ -1255,6 +1271,13 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
     if (ret == MHD_ERR_AGAIN_)
       return MHD_NO;
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+    return MHD_NO;
+  }
+
+  if ((nghttp2_session_want_read (h2->session) == 0) &&
+      (nghttp2_session_want_write (h2->session) == 0))
+  {
+    MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
     return MHD_NO;
   }
 

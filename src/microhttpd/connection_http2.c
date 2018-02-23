@@ -478,6 +478,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
   nghttp2_nv *nva;
   size_t nvlen = 2;
   ENTER("[id=%d]", h2->session_id);
+
   /* Count the number of headers to send */
   struct MHD_HTTP_Header *pos;
   for (pos = response->first_header; NULL != pos; pos = pos->next)
@@ -487,6 +488,8 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
       nvlen++;
     }
   }
+
+  /* content-lenght header */
   if (response->total_size != MHD_SIZE_UNKNOWN)
   {
     nvlen++;
@@ -537,6 +540,7 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
   {
     r = nghttp2_submit_response(h2->session, stream->stream_id, nva, nvlen, NULL);
   }
+  /* HEADERS + DATA frames */
   else
   {
     nghttp2_data_provider data_prd;
@@ -564,7 +568,7 @@ http2_call_connection_handler (struct MHD_Connection *connection,
 
   if (NULL != stream->response)
     return 0;                     /* already queued a response */
-  ENTER("[id=%d] method %s path %s", connection->h2->session_id, stream->method, stream->path);
+  ENTER("[id=%d] method %s url %s", connection->h2->session_id, stream->method, stream->url);
   connection->h2->current_stream_id = stream->stream_id;
   processed = 0;
   stream->client_aware = true;
@@ -800,7 +804,7 @@ error_callback (nghttp2_session *session,
 }
 
 /**
- * Invalid frame received . Only for debugging purposes.
+ * Invalid frame received. Only for debugging purposes.
  *
  * @param session    current http2 session
  * @param frame      frame sent

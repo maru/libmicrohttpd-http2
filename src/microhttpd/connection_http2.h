@@ -106,9 +106,19 @@ struct http2_stream
   char *method;
 
   /**
-   * Requested URL.
+   * Requested absolute path.
    */
   char *path;
+
+  /**
+   * Requested URL.
+   */
+  char *url;
+
+  /**
+   * Requested query in URL.
+   */
+  char *query;
 
   /**
    * Scheme (e.g., http).

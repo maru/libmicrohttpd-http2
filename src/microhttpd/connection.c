@@ -708,7 +708,7 @@ MHD_get_connection_values (struct MHD_Connection *connection,
 #ifdef HTTP2_SUPPORT
   if (connection->http_version == HTTP_VERSION(2, 0))
     /* Future implementation */
-    mhd_assert(0);
+    exit(0);
 #endif /* HTTP2_SUPPORT */
 
   int ret;
@@ -763,11 +763,6 @@ MHD_set_connection_value (struct MHD_Connection *connection,
                           const char *key,
                           const char *value)
 {
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    /* Future implementation */
-    mhd_assert(0);
-#endif /* HTTP2_SUPPORT */
 
   struct MHD_HTTP_Header *pos;
 
@@ -810,12 +805,6 @@ MHD_lookup_connection_value (struct MHD_Connection *connection,
                              enum MHD_ValueKind kind,
                              const char *key)
 {
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    /* Future implementation */
-    mhd_assert(0);
-#endif /* HTTP2_SUPPORT */
-
   struct MHD_HTTP_Header *pos;
 
   if (NULL == connection)

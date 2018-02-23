@@ -43,6 +43,8 @@
 #define H2_HEADER_AUTH_LEN   10
 #define H2_HEADER_PATH       ":path"
 #define H2_HEADER_PATH_LEN   5
+#define H2_HEADER_COOKIE     "cookie"
+#define H2_HEADER_COOKIE_LEN 6
 
 /**
  * HTTP/2 stream.

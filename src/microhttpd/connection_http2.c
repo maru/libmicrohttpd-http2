@@ -568,6 +568,10 @@ http2_call_connection_handler (struct MHD_Connection *connection,
   connection->h2->current_stream_id = stream->stream_id;
   processed = 0;
   stream->client_aware = true;
+  connection->headers_received = stream->headers_received;
+  connection->headers_received_tail = stream->headers_received_tail;
+  connection->method = stream->method;
+  connection->url = stream->path;
   if (MHD_NO ==
       connection->daemon->default_handler (connection->daemon->default_handler_cls,
 					   connection, stream->path, stream->method, MHD_HTTP_VERSION_2_0,
@@ -672,8 +676,11 @@ on_frame_recv_callback (nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  ENTER("[id=%d] frame->hd.type %s %X", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.flags);
+  ENTER("[id=%d] recv %s frame <length=%d, flags=0x%02X, stream_id=%u>",
+    h2->session_id, FRAME_TYPE (frame->hd.type),
+    frame->hd.length, frame->hd.flags, frame->hd.stream_id);
   if (frame->hd.flags) print_flags(frame->hd);
+
   switch (frame->hd.type)
   {
     case NGHTTP2_HEADERS:
@@ -732,7 +739,9 @@ on_frame_send_callback(nghttp2_session *session,
                        const nghttp2_frame *frame, void *user_data)
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
-  ENTER("[id=%d] frame->hd.type %s %X", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.flags);
+  ENTER("[id=%d] send %s frame <length=%d, flags=0x%02X, stream_id=%u>",
+    h2->session_id, FRAME_TYPE (frame->hd.type),
+    frame->hd.length, frame->hd.flags, frame->hd.stream_id);
   return 0;
 }
 
@@ -751,7 +760,7 @@ on_begin_headers_callback (nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  // ENTER("[id=%d]", h2->session_id);
+  ENTER("[id=%d]", h2->session_id);
 
   if (frame->hd.type != NGHTTP2_HEADERS ||
       frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
@@ -833,7 +842,7 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
   (void)flags;
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  // ENTER("[id=%d] %s: %s", h2->session_id, name, value);
+  ENTER("[id=%d] %s: %s", h2->session_id, name, value);
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (stream == NULL)
@@ -878,6 +887,31 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
       stream->authority = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
       mhd_assert (NULL != stream->authority) ;
       strcpy(stream->authority, value);
+  }
+  else
+  {
+    /* Add an entry to the HTTP headers of a stream. */
+    enum MHD_ValueKind kind = MHD_HEADER_KIND;
+    if ((namelen == H2_HEADER_COOKIE_LEN) &&
+        (strncmp(H2_HEADER_COOKIE, name, namelen) == 0))
+    {
+      kind = MHD_COOKIE_KIND;
+    }
+
+    struct MHD_Connection *connection = h2->connection;
+    connection->headers_received = stream->headers_received;
+    connection->headers_received_tail = stream->headers_received_tail;
+
+    char *key = MHD_pool_allocate (stream->pool, namelen + 1, MHD_YES);
+    strcpy(key, name);
+    char *val = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
+    strcpy(val, value);
+
+    if (MHD_NO == MHD_set_connection_value (connection, kind,	key, val))
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+
+    stream->headers_received = connection->headers_received;
+    stream->headers_received_tail = connection->headers_received_tail;
   }
   return 0;
 }

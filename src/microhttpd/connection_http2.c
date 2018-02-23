@@ -570,6 +570,8 @@ http2_call_connection_handler (struct MHD_Connection *connection,
   stream->client_aware = true;
   connection->headers_received = stream->headers_received;
   connection->headers_received_tail = stream->headers_received_tail;
+  connection->method = stream->method;
+  connection->url = stream->path;
   if (MHD_NO ==
       connection->daemon->default_handler (connection->daemon->default_handler_cls,
 					   connection, stream->path, stream->method, MHD_HTTP_VERSION_2_0,

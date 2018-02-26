@@ -562,15 +562,13 @@ build_headers (struct http2_conn *h2, struct http2_stream *stream, struct MHD_Re
  */
 static int
 http2_call_connection_handler (struct MHD_Connection *connection,
-                               struct http2_stream *stream)
+                               struct http2_stream *stream,
+                               char *upload_data, size_t *processed)
 {
-  size_t processed;
-
   if (NULL != stream->response)
     return 0;                     /* already queued a response */
   ENTER("[id=%d] method %s url %s", connection->h2->session_id, stream->method, stream->url);
   connection->h2->current_stream_id = stream->stream_id;
-  processed = 0;
   stream->client_aware = true;
   connection->headers_received = stream->headers_received;
   connection->headers_received_tail = stream->headers_received_tail;
@@ -579,12 +577,14 @@ http2_call_connection_handler (struct MHD_Connection *connection,
   if (MHD_NO ==
       connection->daemon->default_handler (connection->daemon->default_handler_cls,
 					   connection, connection->url, connection->method, MHD_HTTP_VERSION_2_0,
-             /* upload_data */ NULL, &processed,
+					   upload_data, processed,
 					   &stream->client_context))
   {
     /* serious internal error, close stream */
-    nghttp2_submit_rst_stream(connection->h2->session, NGHTTP2_FLAG_NONE,
+    nghttp2_submit_rst_stream (connection->h2->session, NGHTTP2_FLAG_NONE,
                               stream->stream_id, NGHTTP2_INTERNAL_ERROR);
+    ENTER("NGHTTP2_ERR_CALLBACK_FAILURE");
+    return NGHTTP2_ERR_CALLBACK_FAILURE;
   }
   return 0;
 }
@@ -666,6 +666,36 @@ send_data_callback(nghttp2_session *session, nghttp2_frame *frame,
 #define FRAME_TYPE(x) (x==NGHTTP2_DATA?"DATA": (x==NGHTTP2_HEADERS?"HEADERS": (x==NGHTTP2_PRIORITY?"PRIORITY": (x==NGHTTP2_RST_STREAM?"RST_STREAM": (x==NGHTTP2_SETTINGS?"SETTINGS": (x==NGHTTP2_PUSH_PROMISE?"PUSH_PROMISE": (x==NGHTTP2_PING?"PING": (x==NGHTTP2_GOAWAY?"GOAWAY": (x==NGHTTP2_WINDOW_UPDATE?"WINDOW_UPDATE": (x==NGHTTP2_CONTINUATION?"CONTINUATION": (x==NGHTTP2_ALTSVC?"ALTSVC":"-")))))))))))
 
 /**
+ * A chunk of data in a DATA frame is received.
+ * Call the handler of the application for this stream.
+ * Handles chunking of the upload as well as normal uploads.
+ *
+ * @param session    current http2 session
+ * @param flags      flags of the DATA frame
+ * @param stream_id  id of stream
+ * @param data       data
+ * @param len        length of data
+ * @param user_data  HTTP2 connection of type http2_conn
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+int
+on_data_chunk_recv_callback(nghttp2_session *session, uint8_t flags,
+                            int32_t stream_id, const uint8_t *data,
+                            size_t len, void *user_data)
+{
+  struct http2_conn *h2 = (struct http2_conn *)user_data;
+  struct http2_stream *stream;
+  mhd_assert (h2 != NULL);
+  // ENTER("[id=%d] len: %zu", h2->session_id, len);
+
+  stream = nghttp2_session_get_stream_user_data (session, stream_id);
+  if (stream == NULL)
+    return 0;
+
+  return http2_call_connection_handler (h2->connection, stream, (char *)data, &len);
+}
+
+/**
  * A frame was received. If it is a DATA or HEADERS frame,
  * we pass the request to the MHD application.
  *
@@ -685,45 +715,37 @@ on_frame_recv_callback (nghttp2_session *session,
     frame->hd.length, frame->hd.flags, frame->hd.stream_id);
   if (frame->hd.flags) print_flags(frame->hd);
 
+  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  if (stream == NULL)
+    return 0;
+
   switch (frame->hd.type)
   {
     case NGHTTP2_HEADERS:
-      stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-      if (stream != NULL)
+      if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS)
       {
-        if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS)
-        {
-          /* First call */
-          http2_call_connection_handler (h2->connection, stream);
-        }
-        if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
-        {
-          /* Final call to application handler: GET, HEAD requests */
-          return http2_call_connection_handler (h2->connection, stream);
-        }
+        /* First call */
+        size_t unused = 0;
+        int ret = http2_call_connection_handler (h2->connection, stream, NULL, &unused);
+        if (ret != 0)
+          return ret;
+      }
+      if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
+      {
+        /* Final call to application handler: GET, HEAD requests */
+
+        size_t unused = 0;
+        return http2_call_connection_handler (h2->connection, stream, NULL, &unused);
       }
       break;
     case NGHTTP2_DATA:
       /* Check that the client request has finished */
       if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
       {
-        stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-        if (stream != NULL)
-        {
-          /* Final call to application handler: POST, PUT requests */
-          return http2_call_connection_handler (h2->connection, stream);
-        }
+        /* Final call to application handler: POST, PUT requests */
+        size_t unused = 0;
+        return http2_call_connection_handler (h2->connection, stream, NULL, &unused);
       }
-      break;
-    case NGHTTP2_PRIORITY:
-      break;
-    case NGHTTP2_WINDOW_UPDATE:
-      break;
-    case NGHTTP2_RST_STREAM:
-      break;
-    case NGHTTP2_GOAWAY:
-      break;
-    default:
       break;
   }
   return 0;
@@ -853,6 +875,98 @@ http2_connection_add_header (struct MHD_Connection *connection,
 
 
 /**
+ * Parse the cookie header (see RFC 2109).
+ *
+ * @param connection connection to parse header of
+ * @param stream     stream we are processing
+ * @param value      cookie header value
+ * @param valuelen   length of cookie header value
+ * @return #MHD_YES for success, #MHD_NO for failure (malformed, out of memory)
+ */
+int
+http2_parse_cookie_header (struct MHD_Connection *connection,
+                           struct http2_stream *stream,
+                           const char *value, size_t valuelen)
+{
+  char *pos;
+  char *sce;
+  char *ekill;
+  char *equals;
+  char *semicolon;
+  char old;
+  int quotes;
+
+  pos = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
+  if (NULL == pos)
+  {
+#ifdef HAVE_MESSAGES
+      MHD_DLOG (connection->daemon,
+                _("Not enough memory in pool to parse cookies!\n"));
+#endif
+      return MHD_NO;
+  }
+  memcpy (pos, value, valuelen + 1);
+
+  while (NULL != pos)
+  {
+    while (' ' == *pos)
+      pos++;                  /* skip spaces */
+
+    sce = pos;
+    while ( ((*sce) != '\0') &&
+            ((*sce) != ',') &&
+            ((*sce) != ';') &&
+            ((*sce) != '=') )
+      sce++;
+    /* remove tailing whitespace (if any) from key */
+    ekill = sce - 1;
+    while ((*ekill == ' ') && (ekill >= pos))
+      *(ekill--) = '\0';
+    old = *sce;
+    *sce = '\0';
+    if (old != '=')
+    {
+        /* value part omitted, use empty string... */
+        if (MHD_NO == http2_connection_add_header (connection, pos, "", MHD_COOKIE_KIND))
+          return MHD_NO;
+        if (old == '\0')
+          break;
+        pos = sce + 1;
+        continue;
+    }
+    equals = sce + 1;
+    quotes = 0;
+    semicolon = equals;
+    while (('\0' != semicolon[0]) &&
+           ((0 != quotes) || ((';' != semicolon[0]) &&
+           (',' != semicolon[0]))))
+    {
+        if ('"' == semicolon[0])
+          quotes = (quotes + 1) & 1;
+        semicolon++;
+    }
+    if ('\0' == semicolon[0])
+      semicolon = NULL;
+    if (NULL != semicolon)
+    {
+      semicolon[0] = '\0';
+      semicolon++;
+    }
+    /* remove quotes */
+    if (('"' == equals[0]) && ('"' == equals[strlen (equals) - 1]))
+    {
+      equals[strlen (equals) - 1] = '\0';
+      equals++;
+    }
+    if (MHD_NO == http2_connection_add_header (connection, pos, equals, MHD_COOKIE_KIND))
+      return MHD_NO;
+    pos = semicolon;
+  }
+  return MHD_YES;
+}
+
+
+/**
  * A header name/value pair is received for the frame.
  *
  * @param session  current http2 session
@@ -967,16 +1081,17 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
   else
   {
     /* Add an entry to the HTTP headers of a stream. */
+    struct MHD_Connection *connection = h2->connection;
+    connection->headers_received = stream->headers_received;
+    connection->headers_received_tail = stream->headers_received_tail;
+
     enum MHD_ValueKind kind = MHD_HEADER_KIND;
     if ((namelen == H2_HEADER_COOKIE_LEN) &&
         (strncmp(H2_HEADER_COOKIE, name, namelen) == 0))
     {
       kind = MHD_COOKIE_KIND;
+      http2_parse_cookie_header (connection, stream, value, valuelen);
     }
-
-    struct MHD_Connection *connection = h2->connection;
-    connection->headers_received = stream->headers_received;
-    connection->headers_received_tail = stream->headers_received_tail;
 
     char *key = MHD_pool_allocate (stream->pool, namelen + 1, MHD_YES);
     strcpy(key, name);
@@ -1122,6 +1237,9 @@ http2_session_init (struct MHD_Connection *connection)
 
   nghttp2_session_callbacks_set_on_header_callback (
     callbacks, on_header_callback);
+
+  nghttp2_session_callbacks_set_on_data_chunk_recv_callback (
+    callbacks, on_data_chunk_recv_callback);
 
   nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (
     callbacks, on_invalid_frame_recv_callback);
@@ -1346,8 +1464,7 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
     nghttp2_submit_goaway(h2->session, NGHTTP2_FLAG_NONE, h2->accepted_max,
                           NGHTTP2_PROTOCOL_ERROR, NULL, 0);
     nghttp2_session_send(h2->session);
-    connection_close_error (connection,
-                            _("Connection socket is closed due to unexpected error when parsing request.\n"));
+    MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
     return MHD_NO;
   }
 

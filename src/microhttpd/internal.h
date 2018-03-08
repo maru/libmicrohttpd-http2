@@ -48,15 +48,7 @@
 
 #ifdef USE_NGHTTP2
 #include <nghttp2/nghttp2.h>
-#define ENTER_COLOR "32;1m"
-#define HTTP2_DEBUG 0
 struct timeval tm_start;
-#define ENTER(format, args...) if (HTTP2_DEBUG) {\
-  struct timeval now; gettimeofday(&now, NULL);\
-  long int milli = (now.tv_sec-tm_start.tv_sec)*1000000+(now.tv_usec-tm_start.tv_usec);\
-  fprintf(stderr, "\e[%s[%3ld.%03ld]%s ", "33m", milli/1000000, (milli%1000000)/1000, "\e[0m");\
-  fprintf(stderr, "\e[%s[%s]\e[0m " format "\n", ENTER_COLOR, __FUNCTION__, ##args);\
-}
 #endif /* USE_NGHTTP2 */
 
 #ifdef HAVE_STDBOOL_H

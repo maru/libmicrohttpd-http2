@@ -2884,6 +2884,14 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     }
 #endif /* HTTPS_SUPPORT */
 
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_handle_read (connection);
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
+
   /* make sure "read" has a reasonable number of bytes
      in buffer to use per system call (if possible) */
   if (connection->read_buffer_offset + connection->daemon->pool_increment >
@@ -2892,14 +2900,6 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 
   if (connection->read_buffer_size == connection->read_buffer_offset)
     return; /* No space for receiving data. */
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      MHD_http2_handle_read (connection);
-      return;
-    }
-#endif /* HTTP2_SUPPORT */
 
   bytes_read = connection->recv_cls (connection,
                                      &connection->read_buffer

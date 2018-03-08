@@ -83,12 +83,10 @@ struct http2_stream
   struct MHD_Response *response;
 
   /**
-   * The memory pool is created whenever we first read from the TCP
-   * stream and destroyed at the end of each request (and re-created
-   * for the next request).  In the meantime, this pointer is NULL.
-   * The pool is used for all connection-related data except for the
-   * response (which maybe shared between connections) and the IP
-   * address (which persists across individual requests).
+   * The memory pool is created when a stream is created and destroyed
+   * at the end of each stream.
+   * The pool is used for all stream-related data (except for the
+   * response).
    */
   struct MemoryPool *pool;
 
@@ -133,19 +131,6 @@ struct http2_stream
   char *authority;
 
   /**
-   * Buffer for reading requests.  Allocated in pool.  Actually one
-   * byte larger than @e read_buffer_size (if non-NULL) to allow for
-   * 0-termination.
-   */
-  char *read_buffer;
-
-  /**
-   * Buffer for writing response (headers only).  Allocated
-   * in pool.
-   */
-  char *write_buffer;
-
-  /**
    * Number of bytes we had in the HTTP header, set once we
    * pass #MHD_CONNECTION_HEADERS_RECEIVED.
    */
@@ -165,48 +150,13 @@ struct http2_stream
   unsigned int response_code;
 
   /**
-   * Are we receiving with chunked encoding?  This will be set to
-   * #MHD_YES after we parse the headers and are processing the body
-   * with chunks.  After we are done with the body and we are
-   * processing the footers; once the footers are also done, this will
-   * be set to #MHD_NO again (before the final call to the handler).
-   */
-  bool have_chunked_upload;
-
-  /**
-   * If we are receiving with chunked encoding, where are we right
-   * now?  Set to 0 if we are waiting to receive the chunk size;
-   * otherwise, this is the size of the current chunk.  A value of
-   * zero is also used when we're at the end of the chunks.
-   */
-  uint64_t current_chunk_size;
-
-  /**
-   * If we are receiving with chunked encoding, where are we currently
-   * with respect to the current chunk (at what offset / position)?
-   */
-  uint64_t current_chunk_offset;
-
-  /**
-   * How many more bytes of the body do we expect
-   * to read? #MHD_SIZE_UNKNOWN for unknown.
-   */
-  uint64_t remaining_upload_size;
-
-  /**
    * Current write position in the actual response
    * (excluding headers, content only; should be 0
    * while sending headers).
    */
   uint64_t response_write_position;
-
-#if defined(_MHD_HAVE_SENDFILE)
-  /**
-   * Type of send file function.
-   */
-  enum MHD_resp_sender_ resp_sender;
-#endif /* _MHD_HAVE_SENDFILE */
 };
+
 
 /**
  * Session for an HTTP/2 connection.
@@ -219,7 +169,7 @@ struct http2_conn
   nghttp2_session *session;
 
   /**
-   * Identifier.
+   * Identifier (for debugging purposes).
    */
   size_t session_id;
 
@@ -263,6 +213,15 @@ struct http2_conn
    */
   size_t accepted_max;
 
+  /**
+   * Data pending to write in the write_buffer.
+   */
+  const uint8_t *data_pending;
+
+  /**
+   * Length of data pending.
+   */
+  size_t data_pending_len;
 };
 
 

@@ -222,6 +222,8 @@ struct http2_conn
    * Length of data pending.
    */
   size_t data_pending_len;
+
+  size_t deferred_stream;
 };
 
 

@@ -182,6 +182,24 @@ http2_stream_delete (struct http2_conn *h2,
 /* ================================================================ */
 
 /**
+ * Fill header name/value pair.
+ *
+ * @param nv    name/value pair
+ * @param key   name of header
+ * @param value value of header
+ */
+static void
+add_header (nghttp2_nv *nv, const char *key, const char *value)
+{
+  nv->name = (uint8_t*)key;
+  nv->namelen = strlen(key);
+  nv->value = (uint8_t*)value;
+  nv->valuelen = strlen(value);
+  nv->flags = NGHTTP2_NV_FLAG_NONE;
+}
+
+
+/**
  * Callback function invoked when the nghttp2 library wants to
  * read data from the source.
  * Determines the number of bytes that will be in the next DATA frame.
@@ -211,6 +229,7 @@ response_read_callback (nghttp2_session *session, int32_t stream_id,
   struct MHD_Response *response;
   ssize_t nread;
 
+  // ENTER("[id=%d]", h2->session_id);
   /* Get current stream */
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (stream == NULL)
@@ -251,11 +270,14 @@ response_read_callback (nghttp2_session *session, int32_t stream_id,
     {
       nread = 0;
     }
+    else if (0 == ret)
+    {
+      h2->deferred_stream = stream_id;
+      return NGHTTP2_ERR_DEFERRED;
+    }
     else
     {
       response->data_size = ret;
-      response->data_start = 0;
-      stream->response_write_position = 0;
       nread = MHD_MIN (length, ret);
     }
   }
@@ -270,30 +292,55 @@ response_read_callback (nghttp2_session *session, int32_t stream_id,
   if ((nread == 0) || (response->total_size == stream->response_write_position + nread))
   {
     *data_flags |= NGHTTP2_DATA_FLAG_EOF;
-    /* TODO: Add trailer nghttp2_submit_trailer */
 
-    /* TODO: check nghttp2_session_get_stream_remote_close */
+    nghttp2_nv *nva;
+    size_t nvlen = 0, i = 0;
+
+    /* Count the number of trailers to send */
+    struct MHD_HTTP_Header *pos;
+    for (pos = response->first_header; NULL != pos; pos = pos->next)
+    {
+      if (pos->kind == MHD_FOOTER_KIND)
+      {
+        nvlen++;
+      }
+    }
+    if (nvlen > 0)
+    {
+      nva = MHD_pool_allocate (stream->pool, sizeof (nghttp2_nv)*nvlen, MHD_YES);
+      if (nva == NULL)
+        return nread;
+
+      /* Add trailers */
+      for (pos = response->first_header; NULL != pos; pos = pos->next)
+      {
+        if (pos->kind == MHD_FOOTER_KIND)
+        {
+          add_header(&nva[i++], pos->header, pos->value);
+        }
+      }
+      int rv = nghttp2_submit_trailer(session, stream_id, nva, nvlen);
+      if (rv != 0)
+      {
+        if (nghttp2_is_fatal(rv))
+        {
+          return NGHTTP2_ERR_CALLBACK_FAILURE;
+        }
+      }
+      else
+      {
+        *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+      }
+    }
+
+    if (nghttp2_session_get_stream_remote_close(session, stream_id) == 0)
+    {
+      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+                                 stream_id, NGHTTP2_NO_ERROR);
+    }
   }
 
   return nread;
-}
-
-
-/**
- * Fill header name/value pair.
- *
- * @param nv    name/value pair
- * @param key   name of header
- * @param value value of header
- */
-static void
-add_header (nghttp2_nv *nv, const char *key, const char *value)
-{
-  nv->name = (uint8_t*)key;
-  nv->namelen = strlen(key);
-  nv->value = (uint8_t*)value;
-  nv->valuelen = strlen(value);
-  nv->flags = NGHTTP2_NV_FLAG_NONE;
 }
 
 
@@ -477,7 +524,7 @@ send_data_callback (nghttp2_session *session, nghttp2_frame *frame,
 
   left = connection->write_buffer_size - connection->write_buffer_append_offset;
 
-  if (left < 9 + length + padlen)  /* 9 = frame header */
+  if ((connection->suspended) || (left < 9 + length + padlen)  /* 9 = frame header */)
   {
     return NGHTTP2_ERR_WOULDBLOCK;
   }
@@ -500,7 +547,7 @@ send_data_callback (nghttp2_session *session, nghttp2_frame *frame,
     /* Buffer response */
     pos = (size_t) stream->response_write_position - response->data_start;
     memcpy(buffer, &response->data[pos], length);
-    // ENTER("pos %d len %d = %s", pos, length, buffer);
+    // ENTER("pos %d len %d", pos, length);
   }
   else if ((response->crc != NULL) && (length > 0))
   {
@@ -532,10 +579,10 @@ send_data_callback (nghttp2_session *session, nghttp2_frame *frame,
 
   /* Reset data buffer */
   if ((response->total_size == MHD_SIZE_UNKNOWN) &&
-      (stream->response_write_position == response->data_size))
+      ((stream->response_write_position - response->data_start) == response->data_size))
   {
     response->data_size = 0;
-    stream->response_write_position = 0;
+    response->data_start = stream->response_write_position;
   }
 
   connection->write_buffer_append_offset += 9 + (padlen > 0) + length;
@@ -590,8 +637,8 @@ on_frame_recv_callback (nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  // ENTER("[id=%d] recv %s frame <length=%d, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
-  // if (frame->hd.flags) print_flags(frame->hd);
+  ENTER("[id=%d] recv %s frame <length=%d, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
+  if (frame->hd.flags) print_flags(frame->hd);
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (stream == NULL)
@@ -643,7 +690,7 @@ on_frame_send_callback (nghttp2_session *session,
                         const nghttp2_frame *frame, void *user_data)
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
-  // ENTER("[id=%d] send %s frame <length=%d, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
+  ENTER("[id=%d] send %s frame <length=%d, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
 
   MHD_update_last_activity_ (h2->connection);
   return 0;
@@ -1499,6 +1546,12 @@ MHD_http2_handle_idle (struct MHD_Connection *connection)
 #ifdef EPOLL_SUPPORT
     MHD_connection_epoll_update_ (connection);
 #endif /* EPOLL_SUPPORT */
+  }
+
+  /* TODO: resume all deferred streams */
+  if (connection->h2->deferred_stream > 0)
+  {
+    nghttp2_session_resume_data(connection->h2->session, connection->h2->deferred_stream);
   }
 
   return MHD_YES;

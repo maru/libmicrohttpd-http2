@@ -19,8 +19,10 @@
 /**
  * @file chunked_example.c
  * @brief example for generating chunked encoding with libmicrohttpd
+ *        and add a trailer at the end of the response.
  * @author Christian Grothoff
  * @author Karlson2k (Evgeny Grin)
+ * @author Maru Berezin
  */
 
 #include "platform.h"
@@ -137,6 +139,11 @@ ahc_echo (void *cls,
     free (callback_param);
     return MHD_NO;
   }
+
+  /* Add custom trailer */
+  MHD_add_response_header(response, "Trailer", "foo");
+  MHD_add_response_footer(response, "foo", "bar");
+
   ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
   MHD_destroy_response (response);
   return ret;
@@ -147,27 +154,33 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
-  int port;
+  int use_http2 = 0;
+  uint16_t port;
 
-  if (argc != 2)
+  switch (argc)
     {
-      printf ("%s PORT\n", argv[0]);
+    case 2:
+      port = atoi (argv[1]);
+      break;
+    case 3:
+      if (strcmp(argv[1], "-h2") == 0)
+        {
+          use_http2 = MHD_USE_HTTP2;
+          port = atoi (argv[2]);
+          break;
+        }
+    default:
+      printf ("%s [-h2] PORT\n", argv[0]);
       return 1;
     }
-  port = atoi (argv[1]);
-  if ( (1 > port) ||
-       (port > UINT16_MAX) )
-    {
-      fprintf (stderr,
-               "Port must be a number between 1 and 65535\n");
-      return 1;
-    }
-  d = MHD_start_daemon (/* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
+
+  d = MHD_start_daemon (use_http2 |
+                        /* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
                         MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         /* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_POLL, */
 			/* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_POLL, */
 			/* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
-                        (uint16_t) port,
+                        port,
                         NULL, NULL,
                         &ahc_echo, NULL,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,

@@ -567,6 +567,9 @@ send_data_callback (nghttp2_session *session, nghttp2_frame *frame,
     }
   }
 
+  *(buffer + length) = 0;
+  ENTER("%s", buffer);
+
   /* Set padding */
   if (padlen > 0)
   {
@@ -914,7 +917,7 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
   (void)flags;
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  // ENTER("[id=%d] %s: %s", h2->session_id, name, value);
+  ENTER("[id=%d] %s: %s", h2->session_id, name, value);
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (stream == NULL)
@@ -926,21 +929,24 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
       (strncmp(H2_HEADER_METHOD, name, namelen) == 0))
   {
       stream->method = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-      mhd_assert (NULL != stream->method) ;
+      if (NULL == stream->method)
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->method, value);
   }
   else if ((namelen == H2_HEADER_SCHEME_LEN) &&
       (strncmp(H2_HEADER_SCHEME, name, namelen) == 0))
   {
       stream->scheme = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-      mhd_assert (NULL != stream->scheme) ;
+      if (NULL == stream->scheme)
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->scheme, value);
   }
   else if ((namelen == H2_HEADER_PATH_LEN) &&
       (strncmp(H2_HEADER_PATH, name, namelen) == 0))
   {
       stream->path = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-      mhd_assert (NULL != stream->path) ;
+      if (NULL == stream->path)
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->path, value);
 
       /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
@@ -972,6 +978,8 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
         // }
 
         stream->query = MHD_pool_allocate (stream->pool, argslen + 1, MHD_YES);
+        if (NULL == stream->query)
+          return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
         strcpy(stream->query, args);
 
         /* note that this call clobbers 'query' */
@@ -988,6 +996,8 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
 
       /* Absolute path */
       stream->url = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
+      if (NULL == stream->url)
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->url, value);
 
       /* Decode %HH */
@@ -1001,7 +1011,8 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
       (strncmp(H2_HEADER_AUTH, name, namelen) == 0))
   {
       stream->authority = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-      mhd_assert (NULL != stream->authority) ;
+      if (NULL == stream->authority)
+        return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->authority, value);
   }
   else
@@ -1020,8 +1031,12 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
     }
 
     char *key = MHD_pool_allocate (stream->pool, namelen + 1, MHD_YES);
-    strcpy(key, name);
     char *val = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
+
+    if ((NULL == key) || (NULL == val))
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+
+    strcpy(key, name);
     strcpy(val, value);
 
     if (MHD_NO == http2_connection_add_header (connection, key, val, kind))

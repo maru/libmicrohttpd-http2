@@ -1,6 +1,9 @@
 language: c
 compiler: gcc
 sudo: false
+env:
+  NGHTTP2_VERSION=1.24.0
+  CURL_VERSION=7_49_0
 addons:
   apt:
     packages:
@@ -16,20 +19,21 @@ addons:
       - zzuf
       - socat
 install:
-  - if [ $TRAVIS_OS_NAME = linux ]; then
-      curl -L https://github.com/nghttp2/nghttp2/releases/download/v1.24.0/nghttp2-1.24.0.tar.gz |
-         tar xzf - &&
-         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only && make && sudo make install);
-    fi
+  - curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.gz |
+      tar xzf - &&
+      (cd nghttp2-${NGHTTP2_VERSION} && CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only && make && sudo make install);
+  - curl -L https://github.com/curl/curl/archive/curl-${CURL_VERSION}.tar.gz |
+      tar xzf - &&
+      (cd curl-${CURL_VERSION} && CXX="g++-4.8" ./configure --prefix=/usr --with-nghttp2 --without-ssl --with-gnutls && make && sudo make install);
 before_script:
   - autoreconf -fi
 script:
-  - ./configure --enable-https --enable-http2 --with-nghttp2
+  - ./configure --enable-https --enable-http2 --with-nghttp2 --disable-doc --enable-silent-rules --enable-asserts
   - echo '#undef HAVE_INET6' >> MHD_config.h
   - make
   - make check
   - sudo sh -c 'echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6'
-  - ./configure --enable-https
+  - ./configure --enable-https --disable-doc --enable-silent-rules --enable-asserts
   - make
   - make check
 after_failure:

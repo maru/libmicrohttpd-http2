@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "../microhttpd/test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -39,7 +40,7 @@
 
 #include "socat.c"
 
-static int oneone;
+static int http_version, flags = 0;
 
 struct CBC
 {
@@ -180,8 +181,8 @@ testInternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
-                        11080, NULL, NULL, &ahc_echo, NULL, 
+  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+                        11080, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
   if (d == NULL)
@@ -198,10 +199,7 @@ testInternalPost ()
       curl_easy_setopt (c, CURLOPT_HTTPPOST, pd);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -231,8 +229,8 @@ testMultithreadedPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
-                        11080, NULL, NULL, &ahc_echo, NULL, 
+  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+                        11080, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
   if (d == NULL)
@@ -249,10 +247,7 @@ testMultithreadedPost ()
       curl_easy_setopt (c, CURLOPT_HTTPPOST, pd);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -292,9 +287,9 @@ testExternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */ ,
-                        1082, NULL, NULL, &ahc_echo, NULL, 
-			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,			
+  d = MHD_start_daemon (flags | MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */ ,
+                        1082, NULL, NULL, &ahc_echo, NULL,
+			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -317,10 +312,7 @@ testExternalPost ()
       curl_easy_setopt (c, CURLOPT_HTTPPOST, pd);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 15L);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -401,8 +393,18 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  if (has_in_name(argv[0], "11"))
+    http_version = CURL_HTTP_VERSION_1_1;
+#ifdef HTTP2_SUPPORT
+  else if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+#endif /* HTTP2_SUPPORT */
+  else
+    http_version = CURL_HTTP_VERSION_1_0;
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testInternalPost ();

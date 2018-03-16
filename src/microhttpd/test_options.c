@@ -27,6 +27,7 @@
 #include "platform.h"
 #include "microhttpd.h"
 #include "mhd_sockets.h"
+#include "test_helpers.h"
 
 #define MHD_E_MEM "Error: memory error\n"
 #define MHD_E_SERVER_INIT "Error: failed to start server\n"
@@ -34,6 +35,7 @@
 const int DEBUG_GNUTLS_LOG_LEVEL = 0;
 const char *test_file_name = "https_test_file";
 const char test_file_data[] = "Hello World\n";
+static int http2_flag = 0;
 
 static int
 ahc_echo (void *cls,
@@ -99,7 +101,7 @@ test_ip_addr_option ()
   daemon_ip_addr6.sin6_addr = in6addr_loopback;
 #endif
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG, 0,
+  d = MHD_start_daemon (MHD_USE_ERROR_LOG | http2_flag, 0,
                         NULL, NULL, &ahc_echo, NULL, MHD_OPTION_SOCK_ADDR,
                         &daemon_ip_addr, MHD_OPTION_END);
 
@@ -109,7 +111,7 @@ test_ip_addr_option ()
   MHD_stop_daemon (d);
 
 #if HAVE_INET6
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_IPv6, 0,
+  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_IPv6 | http2_flag, 0,
                         NULL, NULL, &ahc_echo, NULL, MHD_OPTION_SOCK_ADDR,
                         &daemon_ip_addr6, MHD_OPTION_END);
 
@@ -127,7 +129,15 @@ int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
-  (void)argc; (void)argv; /* Unused. Silent compiler warning. */
+  int test_http2 = has_in_name(argv[0], "_http2");
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  if (test_http2)
+    {
+#ifdef HTTP2_SUPPORT
+      http2_flag = MHD_USE_HTTP2;
+#endif /* HTTP2_SUPPORT */
+    }
 
   errorCount += test_wrap_loc ("ip addr option", &test_ip_addr_option);
 

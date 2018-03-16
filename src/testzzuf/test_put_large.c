@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "../microhttpd/test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -38,7 +39,7 @@
 
 #include "socat.c"
 
-static int oneone;
+static int http_version, flags = 0;
 
 /**
  * Do not make this much larger since we will hit the
@@ -121,7 +122,7 @@ ahc_echo (void *cls,
       return MHD_YES;
     }
   response = MHD_create_response_from_buffer (strlen (url),
-					      (void *) url, 
+					      (void *) url,
 					      MHD_RESPMEM_MUST_COPY);
   ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
   MHD_destroy_response (response);
@@ -143,7 +144,7 @@ testInternalPut ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080,
                         NULL, NULL, &ahc_echo, &done_flag, MHD_OPTION_END);
   if (d == NULL)
@@ -163,10 +164,7 @@ testInternalPut ()
       curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -195,7 +193,7 @@ testMultithreadedPut ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080,
                         NULL, NULL, &ahc_echo, &done_flag, MHD_OPTION_END);
   if (d == NULL)
@@ -215,10 +213,7 @@ testMultithreadedPut ()
       curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -258,7 +253,7 @@ testExternalPut ()
   cbc.size = 2048;
   cbc.pos = 0;
   multi = NULL;
-  d = MHD_start_daemon (MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */,
+  d = MHD_start_daemon (flags | MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */,
                         11080,
                         NULL, NULL, &ahc_echo, &done_flag,
                         MHD_OPTION_CONNECTION_MEMORY_LIMIT,
@@ -286,10 +281,7 @@ testExternalPut ()
       curl_easy_setopt (c, CURLOPT_INFILESIZE, (long) PUT_SIZE);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT_MS, CURL_TIMEOUT);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -365,10 +357,20 @@ int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
-  (void)argc;	/* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  if (has_in_name(argv[0], "11"))
+    http_version = CURL_HTTP_VERSION_1_1;
+#ifdef HTTP2_SUPPORT
+  else if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+#endif /* HTTP2_SUPPORT */
+  else
+    http_version = CURL_HTTP_VERSION_1_0;
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   put_buffer = malloc (PUT_SIZE);

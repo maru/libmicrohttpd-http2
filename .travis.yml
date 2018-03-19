@@ -21,17 +21,20 @@ addons:
       - socat
 install:
   - |
+    cd ~/build/ &&
     curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.gz |
     tar xzf - &&
     cd nghttp2-${NGHTTP2_VERSION} &&
     CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only &&
     make && sudo make install
   - |
+    cd ~/build/ &&
     curl -L https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz |
     tar xzf - &&
     cd ${CURL_DIR} &&
     CXX="g++-4.8" ./configure --prefix=/usr --with-nghttp2 --without-ssl --with-gnutls &&
     make && sudo make install
+  - cd ~/build/maru/libmicrohttpd-http2/
 before_script:
   - autoreconf -fi
 script:

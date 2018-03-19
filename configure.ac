@@ -1193,7 +1193,7 @@ AC_ARG_ENABLE([curl],
 curl=0
 if test "$enable_curl" != "no"
 then
-  LIBCURL_CHECK_CONFIG([yes],[7.16.4],[enable_curl=yes],
+  LIBCURL_CHECK_CONFIG([yes],[7.49.0],[enable_curl=yes],
     [
       if test "x$enable_curl" = "xyes"; then
         AC_MSG_WARN([[cURL-based tests cannot be enabled because libcurl is missing]])
@@ -1204,7 +1204,7 @@ fi
 if test "$enable_curl" != "no"
 then
 # Lib cURL & cURL - OpenSSL versions
-  AC_DEFINE([MHD_REQ_CURL_VERSION], ["7.16.4"], [required cURL version to run tests])
+  AC_DEFINE([MHD_REQ_CURL_VERSION], ["7.49.0"], [required cURL version to run tests])
   AC_DEFINE([MHD_REQ_CURL_OPENSSL_VERSION], ["0.9.8"], [required cURL SSL version to run tests])
   AC_DEFINE([MHD_REQ_CURL_GNUTLS_VERSION], ["2.8.6"], [gnuTLS lib version - used in conjunction with cURL])
   AC_DEFINE([MHD_REQ_CURL_NSS_VERSION], ["3.12.0"], [NSS lib version - used in conjunction with cURL])
@@ -1909,8 +1909,8 @@ then
          CFLAGS="$NGHTTP2_CFLAGS $CFLAGS"
          LDFLAGS="$NGHTTP2_LIBS $LDFLAGS"
          LIBS="$LIBS $NGHTTP2_LIBS"
-         AC_MSG_CHECKING([[whether nghttp2 is usable]])
          NGHTTP2_CHECK()
+         AC_MSG_CHECKING([[whether nghttp2 is usable]])
          AS_IF([test "x$have_nghttp2" = "xyes"],
            [
             AC_MSG_RESULT([[yes]])

@@ -25,13 +25,13 @@ install:
     tar xzf - &&
     cd nghttp2-${NGHTTP2_VERSION} &&
     CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only &&
-    make && make install
+    make && sudo make install
   - |
     curl -L https://github.com/curl/curl/archive/curl-${CURL_VERSION}.tar.gz |
     tar xzf - &&
     cd ${CURL_DIR} && ./buildconf &&
     CXX="g++-4.8" ./configure --prefix=/usr --with-nghttp2 --without-ssl --with-gnutls &&
-    make && make install
+    make && sudo make install
 before_script:
   - autoreconf -fi
 script:
@@ -48,7 +48,7 @@ script:
       printf("curlverd->version %s\n", curlverd->version);
       return 0;
     }
-    ' | gcc -I/usr/include -L/usr/lib -xc - -lcurl && ./a.out
+    ' | gcc -I/usr/include -L/usr/lib -xc - -lcurl && ./a.out && rm a.out
   - |
     # ./configure --prefix=/usr --enable-https --disable-doc --enable-silent-rules --enable-asserts
     # && echo '#undef HAVE_INET6' >> MHD_config.h

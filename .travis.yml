@@ -1,6 +1,10 @@
 language: c
 compiler: gcc
 sudo: false
+env:
+  NGHTTP2_VERSION=1.24.0
+  CURL_VERSION=7_49_0
+  CURL_DIR=curl-curl-${CURL_VERSION}
 addons:
   apt:
     packages:
@@ -16,21 +20,45 @@ addons:
       - zzuf
       - socat
 install:
-  - if [ $TRAVIS_OS_NAME = linux ]; then
-      curl -L https://github.com/nghttp2/nghttp2/releases/download/v1.24.0/nghttp2-1.24.0.tar.gz |
-         tar xzf - &&
-         (cd nghttp2-1.24.0 && CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only && make && sudo make install);
-    fi
+  - |
+    curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.gz |
+    tar xzf - &&
+    cd nghttp2-${NGHTTP2_VERSION} &&
+    CXX="g++-4.8" ./configure --prefix=/usr --enable-lib-only &&
+    make && make install
+  - |
+    curl -L https://github.com/curl/curl/archive/curl-${CURL_VERSION}.tar.gz |
+    tar xzf - &&
+    cd ${CURL_DIR} && ./buildconf &&
+    CXX="g++-4.8" ./configure --prefix=/usr --with-nghttp2 --without-ssl --with-gnutls &&
+    make && make install
 before_script:
   - autoreconf -fi
 script:
-  - ./configure --enable-https --enable-http2 --with-nghttp2
-  - echo '#undef HAVE_INET6' >> MHD_config.h
-  - make
-  - make check
-  - sudo sh -c 'echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6'
-  - ./configure --enable-https
-  - make
-  - make check
+  - export LD_LIBRARY_PATH=/usr/lib
+  - |
+    echo '
+    #include <curl/curl.h>
+    #include <stdio.h>
+
+    int
+    main (int argc, char *const *argv)
+    {
+      curl_version_info_data *curlverd = curl_version_info (CURLVERSION_NOW);
+      printf("curlverd->version %s\n", curlverd->version);
+      return 0;
+    }
+    ' | gcc -I/usr/include -L/usr/lib -xc - -lcurl && ./a.out
+  - |
+    # ./configure --prefix=/usr --enable-https --disable-doc --enable-silent-rules --enable-asserts
+    # && echo '#undef HAVE_INET6' >> MHD_config.h
+    # && make && make check
+  - |
+    # ./configure --prefix=/usr --enable-https --enable-http2 --with-nghttp2 --disable-doc --disable-silent-rules --enable-asserts
+    # && echo '#undef HAVE_INET6' >> MHD_config.h
+    # && make && make check
 after_failure:
   - cat src/microhttpd/test-suite.log
+  - cat ./src/testcurl/test-suite.log
+  - cat ./src/testcurl/https/test-suite.log
+  - cat ./src/testzzuf/test-suite.log

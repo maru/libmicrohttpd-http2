@@ -39,7 +39,6 @@ before_script:
   - autoreconf -fi
 script:
   - export LD_LIBRARY_PATH=/usr/lib
-  - find / -name curlver.h  2>/dev/null
   - |
     echo '
     #include <curl/curl.h>
@@ -62,6 +61,7 @@ script:
     ./configure --prefix=/usr --enable-https --enable-http2 --with-nghttp2 --disable-doc --disable-silent-rules --enable-asserts &&
     echo '#undef HAVE_INET6' >> MHD_config.h &&
     make && make check
+  - cat /usr/include/curl/curlver.h
 after_script:
   - cat ./src/testcurl/https/test_tls_options.log
 after_failure:

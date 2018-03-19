@@ -97,6 +97,8 @@ main (int argc, char *const *argv)
     port = 0;
   else
     port = 3010;
+    curl_version_info_data *curlverd = curl_version_info (CURLVERSION_NOW);
+    printf("curlverd->version %s\n", curlverd->version);
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_DISABLE_SECMEM, 0);

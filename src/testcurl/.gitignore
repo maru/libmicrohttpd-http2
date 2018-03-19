@@ -105,3 +105,4 @@
 test_quiesce_stream
 test_large_put_inc11
 /test_delete
+*_http2

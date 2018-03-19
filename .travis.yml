@@ -39,6 +39,7 @@ before_script:
   - autoreconf -fi
 script:
   - export LD_LIBRARY_PATH=/usr/lib
+  - find / -name curlver.h  2>/dev/null
   - |
     echo '
     #include <curl/curl.h>

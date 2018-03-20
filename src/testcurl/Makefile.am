@@ -44,24 +44,24 @@ check_PROGRAMS = \
 
 if ENABLE_HTTP2
 check_PROGRAMS += \
-  # test_get_http2 \
-  # test_get_sendfile_http2 \
-  # test_urlparse_http2 \
-  # test_delete_http2 \
-  # test_put_http2 \
-  # test_process_headers_http2 \
-  # test_process_arguments_http2 \
-  # test_parse_cookies_http2 \
-  # test_large_put_http2 \
-  # test_large_put_inc_http2 \
-  # test_long_header_http2 \
-  # test_get_chunked_http2 \
-  # test_put_chunked_http2 \
-  # test_iplimit_http2 \
-  # test_termination_http2 \
-  # test_timeout_http2 \
-  # test_callback_http2 \
-  # perf_get_http2
+  test_get_http2 \
+  test_get_sendfile_http2 \
+  test_urlparse_http2 \
+  test_delete_http2 \
+  test_put_http2 \
+  test_process_headers_http2 \
+  test_process_arguments_http2 \
+  test_parse_cookies_http2 \
+  test_large_put_http2 \
+  test_large_put_inc_http2 \
+  test_long_header_http2 \
+  test_get_chunked_http2 \
+  test_put_chunked_http2 \
+  test_iplimit_http2 \
+  test_termination_http2 \
+  test_timeout_http2 \
+  test_callback_http2 \
+  perf_get_http2
 
 endif
 
@@ -69,7 +69,7 @@ if HAVE_FORK_WAITPID
 if HAVE_CURL_BINARY
 check_PROGRAMS += test_get_response_cleanup
 if ENABLE_HTTP2
-# check_PROGRAMS += test_get_response_cleanup_http2
+check_PROGRAMS += test_get_response_cleanup_http2
 endif
 endif
 endif
@@ -81,15 +81,15 @@ check_PROGRAMS += \
   perf_get_concurrent
 if ENABLE_HTTP2
 check_PROGRAMS += \
-  # test_quiesce_http2 \
-  # test_concurrent_stop_http2 \
-  # perf_get_concurrent_http2
+  test_quiesce_http2 \
+  test_concurrent_stop_http2 \
+  perf_get_concurrent_http2
 endif
 
 if HAVE_CURL_BINARY
 check_PROGRAMS += test_quiesce_stream
 if ENABLE_HTTP2
-# check_PROGRAMS += test_quiesce_stream_http2
+check_PROGRAMS += test_quiesce_stream_http2
 endif
 endif
 endif
@@ -104,9 +104,9 @@ if HAVE_POSTPROCESSOR
   test_post_loop11
 if ENABLE_HTTP2
  check_PROGRAMS += \
-  # test_post_http2 \
-  # test_postform_http2 \
-  # test_post_loop_http2
+  test_post_http2 \
+  test_postform_http2 \
+  test_post_loop_http2
 
 endif
 endif
@@ -116,8 +116,7 @@ if ENABLE_DAUTH
 	test_digestauth test_digestauth_with_arguments
 if ENABLE_HTTP2
   check_PROGRAMS += \
-  # test_digestauth_http2 test_digestauth_with_arguments_http2
-
+  test_digestauth_http2 test_digestauth_with_arguments_http2
 endif
 endif
 

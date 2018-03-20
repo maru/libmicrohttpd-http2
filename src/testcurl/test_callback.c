@@ -25,8 +25,11 @@
  */
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
+
+static int http_version, flags = 0;
 
 struct callback_closure
 {
@@ -123,14 +126,24 @@ main(int argc, char **argv)
   struct timeval tv;
   int extra;
   int port;
-  (void)argc; (void)argv; /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_0;
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     port = 1140;
 
-  d = MHD_start_daemon(0,
+  d = MHD_start_daemon (flags,
 		       port,
 		       NULL,
 		       NULL,
@@ -152,7 +165,7 @@ main(int argc, char **argv)
   curl_easy_setopt (c, CURLOPT_PORT, (long)port);
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &discard_buffer);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   curl_easy_setopt (c, CURLOPT_NOSIGNAL, 1);

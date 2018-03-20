@@ -25,6 +25,7 @@
  */
 
 #include "platform.h"
+#include "test_helpers.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -46,6 +47,8 @@
 #endif /* !WIN32_LEAN_AND_MEAN */
 #include <windows.h>
 #endif
+
+static int http_version, flags = 0;
 
 static int
 connection_handler (void *cls,
@@ -90,10 +93,21 @@ write_data (void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 int
-main (void)
+main (int argc, char *const *argv)
 {
   struct MHD_Daemon *daemon;
   int port;
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_1;
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -101,7 +115,7 @@ main (void)
     port = 1490;
 
 
-  daemon = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  daemon = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                              port,
                              NULL,
                              NULL, connection_handler, NULL, MHD_OPTION_END);
@@ -126,6 +140,7 @@ main (void)
   sprintf (url, "http://127.0.0.1:%d", port);
   curl_easy_setopt (curl, CURLOPT_URL, url);
   curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, write_data);
+  curl_easy_setopt (curl, CURLOPT_HTTP_VERSION, http_version);
 
   CURLcode success = curl_easy_perform (curl);
   if (success != 0)

@@ -25,6 +25,8 @@
  * @author Karlson2k (Evgeny Grin)
  */
 #include "mhd_options.h"
+#include "test_helpers.h"
+#include <curl/curl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -38,6 +40,8 @@
 #define sleep(s) (Sleep((s)*1000), 0)
 #endif /* _WIN32 */
 
+
+static int http_version, flags = 0;
 
 static volatile unsigned int request_counter;
 
@@ -172,10 +176,24 @@ http_AccessHandlerCallback (void *cls,
 
 
 int
-main(void)
+main (int argc, char *const *argv)
 {
   int port;
   char command_line[1024];
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_1;
+
+  char *use_http_version = (http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) ?
+                           "--http2-prior-knowledge" : "--http1.1";
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -194,7 +212,7 @@ main(void)
     | MHD_USE_ITC;
 
   /* Create daemon */
-  struct MHD_Daemon *daemon = MHD_start_daemon (daemon_flags,
+  struct MHD_Daemon *daemon = MHD_start_daemon (flags | daemon_flags,
                                                 port,
                                                 NULL,
                                                 NULL,
@@ -211,7 +229,7 @@ main(void)
         { MHD_stop_daemon (daemon); return 32; }
       port = (int)dinfo->port;
     }
-  sprintf(command_line, "curl -s http://127.0.0.1:%d", port);
+  sprintf(command_line, "curl %s -s http://127.0.0.1:%d", use_http_version, port);
 
   if (0 != system (command_line))
     {

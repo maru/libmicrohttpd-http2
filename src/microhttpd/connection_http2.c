@@ -903,6 +903,51 @@ http2_parse_cookie_header (struct MHD_Connection *connection,
 
 
 /**
+ * Add an entry to the HTTP headers of a stream.
+ *
+ * @param connection connection to handle
+ * @param stream     current stream
+ * @param name       header name
+ * @param namelen    length of header name
+ * @param value      header value
+ * @param valuelen   length of header value
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+static int
+stream_add_header(struct MHD_Connection *connection, struct http2_stream *stream,
+                  const uint8_t *name, const size_t namelen,
+                  const uint8_t *value, const size_t valuelen)
+{
+  connection->headers_received = stream->headers_received;
+  connection->headers_received_tail = stream->headers_received_tail;
+
+  enum MHD_ValueKind kind = MHD_HEADER_KIND;
+  if ((namelen == H2_HEADER_COOKIE_LEN) &&
+      (strncmp(H2_HEADER_COOKIE, name, namelen) == 0))
+  {
+    kind = MHD_COOKIE_KIND;
+    http2_parse_cookie_header (connection, stream, value, valuelen);
+  }
+
+  char *key = MHD_pool_allocate (stream->pool, namelen + 1, MHD_YES);
+  char *val = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
+
+  if ((NULL == key) || (NULL == val))
+    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+
+  strcpy(key, name);
+  strcpy(val, value);
+
+  if (MHD_NO == http2_connection_add_header (connection, key, val, kind))
+    return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+
+  stream->headers_received = connection->headers_received;
+  stream->headers_received_tail = connection->headers_received_tail;
+  return 0;
+}
+
+
+/**
  * A header name/value pair is received for the frame.
  *
  * @param session  current http2 session
@@ -1021,36 +1066,14 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
       if (NULL == stream->authority)
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
       strcpy(stream->authority, value);
+
+      return stream_add_header(h2->connection, stream,
+                               MHD_HTTP_HEADER_HOST, strlen(MHD_HTTP_HEADER_HOST),
+                               value, valuelen);
   }
   else
   {
-    /* Add an entry to the HTTP headers of a stream. */
-    struct MHD_Connection *connection = h2->connection;
-    connection->headers_received = stream->headers_received;
-    connection->headers_received_tail = stream->headers_received_tail;
-
-    enum MHD_ValueKind kind = MHD_HEADER_KIND;
-    if ((namelen == H2_HEADER_COOKIE_LEN) &&
-        (strncmp(H2_HEADER_COOKIE, name, namelen) == 0))
-    {
-      kind = MHD_COOKIE_KIND;
-      http2_parse_cookie_header (connection, stream, value, valuelen);
-    }
-
-    char *key = MHD_pool_allocate (stream->pool, namelen + 1, MHD_YES);
-    char *val = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-
-    if ((NULL == key) || (NULL == val))
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-
-    strcpy(key, name);
-    strcpy(val, value);
-
-    if (MHD_NO == http2_connection_add_header (connection, key, val, kind))
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-
-    stream->headers_received = connection->headers_received;
-    stream->headers_received_tail = connection->headers_received_tail;
+    return stream_add_header(h2->connection, stream, name, namelen, value, valuelen);
   }
   return 0;
 }

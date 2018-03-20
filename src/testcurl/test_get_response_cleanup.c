@@ -27,6 +27,8 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
+#include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -60,7 +62,7 @@
 
 #define TESTSTR "/* DO NOT CHANGE THIS LINE */"
 
-static int oneone;
+static int http_version, flags = 0;
 
 static int ok;
 
@@ -69,11 +71,14 @@ static pid_t
 fork_curl (const char *url)
 {
   pid_t ret;
+  char *use_http_version = (http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) ?
+                           "--http2-prior-knowledge" : "--http1.1";
 
   ret = fork();
   if (ret != 0)
     return ret;
-  execlp ("curl", "curl", "-s", "-N", "-o", "/dev/null", "-GET", url, NULL);
+
+  execlp ("curl", "curl", use_http_version, "-s", "-N", "-o", "/dev/null", "-GET", url, NULL);
   fprintf (stderr,
 	   "Failed to exec curl: %s\n",
 	   strerror (errno));
@@ -165,12 +170,12 @@ testInternalGet ()
   else
     {
       port = 1180;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   ok = 1;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -208,12 +213,12 @@ testMultithreadedGet ()
   else
     {
       port = 1181;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   ok = 1;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 2,
 			MHD_OPTION_END);
@@ -265,12 +270,12 @@ testMultithreadedPoolGet ()
   else
     {
       port = 1182;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   ok = 1;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -315,12 +320,12 @@ testExternalGet ()
   else
     {
       port = 1183;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   ok = 1;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (flags | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -403,8 +408,18 @@ main (int argc, char *const *argv)
     }
 #endif /* _WIN32 */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+if (has_in_name(argv[0], "11"))
+  http_version = CURL_HTTP_VERSION_1_1;
+#ifdef HTTP2_SUPPORT
+else if (has_in_name(argv[0], "_http2"))
+  {
+    http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+    flags = MHD_USE_HTTP2;
+  }
+#endif /* HTTP2_SUPPORT */
+else
+  http_version = CURL_HTTP_VERSION_1_0;
+
   errorCount += testInternalGet ();
   errorCount += testMultithreadedGet ();
   errorCount += testMultithreadedPoolGet ();

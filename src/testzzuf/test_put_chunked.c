@@ -27,7 +27,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
-#include "../microhttpd/test_helpers.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -155,8 +155,9 @@ testInternalPut ()
       curl_easy_setopt (c, CURLOPT_READDATA, &pos);
       curl_easy_setopt (c, CURLOPT_UPLOAD, 1L);
       /* by not giving the file size, we force chunking! */
-      if (http_version > CURL_HTTP_VERSION_1_1)
+      /*
          curl_easy_setopt (c, CURLOPT_INFILESIZE_LARGE, (curl_off_t) 8L);
+       */
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
       curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
@@ -279,8 +280,9 @@ testExternalPut ()
       curl_easy_setopt (c, CURLOPT_READDATA, &pos);
       curl_easy_setopt (c, CURLOPT_UPLOAD, 1L);
       /* by not giving the file size, we force chunking! */
-      if (http_version > CURL_HTTP_VERSION_1_1)
+      /*
          curl_easy_setopt (c, CURLOPT_INFILESIZE_LARGE, (curl_off_t) 8L);
+       */
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT_MS, CURL_TIMEOUT);
       curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);

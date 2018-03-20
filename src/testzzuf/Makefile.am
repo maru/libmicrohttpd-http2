@@ -35,12 +35,12 @@ if ENABLE_HTTP2
 check_PROGRAMS += \
   test_get_http2 \
   test_get_chunked_http2 \
-  # test_post_http2 \
-  # test_post_form_http2 \
-  # test_put_http2 \
-  # test_put_chunked_http2 \
-  # test_put_large_http2 \
-  # test_long_header_http2
+  test_post_http2 \
+  test_post_form_http2 \
+  test_put_http2 \
+  test_put_chunked_http2 \
+  test_put_large_http2 \
+  test_long_header_http2
 endif
 
 TESTS = $(check_PROGRAMS)

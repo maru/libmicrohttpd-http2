@@ -26,7 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
-#include "../microhttpd/test_helpers.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -221,15 +221,17 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  if (has_in_name(argv[0], "11"))
+    http_version = CURL_HTTP_VERSION_1_1;
 #ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
+  else if (has_in_name(argv[0], "_http2"))
     {
       http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
       flags = MHD_USE_HTTP2;
     }
-  else
 #endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_1;
+  else
+    http_version = CURL_HTTP_VERSION_1_0;
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

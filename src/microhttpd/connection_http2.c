@@ -657,6 +657,13 @@ on_frame_recv_callback (nghttp2_session *session,
         int ret = http2_call_connection_handler (h2->connection, stream, NULL, &unused);
         if (ret != 0)
           return ret;
+        if (need_100_continue (h2->connection))
+        {
+          nghttp2_nv nva;
+          add_header(&nva, ":status", status_string[100]);
+          nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE, stream->stream_id,
+                                  NULL, &nva, 1, NULL);
+        }
       }
       if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
       {

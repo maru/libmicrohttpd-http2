@@ -26,7 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
-#include "../microhttpd/test_helpers.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>

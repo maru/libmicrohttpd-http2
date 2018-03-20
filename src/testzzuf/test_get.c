@@ -26,7 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
-#include "../microhttpd/test_helpers.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -305,7 +305,6 @@ main (int argc, char *const *argv)
 #endif /* HTTP2_SUPPORT */
   else
     http_version = CURL_HTTP_VERSION_1_0;
-    printf("http_version %d flags %d\n", http_version, flags);
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

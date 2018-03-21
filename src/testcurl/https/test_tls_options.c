@@ -97,8 +97,16 @@ main (int argc, char *const *argv)
     port = 0;
   else
     port = 3010;
-    curl_version_info_data *curlverd = curl_version_info (CURLVERSION_NOW);
-    printf("curlverd->version %s\n", curlverd->version);
+
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_0;
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_DISABLE_SECMEM, 0);

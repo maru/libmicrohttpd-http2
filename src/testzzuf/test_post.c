@@ -42,8 +42,6 @@
 
 #define POST_DATA "name=daniel&project=curl"
 
-static int http_version, flags = 0;
-
 struct CBC
 {
   char *buf;
@@ -162,7 +160,7 @@ testInternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -210,7 +208,7 @@ testMultithreadedPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD /* | MHD_USE_ERROR_LOG */ ,
                         11080, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -270,7 +268,7 @@ testExternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */ ,
+  d = MHD_start_daemon (use_http2 | MHD_NO_FLAG /* | MHD_USE_ERROR_LOG */ ,
                         1082, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -377,17 +375,7 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  if (has_in_name(argv[0], "11"))
-    http_version = CURL_HTTP_VERSION_1_1;
-#ifdef HTTP2_SUPPORT
-  else if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-#endif /* HTTP2_SUPPORT */
-  else
-    http_version = CURL_HTTP_VERSION_1_0;
+  set_http_version(argv[0], 1);
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

@@ -23,8 +23,12 @@
  * @author Karlson2k (Evgeny Grin)
  */
 
+#ifndef TEST_HELPERS_H_
+#define TEST_HELPERS_H_
+
 #include <string.h>
 #include <curl/curl.h>
+#include "microhttpd.h"
 
 /**
  * Check whether program name contains specific @a marker string.
@@ -165,3 +169,38 @@ int my_trace(CURL *handle, curl_infotype type,
   dump(text, stderr, (unsigned char *)data, size);
   return 0;
 }
+
+
+/**
+ * HTTP version of connections.
+ */
+int http_version = 0;
+
+/**
+ * Use HTTP2 flag for daemon.
+ */
+int use_http2 = 0;
+
+/**
+ * Set HTTP version using the program name.
+ * @param prog_name program name, may include path
+ * @param allow_1_0 allow HTTP/1.0
+ */
+void
+set_http_version(const char *prog_name, int allow_1_0)
+{
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(prog_name, "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      use_http2 = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+  if ((has_in_name(prog_name, "11")) || !allow_1_0)
+    http_version = CURL_HTTP_VERSION_1_1;
+  else
+    http_version = CURL_HTTP_VERSION_1_0;
+}
+
+#endif /* TEST_HELPERS_H_ */

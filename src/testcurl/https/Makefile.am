@@ -11,7 +11,7 @@ endif
 
 if HAVE_POSIX_THREADS
   HTTPS_PARALLEL_TESTS = test_https_get_parallel \
-  test_https_get_parallel_threads
+    test_https_get_parallel_threads
 endif
 
 CPU_COUNT_DEF = -DCPU_COUNT=$(CPU_COUNT)
@@ -34,20 +34,30 @@ check_PROGRAMS = \
   test_https_time_out \
   test_empty_response
 
+if ENABLE_HTTP2
+check_PROGRAMS += \
+  test_tls_options_http2 \
+  test_tls_authentication_http2 \
+  test_https_multi_daemon_http2 \
+  test_https_get_http2 \
+  test_https_get_select_http2 \
+  test_https_session_info_http2 \
+  test_https_time_out_http2 \
+  test_empty_response_http2
+if HAVE_GNUTLS_SNI
+check_PROGRAMS += test_https_sni_http2
+endif
+if HAVE_POSIX_THREADS
+check_PROGRAMS += \
+	test_https_get_parallel_http2 \
+  test_https_get_parallel_threads_http2
+endif
+endif
+
 EXTRA_DIST = cert.pem key.pem \
   host1.crt host1.key host2.crt host2.key
 
-TESTS = \
-  test_tls_options \
-  test_https_multi_daemon \
-  test_https_get \
-  $(TEST_HTTPS_SNI) \
-  test_https_get_select \
-  $(HTTPS_PARALLEL_TESTS) \
-  test_https_session_info \
-  test_https_time_out \
-  test_tls_authentication \
-  test_empty_response
+TESTS = $(check_PROGRAMS)
 
 
 test_https_time_out_SOURCES = \
@@ -173,3 +183,125 @@ test_https_get_select_LDADD  = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
 
+test_https_time_out_http2_SOURCES = \
+  test_https_time_out.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_time_out_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_tls_options_http2_SOURCES = \
+  test_tls_options.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_tls_options_http2_LDADD = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_https_get_parallel_http2_SOURCES = \
+  test_https_get_parallel.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_get_parallel_http2_CPPFLAGS = \
+  $(AM_CPPFLAGS) $(CPU_COUNT_DEF)
+test_https_get_parallel_http2_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+test_https_get_parallel_http2_LDADD = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_empty_response_http2_SOURCES = \
+  test_empty_response.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_empty_response_http2_LDADD = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_https_get_parallel_threads_http2_SOURCES = \
+  test_https_get_parallel_threads.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_get_parallel_threads_http2_CPPFLAGS = \
+  $(AM_CPPFLAGS) $(CPU_COUNT_DEF)
+test_https_get_parallel_threads_http2_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+test_https_get_parallel_threads_http2_LDADD = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_tls_authentication_http2_SOURCES = \
+  test_tls_authentication.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_tls_authentication_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_https_session_info_http2_SOURCES = \
+  test_https_session_info.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_session_info_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_https_multi_daemon_http2_SOURCES = \
+  test_https_multi_daemon.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_multi_daemon_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_https_get_http2_SOURCES = \
+  test_https_get.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_get_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+
+if HAVE_GNUTLS_SNI
+test_https_sni_http2_SOURCES = \
+  test_https_sni.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_sni_http2_CPPFLAGS = \
+  $(AM_CPPFLAGS) \
+  -DABS_SRCDIR=\"$(abs_srcdir)\"
+test_https_sni_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@
+endif
+
+test_https_get_select_http2_SOURCES = \
+  test_https_get_select.c \
+  tls_test_keys.h \
+  tls_test_common.h \
+  tls_test_common.c
+test_https_get_select_http2_LDADD  = \
+  $(top_builddir)/src/testcurl/libcurl_version_check.a \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(GNUTLS_LDFLAGS) $(GNUTLS_LIBS) @LIBGCRYPT_LIBS@ @LIBCURL@

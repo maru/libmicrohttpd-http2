@@ -205,7 +205,7 @@ do_get (const char *url, int port)
 #endif
   curl_easy_setopt (c, CURLOPT_URL, url);
   curl_easy_setopt (c, CURLOPT_PORT, (long)port);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
@@ -263,6 +263,16 @@ main (int argc, char *const *argv)
   else
     port = 3060;
 
+#ifdef HTTP2_SUPPORT
+  if (has_in_name(argv[0], "_http2"))
+    {
+      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      flags = MHD_USE_HTTP2;
+    }
+  else
+#endif /* HTTP2_SUPPORT */
+    http_version = CURL_HTTP_VERSION_1_0;
+
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
 #ifdef GCRYCTL_INITIALIZATION_FINISHED
@@ -280,7 +290,7 @@ main (int argc, char *const *argv)
 
   load_keys ("host1", ABS_SRCDIR "/host1.crt", ABS_SRCDIR "/host1.key");
   load_keys ("host2", ABS_SRCDIR "/host2.crt", ABS_SRCDIR "/host2.key");
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS | MHD_USE_ERROR_LOG,
                         port,
                         NULL, NULL,
                         &http_ahc, NULL,

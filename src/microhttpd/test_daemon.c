@@ -35,14 +35,13 @@
 #include <unistd.h>
 #endif
 
-static int http2_flag = 0;
 
 static int
 testStartError ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | http2_flag, 0, NULL, NULL, NULL, NULL);
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG, 0, NULL, NULL, NULL, NULL);
   if (NULL != d)
   {
     MHD_stop_daemon (d);
@@ -98,7 +97,7 @@ testStartStop ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | http2_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         0,
                         &apc_nothing, NULL,
                         &ahc_nothing, NULL,
@@ -123,7 +122,7 @@ testExternalRun ()
   MHD_socket maxfd;
   int i;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | http2_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -167,7 +166,7 @@ testThread ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD | http2_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -196,7 +195,7 @@ testMultithread ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_THREAD_PER_CONNECTION | http2_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_THREAD_PER_CONNECTION,
                         0,
                         &apc_all, NULL,
                         &ahc_nothing, NULL,
@@ -225,15 +224,9 @@ main (int argc,
       char *const *argv)
 {
   int errorCount = 0;
-  int test_http2 = has_in_name(argv[0], "_http2");
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  if (test_http2)
-    {
-#ifdef HTTP2_SUPPORT
-      http2_flag = MHD_USE_HTTP2;
-#endif /* HTTP2_SUPPORT */
-    }
+  set_http_version(argv[0], 0);
 
   errorCount += testStartError ();
   errorCount += testStartStop ();

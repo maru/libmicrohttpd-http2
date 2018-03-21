@@ -701,7 +701,13 @@ on_frame_send_callback (nghttp2_session *session,
 {
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   ENTER("[id=%zu] send %s frame <length=%zu, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
-
+  if (frame->hd.type == NGHTTP2_HEADERS) {
+    nghttp2_nv *nva = frame->headers.nva;
+    nghttp2_nv *end = frame->headers.nva + frame->headers.nvlen;
+    for (; nva != end; ++nva) {
+      ENTER("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), nva->name, do_color("\033[0m"), nva->value);
+    }
+  }
   MHD_update_last_activity_ (h2->connection);
   return 0;
 }
@@ -969,7 +975,7 @@ on_header_callback (nghttp2_session *session, const nghttp2_frame *frame,
   (void)flags;
   struct http2_conn *h2 = (struct http2_conn *)user_data;
   struct http2_stream *stream;
-  ENTER("[id=%zu] %s: %s", h2->session_id, name, value);
+  ENTER("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (stream == NULL)

@@ -26,6 +26,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <sys/stat.h>
 #include <limits.h>
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
@@ -91,22 +92,14 @@ main (int argc, char *const *argv)
   int daemon_flags =
     MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS | MHD_USE_ERROR_LOG;
   int port;
-  (void)argc; (void)argv;       /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     port = 3010;
-
-#ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_0;
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_DISABLE_SECMEM, 0);

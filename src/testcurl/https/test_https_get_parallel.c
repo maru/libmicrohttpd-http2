@@ -27,6 +27,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <sys/stat.h>
 #include <limits.h>
 #include <curl/curl.h>
@@ -136,11 +137,13 @@ test_parallel_clients (void * cls, int port, const char *cipher_suite,
 
 int
 main (int argc, char *const *argv)
-{  
+{
   unsigned int errorCount = 0;
   const char *aes256_sha = "AES256-SHA";
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;

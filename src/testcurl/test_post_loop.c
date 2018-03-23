@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -48,7 +49,7 @@
 
 #define LOOPCOUNT 1000
 
-static int oneone;
+static double http_version_val;
 
 struct CBC
 {
@@ -93,7 +94,7 @@ ahc_echo (void *cls,
     {
       if (*mptr != &marker)
         abort ();
-      response = MHD_create_response_from_buffer (2, "OK", 
+      response = MHD_create_response_from_buffer (2, "OK",
 						  MHD_RESPMEM_PERSISTENT);
       ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
       MHD_destroy_response (response);
@@ -125,13 +126,13 @@ testInternalPost ()
   else
     {
       port = 1350;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL, MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -159,10 +160,7 @@ testInternalPost ()
       curl_easy_setopt (c, CURLOPT_POST, 1L);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -207,13 +205,13 @@ testMultithreadedPost ()
   else
     {
       port = 1351;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL, MHD_OPTION_END);
   if (d == NULL)
     return 16;
@@ -241,10 +239,7 @@ testMultithreadedPost ()
       curl_easy_setopt (c, CURLOPT_POST, 1L);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -289,13 +284,13 @@ testMultithreadedPoolPost ()
   else
     {
       port = 1352;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL,
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -324,10 +319,7 @@ testMultithreadedPoolPost ()
       curl_easy_setopt (c, CURLOPT_POST, 1L);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -388,7 +380,7 @@ testExternalPost ()
   else
     {
       port = 1353;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
@@ -396,7 +388,7 @@ testExternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL, MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -430,10 +422,7 @@ testExternalPost ()
       curl_easy_setopt (c, CURLOPT_POST, 1L);
       curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
       curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-      if (oneone)
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-      else
-        curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+      curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
       curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
       /* NOTE: use of CONNECTTIMEOUT without also
        *   setting NOSIGNAL results in really weird
@@ -490,7 +479,7 @@ testExternalPost ()
 	      fprintf (stderr,
 		       "select failed: %s\n",
 		       strerror (errno));
-	      break;	      
+	      break;
 	    }
           while (CURLM_CALL_MULTI_PERFORM ==
                  curl_multi_perform (multi, &running));
@@ -540,11 +529,11 @@ static unsigned long long start_time;
 
 
 /**
- * Get the current timestamp 
+ * Get the current timestamp
  *
  * @return current time in ms
  */
-static unsigned long long 
+static unsigned long long
 now ()
 {
   struct timeval tv;
@@ -559,50 +548,58 @@ int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
+  char counter[100];
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  set_http_version(argv[0], 1);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   start_time = now();
   errorCount += testInternalPost ();
+  return errorCount != 0;       /* 0 == pass */
+
+  http_version_val = (http_version > CURL_HTTP_VERSION_1_1) ? 2.0 : (http_version == CURL_HTTP_VERSION_1_1 ? 1.1 : 1.0);
+  snprintf(counter, sizeof(counter), "Sequential POSTs (http/%0.1f)", http_version_val);
   fprintf (stderr,
-	   oneone ? "%s: Sequential POSTs (http/1.1) %f/s\n" : "%s: Sequential POSTs (http/1.0) %f/s\n",
-	   "internal select",
+     "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+	   "internal select", http_version_val,
 	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
   GAUGER ("internal select",
-	  oneone ? "Sequential POSTs (http/1.1)" : "Sequential POSTs (http/1.0)",
+	  counter,
 	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
 	  "requests/s");
+
   start_time = now();
   errorCount += testMultithreadedPost ();
   fprintf (stderr,
-	   oneone ? "%s: Sequential POSTs (http/1.1) %f/s\n" : "%s: Sequential POSTs (http/1.0) %f/s\n",
-	   "multithreaded post",
+	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+	   "multithreaded post", http_version_val,
 	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
   GAUGER ("Multithreaded select",
-	  oneone ? "Sequential POSTs (http/1.1)" : "Sequential POSTs (http/1.0)",
+	  counter,
 	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
 	  "requests/s");
+
   start_time = now();
   errorCount += testMultithreadedPoolPost ();
   fprintf (stderr,
-	   oneone ? "%s: Sequential POSTs (http/1.1) %f/s\n" : "%s: Sequential POSTs (http/1.0) %f/s\n",
-	   "thread with pool",
+	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+	   "thread with pool", http_version_val,
 	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
   GAUGER ("thread with pool",
-	  oneone ? "Sequential POSTs (http/1.1)" : "Sequential POSTs (http/1.0)",
+	  counter,
 	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
 	  "requests/s");
+
   start_time = now();
   errorCount += testExternalPost ();
   fprintf (stderr,
-	   oneone ? "%s: Sequential POSTs (http/1.1) %f/s\n" : "%s: Sequential POSTs (http/1.0) %f/s\n",
-	   "external select",
+	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+	   "external select", http_version_val,
 	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
   GAUGER ("external select",
-	  oneone ? "Sequential POSTs (http/1.1)" : "Sequential POSTs (http/1.0)",
+	  counter,
 	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
 	  "requests/s");
   if (errorCount != 0)

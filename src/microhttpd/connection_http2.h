@@ -45,6 +45,8 @@
 #define H2_HEADER_PATH_LEN   5
 #define H2_HEADER_COOKIE     "cookie"
 #define H2_HEADER_COOKIE_LEN 6
+#define H2_HEADER_CONTENT_LENGTH     "content-length"
+#define H2_HEADER_CONTENT_LENGTH_LEN 14
 
 /**
  * HTTP/2 stream.
@@ -148,6 +150,12 @@ struct http2_stream
    * is already set.
    */
   unsigned int response_code;
+  
+  /**
+   * How many more bytes of the body do we expect
+   * to read? #MHD_SIZE_UNKNOWN for unknown.
+   */
+  uint64_t remaining_upload_size;
 
   /**
    * Current write position in the actual response
@@ -177,6 +185,13 @@ struct http2_conn
    * Pointer to connection.
    */
   struct MHD_Connection *connection;
+
+  /**
+   * The memory pool is created when a session is created and destroyed
+   * at the end of each session.
+   * The pool is used for read/write-related data from/into the socket.
+   */
+  struct MemoryPool *pool;
 
   /**
    * Session settings.

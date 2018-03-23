@@ -41,7 +41,6 @@
 #endif /* _WIN32 */
 
 
-static int http_version, flags = 0;
 
 static volatile unsigned int request_counter;
 
@@ -182,15 +181,7 @@ main (int argc, char *const *argv)
   char command_line[1024];
   (void)argc;   /* Unused. Silent compiler warning. */
 
-#ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_1;
+  set_http_version(argv[0], 0);
 
   char *use_http_version = (http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) ?
                            "--http2-prior-knowledge" : "--http1.1";
@@ -212,7 +203,7 @@ main (int argc, char *const *argv)
     | MHD_USE_ITC;
 
   /* Create daemon */
-  struct MHD_Daemon *daemon = MHD_start_daemon (flags | daemon_flags,
+  struct MHD_Daemon *daemon = MHD_start_daemon (use_http2 | daemon_flags,
                                                 port,
                                                 NULL,
                                                 NULL,

@@ -37,7 +37,6 @@
 #include <unistd.h>
 #endif
 
-static int http_version, flags = 0;
 
 struct CBC
 {
@@ -147,7 +146,7 @@ testExternalGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -272,17 +271,7 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  if (has_in_name(argv[0], "11"))
-    http_version = CURL_HTTP_VERSION_1_1;
-#ifdef HTTP2_SUPPORT
-  else if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-#endif /* HTTP2_SUPPORT */
-  else
-    http_version = CURL_HTTP_VERSION_1_0;
+  set_http_version(argv[0], 1);
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

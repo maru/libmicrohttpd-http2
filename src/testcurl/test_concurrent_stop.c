@@ -54,7 +54,6 @@
 /**
  * HTTP version, daemon flags
  */
-static int http_version, flags = 0;
 
 /**
  * Response to return (re-used).
@@ -211,7 +210,7 @@ testMultithreadedGet (int port,
   struct MHD_Daemon *d;
   pthread_t p;
 
-  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
                         port,
                         NULL, NULL,
                         &ahc_echo, "GET",
@@ -241,7 +240,7 @@ testMultithreadedPoolGet (int port,
   struct MHD_Daemon *d;
   pthread_t p;
 
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
                         port,
                         NULL, NULL,
                         &ahc_echo, "GET",
@@ -272,22 +271,12 @@ main (int argc, char *const *argv)
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  set_http_version(argv[0], 1);
+
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     port = 1142;
-
-  if (has_in_name(argv[0], "11"))
-    http_version = CURL_HTTP_VERSION_1_1;
-#ifdef HTTP2_SUPPORT
-  else if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-#endif /* HTTP2_SUPPORT */
-  else
-    http_version = CURL_HTTP_VERSION_1_0;
 
   if ((0 != port) && (http_version == CURL_HTTP_VERSION_1_1))
     port += 5;

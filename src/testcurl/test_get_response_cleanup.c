@@ -62,7 +62,6 @@
 
 #define TESTSTR "/* DO NOT CHANGE THIS LINE */"
 
-static int http_version, flags = 0;
 
 static int ok;
 
@@ -175,7 +174,7 @@ testInternalGet ()
     }
 
   ok = 1;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -218,7 +217,7 @@ testMultithreadedGet ()
     }
 
   ok = 1;
-  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 2,
 			MHD_OPTION_END);
@@ -275,7 +274,7 @@ testMultithreadedPoolGet ()
     }
 
   ok = 1;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -325,7 +324,7 @@ testExternalGet ()
     }
 
   ok = 1;
-  d = MHD_start_daemon (flags | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -397,6 +396,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  set_http_version(argv[0], 1);
+
 #ifndef _WIN32
   /* Solaris has no way to disable SIGPIPE on socket disconnect. */
   if (MHD_NO == MHD_is_feature_supported (MHD_FEATURE_AUTOSUPPRESS_SIGPIPE))
@@ -407,18 +408,6 @@ main (int argc, char *const *argv)
       sigaction(SIGPIPE, &act, NULL);
     }
 #endif /* _WIN32 */
-
-if (has_in_name(argv[0], "11"))
-  http_version = CURL_HTTP_VERSION_1_1;
-#ifdef HTTP2_SUPPORT
-else if (has_in_name(argv[0], "_http2"))
-  {
-    http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-    flags = MHD_USE_HTTP2;
-  }
-#endif /* HTTP2_SUPPORT */
-else
-  http_version = CURL_HTTP_VERSION_1_0;
 
   errorCount += testInternalGet ();
   errorCount += testMultithreadedGet ();

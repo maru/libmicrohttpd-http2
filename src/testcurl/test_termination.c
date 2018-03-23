@@ -48,7 +48,6 @@
 #include <windows.h>
 #endif
 
-static int http_version, flags = 0;
 
 static int
 connection_handler (void *cls,
@@ -99,15 +98,7 @@ main (int argc, char *const *argv)
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-#ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_1;
+  set_http_version(argv[0], 0);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -115,7 +106,7 @@ main (int argc, char *const *argv)
     port = 1490;
 
 
-  daemon = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  daemon = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                              port,
                              NULL,
                              NULL, connection_handler, NULL, MHD_OPTION_END);

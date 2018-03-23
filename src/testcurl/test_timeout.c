@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -36,7 +37,6 @@
 #include <unistd.h>
 #endif
 
-static int oneone;
 
 static int withTimeout = 1;
 
@@ -50,7 +50,7 @@ struct CBC
 };
 
 
-static void 
+static void
 termination_cb (void *cls,
 		struct MHD_Connection *connection,
 		void **con_cls,
@@ -153,7 +153,7 @@ ahc_echo (void *cls,
       return MHD_YES;
     }
   response = MHD_create_response_from_buffer (strlen (url),
-					      (void *) url, 
+					      (void *) url,
 					      MHD_RESPMEM_MUST_COPY);
   ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
   MHD_destroy_response (response);
@@ -178,14 +178,14 @@ testWithoutTimeout ()
   else
     {
       port = 1500;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 5;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
                         MHD_OPTION_CONNECTION_TIMEOUT, 2,
@@ -212,10 +212,7 @@ testWithoutTimeout ()
   curl_easy_setopt (c, CURLOPT_INFILESIZE_LARGE, (curl_off_t) 8L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -252,14 +249,14 @@ testWithTimeout ()
   else
     {
       port = 1501;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 5;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port,
                         NULL, NULL, &ahc_echo, &done_flag,
                         MHD_OPTION_CONNECTION_TIMEOUT, 2,
@@ -286,10 +283,7 @@ testWithTimeout ()
   curl_easy_setopt (c, CURLOPT_INFILESIZE_LARGE, (curl_off_t) 8L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -299,7 +293,8 @@ testWithTimeout ()
     {
       curl_easy_cleanup (c);
       MHD_stop_daemon (d);
-      if (errornum == CURLE_GOT_NOTHING)
+      if (errornum == CURLE_GOT_NOTHING ||
+          ((errornum == CURLE_RECV_ERROR) && (http_version > CURL_HTTP_VERSION_1_1)))
     	  /* mhd had the timeout */
     	  return 0;
       else
@@ -318,14 +313,14 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  set_http_version(argv[0], 1);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 16;
   errorCount += testWithoutTimeout ();
   errorCount += testWithTimeout ();
   if (errorCount != 0)
-    fprintf (stderr, 
+    fprintf (stderr,
 	     "Error during test execution (code: %u)\n",
 	     errorCount);
   curl_global_cleanup ();

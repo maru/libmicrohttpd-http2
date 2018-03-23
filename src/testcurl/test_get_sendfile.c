@@ -51,7 +51,6 @@
 
 static char *sourcefile;
 
-static int http_version, flags = 0;
 
 struct CBC
 {
@@ -138,7 +137,7 @@ testInternalGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -204,7 +203,7 @@ testMultithreadedGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 16;
@@ -270,7 +269,7 @@ testMultithreadedPoolGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -352,7 +351,7 @@ testExternalGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 256;
@@ -491,7 +490,7 @@ testUnknownPortGet ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (flags | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         0, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_SOCK_ADDR, &addr,
                         MHD_OPTION_END);
@@ -562,6 +561,8 @@ main (int argc, char *const *argv)
   FILE *f;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  set_http_version(argv[0], 1);
+
   if ( (NULL == (tmp = getenv ("TMPDIR"))) &&
        (NULL == (tmp = getenv ("TMP"))) &&
        (NULL == (tmp = getenv ("TEMP"))) )
@@ -580,18 +581,6 @@ main (int argc, char *const *argv)
     }
   fwrite (TESTSTR, strlen (TESTSTR), 1, f);
   fclose (f);
-
-  if (has_in_name(argv[0], "11"))
-    http_version = CURL_HTTP_VERSION_1_1;
-#ifdef HTTP2_SUPPORT
-  else if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-#endif /* HTTP2_SUPPORT */
-  else
-    http_version = CURL_HTTP_VERSION_1_0;
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;

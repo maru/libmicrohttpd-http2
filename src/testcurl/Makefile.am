@@ -52,11 +52,9 @@ check_PROGRAMS += \
   test_process_headers_http2 \
   test_process_arguments_http2 \
   test_parse_cookies_http2 \
-  test_large_put_http2 \
   test_large_put_inc_http2 \
   test_long_header_http2 \
   test_get_chunked_http2 \
-  test_put_chunked_http2 \
   test_iplimit_http2 \
   test_termination_http2 \
   test_timeout_http2 \
@@ -491,12 +489,6 @@ test_put_http2_LDADD = \
 test_put_chunked_http2_SOURCES = \
   test_put_chunked.c
 test_put_chunked_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  @LIBCURL@
-
-test_large_put_http2_SOURCES = \
-  test_large_put.c
-test_large_put_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 

@@ -29,7 +29,6 @@
 #include <curl/curl.h>
 #include <microhttpd.h>
 
-static int http_version, flags = 0;
 
 struct callback_closure
 {
@@ -128,22 +127,14 @@ main(int argc, char **argv)
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-#ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_0;
+  set_http_version(argv[0], 1);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     port = 1140;
 
-  d = MHD_start_daemon (flags,
+  d = MHD_start_daemon (use_http2,
 		       port,
 		       NULL,
 		       NULL,

@@ -79,7 +79,6 @@ check_PROGRAMS += \
   perf_get_concurrent
 if ENABLE_HTTP2
 check_PROGRAMS += \
-  test_quiesce_http2 \
   test_concurrent_stop_http2 \
   perf_get_concurrent_http2
 endif

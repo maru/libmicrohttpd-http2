@@ -165,7 +165,7 @@ ServeOneRequest(void *param)
         }
       MHD_run (d);
     }
-    sleep(1);
+
   fd = MHD_quiesce_daemon (d);
   if (MHD_INVALID_SOCKET == fd)
     {

@@ -317,7 +317,6 @@ testExternalPost ()
        *   crashes on my system! */
       curl_easy_setopt (c, CURLOPT_NOSIGNAL, 1);
 
-
       mret = curl_multi_add_handle (multi, c);
       if (mret != CURLM_OK)
         {
@@ -379,6 +378,7 @@ testExternalPost ()
     }
   fprintf (stderr, "\n");
   zzuf_socat_stop ();
+  curl_multi_cleanup (multi);
 
   MHD_stop_daemon (d);
   return 0;

@@ -74,6 +74,57 @@
 #define MICROHTTPD2_H
 
 
+#ifdef __cplusplus
+extern "C"
+{
+#if 0                           /* keep Emacsens' auto-indent happy */
+}
+#endif
+#endif
+
+/* While we generally would like users to use a configure-driven
+   build process which detects which headers are present and
+   hence works on any platform, we use "standard" includes here
+   to build out-of-the-box for beginning users on common systems.
+
+   If generic headers don't work on your platform, include headers
+   which define 'va_list', 'size_t', 'ssize_t', 'intptr_t',
+   'uint16_t', 'uint32_t', 'uint64_t', 'off_t', 'struct sockaddr',
+   'socklen_t', 'fd_set' and "#define MHD_PLATFORM_H" before
+   including "microhttpd.h". Then the following "standard"
+   includes won't be used (which might be a good idea, especially
+   on platforms where they do not exist).
+   */
+#ifndef MHD_PLATFORM_H
+#include <stdarg.h>
+#include <stdint.h>
+#include <sys/types.h>
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#include <ws2tcpip.h>
+#if defined(_MSC_FULL_VER) && !defined (_SSIZE_T_DEFINED)
+#define _SSIZE_T_DEFINED
+typedef intptr_t ssize_t;
+#endif /* !_SSIZE_T_DEFINED */
+#else
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#endif
+#endif
+
+#if defined(__CYGWIN__) && !defined(_SYS_TYPES_FD_SET)
+/* Do not define __USE_W32_SOCKETS under Cygwin! */
+#error Cygwin with winsock fd_set is not supported
+#endif
+
+/**
+ * Current version of the library.
+ * 0x01093001 = 1.9.30-1.
+ */
+#define MHD_VERSION 0x01000000
+
+
+
 /**
  * Representation of 'bool' in the public API as stdbool.h may not
  * always be available.
@@ -96,6 +147,157 @@ enum MHD_Bool
 
 
 /**
+ * Constant used to indicate unknown size (use when
+ * creating a response).
+ */
+#ifdef UINT64_MAX
+#define MHD_SIZE_UNKNOWN UINT64_MAX
+#else
+#define MHD_SIZE_UNKNOWN  ((uint64_t) -1LL)
+#endif
+
+#ifdef SIZE_MAX
+#define MHD_CONTENT_READER_END_OF_STREAM SIZE_MAX
+#define MHD_CONTENT_READER_END_WITH_ERROR (SIZE_MAX - 1)
+#else
+#define MHD_CONTENT_READER_END_OF_STREAM ((size_t) -1LL)
+#define MHD_CONTENT_READER_END_WITH_ERROR (((size_t) -1LL) - 1)
+#endif
+
+#ifndef _MHD_EXTERN
+#if defined(_WIN32) && defined(MHD_W32LIB)
+#define _MHD_EXTERN extern
+#elif defined (_WIN32) && defined(MHD_W32DLL)
+/* Define MHD_W32DLL when using MHD as W32 .DLL to speed up linker a little */
+#define _MHD_EXTERN __declspec(dllimport)
+#else
+#define _MHD_EXTERN extern
+#endif
+#endif
+
+#ifndef MHD_SOCKET_DEFINED
+/**
+ * MHD_socket is type for socket FDs
+ */
+#if !defined(_WIN32) || defined(_SYS_TYPES_FD_SET)
+#define MHD_POSIX_SOCKETS 1
+typedef int MHD_socket;
+#define MHD_INVALID_SOCKET (-1)
+#else /* !defined(_WIN32) || defined(_SYS_TYPES_FD_SET) */
+#define MHD_WINSOCK_SOCKETS 1
+#include <winsock2.h>
+typedef SOCKET MHD_socket;
+#define MHD_INVALID_SOCKET (INVALID_SOCKET)
+#endif /* !defined(_WIN32) || defined(_SYS_TYPES_FD_SET) */
+#define MHD_SOCKET_DEFINED 1
+#endif /* MHD_SOCKET_DEFINED */
+
+/**
+ * Define MHD_NO_DEPRECATION before including "microhttpd.h" to disable deprecation messages
+ */
+#ifdef MHD_NO_DEPRECATION
+#define _MHD_DEPR_MACRO(msg)
+#define _MHD_NO_DEPR_IN_MACRO 1
+#define _MHD_DEPR_IN_MACRO(msg)
+#define _MHD_NO_DEPR_FUNC 1
+#define _MHD_DEPR_FUNC(msg)
+#endif /* MHD_NO_DEPRECATION */
+
+#ifndef _MHD_DEPR_MACRO
+#if defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1500
+/* VS 2008 or later */
+/* Stringify macros */
+#define _MHD_INSTRMACRO(a) #a
+#define _MHD_STRMACRO(a) _MHD_INSTRMACRO(a)
+/* deprecation message */
+#define _MHD_DEPR_MACRO(msg) __pragma(message(__FILE__ "(" _MHD_STRMACRO(__LINE__)"): warning: " msg))
+#define _MHD_DEPR_IN_MACRO(msg) _MHD_DEPR_MACRO(msg)
+#elif defined(__clang__) || defined (__GNUC_PATCHLEVEL__)
+/* clang or GCC since 3.0 */
+#define _MHD_GCC_PRAG(x) _Pragma (#x)
+#if (defined(__clang__) && (__clang_major__+0 >= 5 ||			\
+			    (!defined(__apple_build_version__) && (__clang_major__+0  > 3 || (__clang_major__+0 == 3 && __clang_minor__ >= 3))))) || \
+  __GNUC__+0 > 4 || (__GNUC__+0 == 4 && __GNUC_MINOR__+0 >= 8)
+/* clang >= 3.3 (or XCode's clang >= 5.0) or
+   GCC >= 4.8 */
+#define _MHD_DEPR_MACRO(msg) _MHD_GCC_PRAG(GCC warning msg)
+#define _MHD_DEPR_IN_MACRO(msg) _MHD_DEPR_MACRO(msg)
+#else /* older clang or GCC */
+/* clang < 3.3, XCode's clang < 5.0, 3.0 <= GCC < 4.8 */
+#define _MHD_DEPR_MACRO(msg) _MHD_GCC_PRAG(message msg)
+#if (defined(__clang__) && (__clang_major__+0  > 2 || (__clang_major__+0 == 2 && __clang_minor__ >= 9))) /* FIXME: clang >= 2.9, earlier versions not tested */
+/* clang handles inline pragmas better than GCC */
+#define _MHD_DEPR_IN_MACRO(msg) _MHD_DEPR_MACRO(msg)
+#endif /* clang >= 2.9 */
+#endif  /* older clang or GCC */
+/* #elif defined(SOMEMACRO) */ /* add compiler-specific macros here if required */
+#endif /* clang || GCC >= 3.0 */
+#endif /* !_MHD_DEPR_MACRO */
+
+#ifndef _MHD_DEPR_MACRO
+#define _MHD_DEPR_MACRO(msg)
+#endif /* !_MHD_DEPR_MACRO */
+
+#ifndef _MHD_DEPR_IN_MACRO
+#define _MHD_NO_DEPR_IN_MACRO 1
+#define _MHD_DEPR_IN_MACRO(msg)
+#endif /* !_MHD_DEPR_IN_MACRO */
+
+#ifndef _MHD_DEPR_FUNC
+#if defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1400
+/* VS 2005 or later */
+#define _MHD_DEPR_FUNC(msg) __declspec(deprecated(msg))
+#elif defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1310
+/* VS .NET 2003 deprecation do not support custom messages */
+#define _MHD_DEPR_FUNC(msg) __declspec(deprecated)
+#elif (__GNUC__+0 >= 5) || (defined (__clang__) && \
+  (__clang_major__+0 > 2 || (__clang_major__+0 == 2 && __clang_minor__ >= 9)))  /* FIXME: earlier versions not tested */
+/* GCC >= 5.0 or clang >= 2.9 */
+#define _MHD_DEPR_FUNC(msg) __attribute__((deprecated(msg)))
+#elif defined (__clang__) || __GNUC__+0 > 3 || (__GNUC__+0 == 3 && __GNUC_MINOR__+0 >= 1)
+/* 3.1 <= GCC < 5.0 or clang < 2.9 */
+/* old GCC-style deprecation do not support custom messages */
+#define _MHD_DEPR_FUNC(msg) __attribute__((__deprecated__))
+/* #elif defined(SOMEMACRO) */ /* add compiler-specific macros here if required */
+#endif /* clang < 2.9 || GCC >= 3.1 */
+#endif /* !_MHD_DEPR_FUNC */
+
+#ifndef _MHD_DEPR_FUNC
+#define _MHD_NO_DEPR_FUNC 1
+#define _MHD_DEPR_FUNC(msg)
+#endif /* !_MHD_DEPR_FUNC */
+
+
+/* Define MHD_NONNULL attribute */
+
+/**
+ * Macro to indicate that certain parameters must be
+ * non-null.  Todo: port to non-gcc platforms.
+ */
+#if defined(__CYGWIN__) || defined(_WIN32) || defined(MHD_W32LIB)
+#define MHD_NONNULL(...) /* empty */
+#else
+#define MHD_NONNULL(...) __THROW __nonnull((__VA_ARGS__))
+#endif
+
+/**
+ * Not all architectures and `printf()`'s support the `long long` type.
+ * This gives the ability to replace `long long` with just a `long`,
+ * standard `int` or a `short`.
+ */
+#ifndef MHD_UNSIGNED_LONG_LONG
+#define MHD_UNSIGNED_LONG_LONG unsigned long long
+#endif
+/**
+ * Format string for printing a variable of type #MHD_LONG_LONG.
+ * You should only redefine this if you also define #MHD_LONG_LONG.
+ */
+#ifndef MHD_UNSIGNED_LONG_LONG_PRINTF
+#define MHD_UNSIGNED_LONG_LONG_PRINTF "%llu"
+#endif
+
+
+/**
  * @brief Handle for a connection / HTTP request.
  *
  * With HTTP/1.1, multiple requests can be run over the same
@@ -112,19 +314,31 @@ struct MHD_Request;
 
 
 /**
+ * A connection corresponds to the network/stream abstraction.
+ * A single network (i.e. TCP) stream may be used for multiple
+ * requests, which in HTTP/1.1 must be processed sequentially.
+ */
+struct MHD_Connection;
+
+
+/**
  * Return values for reporting errors, also used
  * for logging.
  *
  * A value of 0 indicates success (as a return value).
- * Values between 1 and 10000 must not be used.
+ * Values between 0 and 10000 must be handled explicitly by the app.
  * Values from 10000-19999 are informational.
  * Values from 20000-29999 indicate successful operations.
  * Values from 30000-39999 indicate unsuccessful (normal) operations.
  * Values from 40000-49999 indicate client errors.
- * Values from 50000-59999 indicate server errors.
+ * Values from 50000-59999 indicate MHD server errors.
+ * Values from 60000-69999 indicate application errors.
  */
 enum MHD_StatusCode
 {
+
+  /* 00000-level status codes indicate return values
+     the application must act on. */
 
   /**
    * Successful operation (not used for logging).
@@ -132,22 +346,183 @@ enum MHD_StatusCode
   MHD_SC_OK = 0,
 
   /**
+   * We were asked to return a timeout, but, there is no timeout.
+   */
+  MHD_SC_NO_TIMEOUT = 1,
+
+
+  /* 10000-level status codes indicate intermediate
+     results of some kind. */
+
+  /**
    * Informational event, MHD started.
    */
   MHD_SC_DAEMON_STARTED = 10000,
 
+  /**
+   * Informational event, we accepted a connection.
+   */
+  MHD_SC_CONNECTION_ACCEPTED = 10001,
 
   /**
-   * MHD does not support the requested combination of
-   * EPOLL with thread-per-connection mode.
+   * Informational event, thread processing connection termiantes.
    */
-  MHD_SC_SYSCALL_THREAD_COMBINATION_INVALID = 40000,
+  MHD_SC_THREAD_TERMINATING = 10002,
 
   /**
-   * MHD does not support quiescing if ITC was disabled
-   * and threads are used.
+   * Informational event, state machine status for a connection.
    */
-  MHD_SC_SYSCALL_QUIESCE_REQUIRES_ITC = 40001,
+  MHD_SC_STATE_MACHINE_STATUS_REPORT = 10003,
+
+  /**
+   * accept() returned transient error.
+   */
+  MHD_SC_ACCEPT_FAILED_EAGAIN = 10004,
+
+
+  /* 20000-level status codes indicate success of some kind. */
+
+  /**
+   * MHD is closing a connection after the client closed it
+   * (perfectly normal end).
+   */
+  MHD_SC_CONNECTION_CLOSED = 20000,
+
+  /**
+   * MHD is closing a connection because the application
+   * logic to generate the response data completed.
+   */
+  MHD_SC_APPLICATION_DATA_GENERATION_FINISHED = 20001,
+
+
+  /* 30000-level status codes indicate transient failures
+     that might go away if the client tries again. */
+
+
+  /**
+   * Resource limit in terms of number of parallel connections
+   * hit.
+   */
+  MHD_SC_LIMIT_CONNECTIONS_REACHED = 30000,
+
+  /**
+   * We failed to allocate memory for poll() syscall.
+   * (May be transient.)
+   */
+  MHD_SC_POLL_MALLOC_FAILURE = 30001,
+
+  /**
+   * The operation failed because the respective
+   * daemon is already too deep inside of the shutdown
+   * activity.
+   */
+  MHD_SC_DAEMON_ALREADY_SHUTDOWN = 30002,
+
+  /**
+   * We failed to start a thread.
+   */
+  MHD_SC_THREAD_LAUNCH_FAILURE = 30003,
+
+  /**
+   * The operation failed because we either have no
+   * listen socket or were already quiesced.
+   */
+  MHD_SC_DAEMON_ALREADY_QUIESCED = 30004,
+
+  /**
+   * The operation failed because client disconnected
+   * faster than we could accept().
+   */
+  MHD_SC_ACCEPT_FAST_DISCONNECT = 30005,
+
+  /**
+   * Operating resource limits hit on accept().
+   */
+  MHD_SC_ACCEPT_SYSTEM_LIMIT_REACHED = 30006,
+
+  /**
+   * Connection was refused by accept policy callback.
+   */
+  MHD_SC_ACCEPT_POLICY_REJECTED = 30007,
+
+  /**
+   * We failed to allocate memory for the connection.
+   * (May be transient.)
+   */
+  MHD_SC_CONNECTION_MALLOC_FAILURE = 30008,
+
+  /**
+   * We failed to allocate memory for the connection's memory pool.
+   * (May be transient.)
+   */
+  MHD_SC_POOL_MALLOC_FAILURE = 30009,
+
+  /**
+   * We failed to forward data from a Web socket to the
+   * application to the remote side due to the socket
+   * being closed prematurely. (May be transient.)
+   */
+  MHD_SC_UPGRADE_FORWARD_INCOMPLETE = 30010,
+
+  /**
+   * We failed to allocate memory for generatig the response from our
+   * memory pool.  Likely the request header was too large to leave
+   * enough room.
+   */
+  MHD_SC_CONNECTION_POOL_MALLOC_FAILURE = 30011,
+
+
+  /* 40000-level errors are caused by the HTTP client
+     (or the network) */
+
+  /**
+   * MHD is closing a connection because parsing the
+   * request failed.
+   */
+  MHD_SC_CONNECTION_PARSE_FAIL_CLOSED = 40000,
+
+  /**
+   * MHD is closing a connection because it was reset.
+   */
+  MHD_SC_CONNECTION_RESET_CLOSED = 40001,
+
+  /**
+   * MHD is closing a connection because reading the
+   * request failed.
+   */
+  MHD_SC_CONNECTION_READ_FAIL_CLOSED = 40002,
+
+  /**
+   * MHD is closing a connection because writing the response failed.
+   */
+  MHD_SC_CONNECTION_WRITE_FAIL_CLOSED = 40003,
+
+  /**
+   * MHD is returning an error because the header provided
+   * by the client is too big.
+   */
+  MHD_SC_CLIENT_HEADER_TOO_BIG = 40004,
+
+  /**
+   * An HTTP/1.1 request was sent without the "Host:" header.
+   */
+  MHD_SC_HOST_HEADER_MISSING = 40005,
+
+  /**
+   * The given content length was not a number.
+   */
+  MHD_SC_CONTENT_LENGTH_MALFORMED = 40006,
+
+  /**
+   * The given uploaded, chunked-encoded body was malformed.
+   */
+  MHD_SC_CHUNKED_ENCODING_MALFORMED = 40007,
+
+
+
+  /* 50000-level errors are because of an error internal
+     to the MHD logic, possibly including our interaction
+     with the operating system (but not the application) */
 
   /**
    * This build of MHD does not support TLS, but the application
@@ -155,17 +530,6 @@ enum MHD_StatusCode
    */
   MHD_SC_TLS_DISABLED = 50000,
 
-  /**
-   * The application requested an unsupported TLS backend to be used.
-   */
-  MHD_SC_TLS_BACKEND_UNSUPPORTED = 50001,
-
-  /**
-   * The application requested a TLS cipher suite which is not
-   * supported by the selected backend.
-   */
-  MHD_SC_TLS_CIPHERS_INVALID = 50002
-  
   /**
    * The application attempted to setup TLS paramters before
    * enabling TLS.
@@ -214,7 +578,7 @@ enum MHD_StatusCode
    * We failed to open the listen socket. Maybe the build
    * supports IPv6, but your kernel does not?
    */
-  MHD_SC_FAILED_TO_OPEN_LISTEN_SOCKET = 50011,  
+  MHD_SC_FAILED_TO_OPEN_LISTEN_SOCKET = 50011,
 
   /**
    * Specified address family is not supported by this build.
@@ -230,7 +594,7 @@ enum MHD_StatusCode
    * Enabling listen address reuse is not supported by this platform.
    */
   MHD_SC_LISTEN_ADDRESS_REUSE_ENABLE_NOT_SUPPORTED = 50014,
-  
+
   /**
    * Failed to disable listen address reuse.
    */
@@ -242,7 +606,7 @@ enum MHD_StatusCode
   MHD_SC_LISTEN_ADDRESS_REUSE_DISABLE_NOT_SUPPORTED = 50016,
 
   /**
-   * We failed to explicitly enable or disable dual stack for 
+   * We failed to explicitly enable or disable dual stack for
    * the IPv6 listen socket.  The socket will be used in whatever
    * the default is the OS gives us.
    */
@@ -253,11 +617,6 @@ enum MHD_StatusCode
    * dual stack behavior.
    */
   MHD_SC_LISTEN_DUAL_STACK_CONFIGURATION_NOT_SUPPORTED = 50018,
-
-  /**
-   * We failed to bind the listen socket.
-   */
-  MHD_SC_LISTEN_SOCKET_BIND_FAILED = 50019,
 
   /**
    * Failed to enable TCP FAST OPEN option.
@@ -301,6 +660,17 @@ enum MHD_StatusCode
   MHD_SC_THREAD_POOL_CREATE_MUTEX_FAILURE = 50027,
 
   /**
+   * There was an attempt to upgrade a connection on
+   * a daemon where upgrades are disallowed.
+   */
+  MHD_SC_UPGRADE_ON_DAEMON_WITH_UPGRADE_DISALLOWED = 50028,
+
+  /**
+   * Failed to signal via ITC channel.
+   */
+  MHD_SC_ITC_USE_FAILED = 50029,
+
+  /**
    * We failed to initialize the main thread for listening.
    */
   MHD_SC_THREAD_MAIN_LAUNCH_FAILURE = 50030,
@@ -310,7 +680,204 @@ enum MHD_StatusCode
    */
   MHD_SC_THREAD_POOL_LAUNCH_FAILURE = 50031,
 
-  
+  /**
+   * We failed to add a socket to the epoll() set.
+   */
+  MHD_SC_EPOLL_CTL_ADD_FAILED = 50032,
+
+  /**
+   * We failed to create control socket for the epoll().
+   */
+  MHD_SC_EPOLL_CTL_CREATE_FAILED = 50034,
+
+  /**
+   * We failed to configure control socket for the epoll()
+   * to be non-inheritable.
+   */
+  MHD_SC_EPOLL_CTL_CONFIGURE_NOINHERIT_FAILED = 50035,
+
+  /**
+   * We failed to build the FD set because a socket was
+   * outside of the permitted range.
+   */
+  MHD_SC_SOCKET_OUTSIDE_OF_FDSET_RANGE = 50036,
+
+  /**
+   * This daemon was not configured with options that
+   * would allow us to build an FD set for select().
+   */
+  MHD_SC_CONFIGURATION_MISSMATCH_FOR_GET_FDSET = 50037,
+
+  /**
+   * This daemon was not configured with options that
+   * would allow us to obtain a meaningful timeout.
+   */
+  MHD_SC_CONFIGURATION_MISSMATCH_FOR_GET_TIMEOUT = 50038,
+
+  /**
+   * This daemon was not configured with options that
+   * would allow us to run with select() data.
+   */
+  MHD_SC_CONFIGURATION_MISSMATCH_FOR_RUN_SELECT = 50039,
+
+  /**
+   * This daemon was not configured to run with an
+   * external event loop.
+   */
+  MHD_SC_CONFIGURATION_MISSMATCH_FOR_RUN_EXTERNAL = 50040,
+
+  /**
+   * Encountered an unexpected event loop style
+   * (should never happen).
+   */
+  MHD_SC_CONFIGURATION_UNEXPECTED_ELS = 50041,
+
+  /**
+   * Encountered an unexpected error from select()
+   * (should never happen).
+   */
+  MHD_SC_UNEXPECTED_SELECT_ERROR = 50042,
+
+  /**
+   * poll() is not supported.
+   */
+  MHD_SC_POLL_NOT_SUPPORTED = 50043,
+
+  /**
+   * Encountered an unexpected error from poll()
+   * (should never happen).
+   */
+  MHD_SC_UNEXPECTED_POLL_ERROR = 50044,
+
+  /**
+   * We failed to configure accepted socket
+   * to not use a signal pipe.
+   */
+  MHD_SC_ACCEPT_CONFIGURE_NOSIGPIPE_FAILED = 50045,
+
+  /**
+   * Encountered an unexpected error from epoll_wait()
+   * (should never happen).
+   */
+  MHD_SC_UNEXPECTED_EPOLL_WAIT_ERROR = 50046,
+
+  /**
+   * epoll file descriptor is invalid (strange)
+   */
+  MHD_SC_EPOLL_FD_INVALID = 50047,
+
+  /**
+   * We failed to configure accepted socket
+   * to be non-inheritable.
+   */
+  MHD_SC_ACCEPT_CONFIGURE_NOINHERIT_FAILED = 50048,
+
+  /**
+   * We failed to configure accepted socket
+   * to be non-blocking.
+   */
+  MHD_SC_ACCEPT_CONFIGURE_NONBLOCKING_FAILED = 50049,
+
+  /**
+   * accept() returned non-transient error.
+   */
+  MHD_SC_ACCEPT_FAILED_UNEXPECTEDLY = 50050,
+
+  /**
+   * Operating resource limits hit on accept() while
+   * zero connections are active. Oopsie.
+   */
+  MHD_SC_ACCEPT_SYSTEM_LIMIT_REACHED_INSTANTLY = 50051,
+
+  /**
+   * Failed to add IP address to per-IP counter for
+   * some reason.
+   */
+  MHD_SC_IP_COUNTER_FAILURE = 50052,
+
+  /**
+   * Application violated our API by calling shutdown
+   * while having an upgrade connection still open.
+   */
+  MHD_SC_SHUTDOWN_WITH_OPEN_UPGRADED_CONNECTION = 50053,
+
+  /**
+   * Due to an unexpected internal error with the
+   * state machine, we closed the connection.
+   */
+  MHD_SC_STATEMACHINE_FAILURE_CONNECTION_CLOSED = 50054,
+
+  /**
+   * Failed to allocate memory in connection's pool
+   * to parse the cookie header.
+   */
+  MHD_SC_COOKIE_POOL_ALLOCATION_FAILURE = 50055,
+
+  /**
+   * MHD failed to build the response header.
+   */
+  MHD_SC_FAILED_RESPONSE_HEADER_GENERATION = 50056,
+
+
+
+  /* 60000-level errors are because the application
+     logic did something wrong or generated an error. */
+
+  /**
+   * MHD does not support the requested combination of
+   * EPOLL with thread-per-connection mode.
+   */
+  MHD_SC_SYSCALL_THREAD_COMBINATION_INVALID = 60000,
+
+  /**
+   * MHD does not support quiescing if ITC was disabled
+   * and threads are used.
+   */
+  MHD_SC_SYSCALL_QUIESCE_REQUIRES_ITC = 60001,
+
+  /**
+   * We failed to bind the listen socket.
+   */
+  MHD_SC_LISTEN_SOCKET_BIND_FAILED = 60002,
+
+  /**
+   * The application requested an unsupported TLS backend to be used.
+   */
+  MHD_SC_TLS_BACKEND_UNSUPPORTED = 60003,
+
+  /**
+   * The application requested a TLS cipher suite which is not
+   * supported by the selected backend.
+   */
+  MHD_SC_TLS_CIPHERS_INVALID = 60004,
+
+  /**
+   * MHD is closing a connection because the application
+   * logic to generate the response data failed.
+   */
+  MHD_SC_APPLICATION_DATA_GENERATION_FAILURE_CLOSED = 60005,
+
+  /**
+   * MHD is closing a connection because the application
+   * callback told it to do so.
+   */
+  MHD_SC_APPLICATION_CALLBACK_FAILURE_CLOSED = 60006,
+
+  /**
+   * Application only partially processed upload and did
+   * not suspend connection. This may result in a hung
+   * connection.
+   */
+  MHD_SC_APPLICATION_HUNG_CONNECTION = 60007,
+
+  /**
+   * Application only partially processed upload and did
+   * not suspend connection and the read buffer was maxxed
+   * out, so MHD closed the connection.
+   */
+  MHD_SC_APPLICATION_HUNG_CONNECTION_CLOSED = 60008,
+
+
 };
 
 
@@ -332,6 +899,12 @@ struct MHD_Action;
  * add additional methods (as per IANA registry), thus even if the API
  * returns "unknown" today, it may return a method-specific header in
  * the future!
+ *
+ * @defgroup methods HTTP methods
+ * HTTP methods (as strings).
+ * See: http://www.iana.org/assignments/http-methods/http-methods.xml
+ * Registry Version 2015-05-19
+ * @{
  */
 enum MHD_Method
 {
@@ -343,31 +916,37 @@ enum MHD_Method
 
   /**
    * "OPTIONS" method.
+   * Safe.     Idempotent.     RFC7231, Section 4.3.7.
    */
   MHD_METHOD_OPTIONS = 1,
 
   /**
    * "GET" method.
+   * Safe.     Idempotent.     RFC7231, Section 4.3.1.
    */
   MHD_METHOD_GET = 2,
 
   /**
    * "HEAD" method.
+   * Safe.     Idempotent.     RFC7231, Section 4.3.2.
    */
   MHD_METHOD_HEAD = 3,
 
   /**
    * "POST" method.
+   * Not safe. Not idempotent. RFC7231, Section 4.3.3.
    */
   MHD_METHOD_POST = 4,
 
   /**
    * "PUT" method.
+   * Not safe. Idempotent.     RFC7231, Section 4.3.4.
    */
   MHD_METHOD_PUT = 5,
 
   /**
    * "DELETE" method.
+   * Not safe. Idempotent.     RFC7231, Section 4.3.5.
    */
   MHD_METHOD_DELETE = 6,
 
@@ -536,6 +1115,339 @@ enum MHD_Method
 
 };
 
+/** @} */ /* end of group methods */
+
+
+/**
+ * @defgroup postenc HTTP POST encodings
+ * See also: http://www.w3.org/TR/html4/interact/forms.html#h-17.13.4
+ * @{
+ */
+#define MHD_HTTP_POST_ENCODING_FORM_URLENCODED "application/x-www-form-urlencoded"
+#define MHD_HTTP_POST_ENCODING_MULTIPART_FORMDATA "multipart/form-data"
+
+/** @} */ /* end of group postenc */
+
+
+
+/**
+ * @defgroup headers HTTP headers
+ * These are the standard headers found in HTTP requests and responses.
+ * See: http://www.iana.org/assignments/message-headers/message-headers.xml
+ * Registry Version 2017-01-27
+ * @{
+ */
+
+/* Main HTTP headers. */
+/* Standard.      RFC7231, Section 5.3.2 */
+#define MHD_HTTP_HEADER_ACCEPT "Accept"
+/* Standard.      RFC7231, Section 5.3.3 */
+#define MHD_HTTP_HEADER_ACCEPT_CHARSET "Accept-Charset"
+/* Standard.      RFC7231, Section 5.3.4; RFC7694, Section 3 */
+#define MHD_HTTP_HEADER_ACCEPT_ENCODING "Accept-Encoding"
+/* Standard.      RFC7231, Section 5.3.5 */
+#define MHD_HTTP_HEADER_ACCEPT_LANGUAGE "Accept-Language"
+/* Standard.      RFC7233, Section 2.3 */
+#define MHD_HTTP_HEADER_ACCEPT_RANGES "Accept-Ranges"
+/* Standard.      RFC7234, Section 5.1 */
+#define MHD_HTTP_HEADER_AGE "Age"
+/* Standard.      RFC7231, Section 7.4.1 */
+#define MHD_HTTP_HEADER_ALLOW "Allow"
+/* Standard.      RFC7235, Section 4.2 */
+#define MHD_HTTP_HEADER_AUTHORIZATION "Authorization"
+/* Standard.      RFC7234, Section 5.2 */
+#define MHD_HTTP_HEADER_CACHE_CONTROL "Cache-Control"
+/* Reserved.      RFC7230, Section 8.1 */
+#define MHD_HTTP_HEADER_CLOSE "Close"
+/* Standard.      RFC7230, Section 6.1 */
+#define MHD_HTTP_HEADER_CONNECTION "Connection"
+/* Standard.      RFC7231, Section 3.1.2.2 */
+#define MHD_HTTP_HEADER_CONTENT_ENCODING "Content-Encoding"
+/* Standard.      RFC7231, Section 3.1.3.2 */
+#define MHD_HTTP_HEADER_CONTENT_LANGUAGE "Content-Language"
+/* Standard.      RFC7230, Section 3.3.2 */
+#define MHD_HTTP_HEADER_CONTENT_LENGTH "Content-Length"
+/* Standard.      RFC7231, Section 3.1.4.2 */
+#define MHD_HTTP_HEADER_CONTENT_LOCATION "Content-Location"
+/* Standard.      RFC7233, Section 4.2 */
+#define MHD_HTTP_HEADER_CONTENT_RANGE "Content-Range"
+/* Standard.      RFC7231, Section 3.1.1.5 */
+#define MHD_HTTP_HEADER_CONTENT_TYPE "Content-Type"
+/* Standard.      RFC7231, Section 7.1.1.2 */
+#define MHD_HTTP_HEADER_DATE "Date"
+/* Standard.      RFC7232, Section 2.3 */
+#define MHD_HTTP_HEADER_ETAG "ETag"
+/* Standard.      RFC7231, Section 5.1.1 */
+#define MHD_HTTP_HEADER_EXPECT "Expect"
+/* Standard.      RFC7234, Section 5.3 */
+#define MHD_HTTP_HEADER_EXPIRES "Expires"
+/* Standard.      RFC7231, Section 5.5.1 */
+#define MHD_HTTP_HEADER_FROM "From"
+/* Standard.      RFC7230, Section 5.4 */
+#define MHD_HTTP_HEADER_HOST "Host"
+/* Standard.      RFC7232, Section 3.1 */
+#define MHD_HTTP_HEADER_IF_MATCH "If-Match"
+/* Standard.      RFC7232, Section 3.3 */
+#define MHD_HTTP_HEADER_IF_MODIFIED_SINCE "If-Modified-Since"
+/* Standard.      RFC7232, Section 3.2 */
+#define MHD_HTTP_HEADER_IF_NONE_MATCH "If-None-Match"
+/* Standard.      RFC7233, Section 3.2 */
+#define MHD_HTTP_HEADER_IF_RANGE "If-Range"
+/* Standard.      RFC7232, Section 3.4 */
+#define MHD_HTTP_HEADER_IF_UNMODIFIED_SINCE "If-Unmodified-Since"
+/* Standard.      RFC7232, Section 2.2 */
+#define MHD_HTTP_HEADER_LAST_MODIFIED "Last-Modified"
+/* Standard.      RFC7231, Section 7.1.2 */
+#define MHD_HTTP_HEADER_LOCATION "Location"
+/* Standard.      RFC7231, Section 5.1.2 */
+#define MHD_HTTP_HEADER_MAX_FORWARDS "Max-Forwards"
+/* Standard.      RFC7231, Appendix A.1 */
+#define MHD_HTTP_HEADER_MIME_VERSION "MIME-Version"
+/* Standard.      RFC7234, Section 5.4 */
+#define MHD_HTTP_HEADER_PRAGMA "Pragma"
+/* Standard.      RFC7235, Section 4.3 */
+#define MHD_HTTP_HEADER_PROXY_AUTHENTICATE "Proxy-Authenticate"
+/* Standard.      RFC7235, Section 4.4 */
+#define MHD_HTTP_HEADER_PROXY_AUTHORIZATION "Proxy-Authorization"
+/* Standard.      RFC7233, Section 3.1 */
+#define MHD_HTTP_HEADER_RANGE "Range"
+/* Standard.      RFC7231, Section 5.5.2 */
+#define MHD_HTTP_HEADER_REFERER "Referer"
+/* Standard.      RFC7231, Section 7.1.3 */
+#define MHD_HTTP_HEADER_RETRY_AFTER "Retry-After"
+/* Standard.      RFC7231, Section 7.4.2 */
+#define MHD_HTTP_HEADER_SERVER "Server"
+/* Standard.      RFC7230, Section 4.3 */
+#define MHD_HTTP_HEADER_TE "TE"
+/* Standard.      RFC7230, Section 4.4 */
+#define MHD_HTTP_HEADER_TRAILER "Trailer"
+/* Standard.      RFC7230, Section 3.3.1 */
+#define MHD_HTTP_HEADER_TRANSFER_ENCODING "Transfer-Encoding"
+/* Standard.      RFC7230, Section 6.7 */
+#define MHD_HTTP_HEADER_UPGRADE "Upgrade"
+/* Standard.      RFC7231, Section 5.5.3 */
+#define MHD_HTTP_HEADER_USER_AGENT "User-Agent"
+/* Standard.      RFC7231, Section 7.1.4 */
+#define MHD_HTTP_HEADER_VARY "Vary"
+/* Standard.      RFC7230, Section 5.7.1 */
+#define MHD_HTTP_HEADER_VIA "Via"
+/* Standard.      RFC7235, Section 4.1 */
+#define MHD_HTTP_HEADER_WWW_AUTHENTICATE "WWW-Authenticate"
+/* Standard.      RFC7234, Section 5.5 */
+#define MHD_HTTP_HEADER_WARNING "Warning"
+
+/* Additional HTTP headers. */
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_A_IM "A-IM"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_ACCEPT_ADDITIONS "Accept-Additions"
+/* Informational. RFC7089 */
+#define MHD_HTTP_HEADER_ACCEPT_DATETIME "Accept-Datetime"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_ACCEPT_FEATURES "Accept-Features"
+/* No category.   RFC5789 */
+#define MHD_HTTP_HEADER_ACCEPT_PATCH "Accept-Patch"
+/* Standard.      RFC7639, Section 2 */
+#define MHD_HTTP_HEADER_ALPN "ALPN"
+/* Standard.      RFC7838 */
+#define MHD_HTTP_HEADER_ALT_SVC "Alt-Svc"
+/* Standard.      RFC7838 */
+#define MHD_HTTP_HEADER_ALT_USED "Alt-Used"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_ALTERNATES "Alternates"
+/* No category.   RFC4437 */
+#define MHD_HTTP_HEADER_APPLY_TO_REDIRECT_REF "Apply-To-Redirect-Ref"
+/* Experimental.  RFC8053, Section 4 */
+#define MHD_HTTP_HEADER_AUTHENTICATION_CONTROL "Authentication-Control"
+/* Standard.      RFC7615, Section 3 */
+#define MHD_HTTP_HEADER_AUTHENTICATION_INFO "Authentication-Info"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_C_EXT "C-Ext"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_C_MAN "C-Man"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_C_OPT "C-Opt"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_C_PEP "C-PEP"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_C_PEP_INFO "C-PEP-Info"
+/* Standard.      RFC7809, Section 7.1 */
+#define MHD_HTTP_HEADER_CALDAV_TIMEZONES "CalDAV-Timezones"
+/* Obsoleted.     RFC2068; RFC2616 */
+#define MHD_HTTP_HEADER_CONTENT_BASE "Content-Base"
+/* Standard.      RFC6266 */
+#define MHD_HTTP_HEADER_CONTENT_DISPOSITION "Content-Disposition"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_CONTENT_ID "Content-ID"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_CONTENT_MD5 "Content-MD5"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_CONTENT_SCRIPT_TYPE "Content-Script-Type"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_CONTENT_STYLE_TYPE "Content-Style-Type"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_CONTENT_VERSION "Content-Version"
+/* Standard.      RFC6265 */
+#define MHD_HTTP_HEADER_COOKIE "Cookie"
+/* Obsoleted.     RFC2965; RFC6265 */
+#define MHD_HTTP_HEADER_COOKIE2 "Cookie2"
+/* Standard.      RFC5323 */
+#define MHD_HTTP_HEADER_DASL "DASL"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_DAV "DAV"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_DEFAULT_STYLE "Default-Style"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_DELTA_BASE "Delta-Base"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_DEPTH "Depth"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_DERIVED_FROM "Derived-From"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_DESTINATION "Destination"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_DIFFERENTIAL_ID "Differential-ID"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_DIGEST "Digest"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_EXT "Ext"
+/* Standard.      RFC7239 */
+#define MHD_HTTP_HEADER_FORWARDED "Forwarded"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_GETPROFILE "GetProfile"
+/* Experimental.  RFC7486, Section 6.1.1 */
+#define MHD_HTTP_HEADER_HOBAREG "Hobareg"
+/* Standard.      RFC7540, Section 3.2.1 */
+#define MHD_HTTP_HEADER_HTTP2_SETTINGS "HTTP2-Settings"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_IM "IM"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_IF "If"
+/* Standard.      RFC6638 */
+#define MHD_HTTP_HEADER_IF_SCHEDULE_TAG_MATCH "If-Schedule-Tag-Match"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_KEEP_ALIVE "Keep-Alive"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_LABEL "Label"
+/* No category.   RFC5988 */
+#define MHD_HTTP_HEADER_LINK "Link"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_LOCK_TOKEN "Lock-Token"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_MAN "Man"
+/* Informational. RFC7089 */
+#define MHD_HTTP_HEADER_MEMENTO_DATETIME "Memento-Datetime"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_METER "Meter"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_NEGOTIATE "Negotiate"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_OPT "Opt"
+/* Experimental.  RFC8053, Section 3 */
+#define MHD_HTTP_HEADER_OPTIONAL_WWW_AUTHENTICATE "Optional-WWW-Authenticate"
+/* Standard.      RFC4229 */
+#define MHD_HTTP_HEADER_ORDERING_TYPE "Ordering-Type"
+/* Standard.      RFC6454 */
+#define MHD_HTTP_HEADER_ORIGIN "Origin"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_OVERWRITE "Overwrite"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_P3P "P3P"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PEP "PEP"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PICS_LABEL "PICS-Label"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PEP_INFO "Pep-Info"
+/* Standard.      RFC4229 */
+#define MHD_HTTP_HEADER_POSITION "Position"
+/* Standard.      RFC7240 */
+#define MHD_HTTP_HEADER_PREFER "Prefer"
+/* Standard.      RFC7240 */
+#define MHD_HTTP_HEADER_PREFERENCE_APPLIED "Preference-Applied"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROFILEOBJECT "ProfileObject"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROTOCOL "Protocol"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROTOCOL_INFO "Protocol-Info"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROTOCOL_QUERY "Protocol-Query"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROTOCOL_REQUEST "Protocol-Request"
+/* Standard.      RFC7615, Section 4 */
+#define MHD_HTTP_HEADER_PROXY_AUTHENTICATION_INFO "Proxy-Authentication-Info"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROXY_FEATURES "Proxy-Features"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PROXY_INSTRUCTION "Proxy-Instruction"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_PUBLIC "Public"
+/* Standard.      RFC7469 */
+#define MHD_HTTP_HEADER_PUBLIC_KEY_PINS "Public-Key-Pins"
+/* Standard.      RFC7469 */
+#define MHD_HTTP_HEADER_PUBLIC_KEY_PINS_REPORT_ONLY "Public-Key-Pins-Report-Only"
+/* No category.   RFC4437 */
+#define MHD_HTTP_HEADER_REDIRECT_REF "Redirect-Ref"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SAFE "Safe"
+/* Standard.      RFC6638 */
+#define MHD_HTTP_HEADER_SCHEDULE_REPLY "Schedule-Reply"
+/* Standard.      RFC6638 */
+#define MHD_HTTP_HEADER_SCHEDULE_TAG "Schedule-Tag"
+/* Standard.      RFC6455 */
+#define MHD_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT "Sec-WebSocket-Accept"
+/* Standard.      RFC6455 */
+#define MHD_HTTP_HEADER_SEC_WEBSOCKET_EXTENSIONS "Sec-WebSocket-Extensions"
+/* Standard.      RFC6455 */
+#define MHD_HTTP_HEADER_SEC_WEBSOCKET_KEY "Sec-WebSocket-Key"
+/* Standard.      RFC6455 */
+#define MHD_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL "Sec-WebSocket-Protocol"
+/* Standard.      RFC6455 */
+#define MHD_HTTP_HEADER_SEC_WEBSOCKET_VERSION "Sec-WebSocket-Version"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SECURITY_SCHEME "Security-Scheme"
+/* Standard.      RFC6265 */
+#define MHD_HTTP_HEADER_SET_COOKIE "Set-Cookie"
+/* Obsoleted.     RFC2965; RFC6265 */
+#define MHD_HTTP_HEADER_SET_COOKIE2 "Set-Cookie2"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SETPROFILE "SetProfile"
+/* Standard.      RFC5023 */
+#define MHD_HTTP_HEADER_SLUG "SLUG"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SOAPACTION "SoapAction"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_STATUS_URI "Status-URI"
+/* Standard.      RFC6797 */
+#define MHD_HTTP_HEADER_STRICT_TRANSPORT_SECURITY "Strict-Transport-Security"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SURROGATE_CAPABILITY "Surrogate-Capability"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_SURROGATE_CONTROL "Surrogate-Control"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_TCN "TCN"
+/* Standard.      RFC4918 */
+#define MHD_HTTP_HEADER_TIMEOUT "Timeout"
+/* Standard.      RFC8030, Section 5.4 */
+#define MHD_HTTP_HEADER_TOPIC "Topic"
+/* Standard.      RFC8030, Section 5.2 */
+#define MHD_HTTP_HEADER_TTL "TTL"
+/* Standard.      RFC8030, Section 5.3 */
+#define MHD_HTTP_HEADER_URGENCY "Urgency"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_URI "URI"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_VARIANT_VARY "Variant-Vary"
+/* No category.   RFC4229 */
+#define MHD_HTTP_HEADER_WANT_DIGEST "Want-Digest"
+/* Informational. RFC7034 */
+#define MHD_HTTP_HEADER_X_FRAME_OPTIONS "X-Frame-Options"
+
+/* Some provisional headers. */
+#define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+/** @} */ /* end of group headers */
+
 
 /**
  * A client has requested the given url using the given method
@@ -554,7 +1466,7 @@ enum MHD_Method
  *         if the socket must be closed due to a serios
  *         error while handling the request
  */
-typedef struct MHD_Action *
+typedef const struct MHD_Action *
 (*MHD_RequestCallback) (void *cls,
 			struct MHD_Request *request,
 			const char *url,
@@ -572,7 +1484,8 @@ typedef struct MHD_Action *
  */
 _MHD_EXTERN struct MHD_Daemon *
 MHD_daemon_create (MHD_RequestCallback cb,
-		   void *cb_cls);
+		   void *cb_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -584,7 +1497,8 @@ MHD_daemon_create (MHD_RequestCallback cb,
  * @ingroup event
  */
 _MHD_EXTERN enum MHD_StatusCode
-MHD_daemon_start (struct MHD_Daemon *daemon);
+MHD_daemon_start (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -608,7 +1522,8 @@ MHD_daemon_start (struct MHD_Daemon *daemon);
  * @ingroup specialized
  */
 _MHD_EXTERN MHD_socket
-MHD_daemon_quiesce (struct MHD_Daemon *daemon);
+MHD_daemon_quiesce (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -618,7 +1533,215 @@ MHD_daemon_quiesce (struct MHD_Daemon *daemon);
  * @ingroup event
  */
 _MHD_EXTERN void
-MHD_daemon_destroy (struct MHD_Daemon *daemon);
+MHD_daemon_destroy (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
+
+
+/**
+ * Add another client connection to the set of connections managed by
+ * MHD.  This API is usually not needed (since MHD will accept inbound
+ * connections on the server socket).  Use this API in special cases,
+ * for example if your HTTP server is behind NAT and needs to connect
+ * out to the HTTP client, or if you are building a proxy.
+ *
+ * If you use this API in conjunction with a internal select or a
+ * thread pool, you must set the option #MHD_USE_ITC to ensure that
+ * the freshly added connection is immediately processed by MHD.
+ *
+ * The given client socket will be managed (and closed!) by MHD after
+ * this call and must no longer be used directly by the application
+ * afterwards.
+ *
+ * @param daemon daemon that manages the connection
+ * @param client_socket socket to manage (MHD will expect
+ *        to receive an HTTP request from this socket next).
+ * @param addr IP address of the client
+ * @param addrlen number of bytes in @a addr
+ * @return #MHD_SC_OK on success
+ *        The socket will be closed in any case; `errno` is
+ *        set to indicate further details about the error.
+ * @ingroup specialized
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_add_connection (struct MHD_Daemon *daemon,
+			   MHD_socket client_socket,
+			   const struct sockaddr *addr,
+			   socklen_t addrlen)
+  MHD_NONNULL(1);
+
+
+/**
+ * Obtain the `select()` sets for this daemon.  Daemon's FDs will be
+ * added to fd_sets. To get only daemon FDs in fd_sets, call FD_ZERO
+ * for each fd_set before calling this function. FD_SETSIZE is assumed
+ * to be platform's default.
+ *
+ * This function should only be called in when MHD is configured to
+ * use external select with 'select()' or with 'epoll'.  In the latter
+ * case, it will only add the single 'epoll()' file descriptor used by
+ * MHD to the sets.  It's necessary to use #MHD_get_timeout() in
+ * combination with this function.
+ *
+ * This function must be called only for daemon started without
+ * #MHD_USE_INTERNAL_POLLING_THREAD flag.
+ *
+ * @param daemon daemon to get sets from
+ * @param read_fd_set read set
+ * @param write_fd_set write set
+ * @param except_fd_set except set
+ * @param max_fd increased to largest FD added (if larger
+ *               than existing value); can be NULL
+ * @return #MHD_SC_OK on success, otherwise error code
+ * @ingroup event
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_get_fdset (struct MHD_Daemon *daemon,
+		      fd_set *read_fd_set,
+		      fd_set *write_fd_set,
+		      fd_set *except_fd_set,
+		      MHD_socket *max_fd)
+  MHD_NONNULL(1,2,3,4);
+
+
+/**
+ * Obtain the `select()` sets for this daemon.  Daemon's FDs will be
+ * added to fd_sets. To get only daemon FDs in fd_sets, call FD_ZERO
+ * for each fd_set before calling this function.
+ *
+ * Passing custom FD_SETSIZE as @a fd_setsize allow usage of
+ * larger/smaller than platform's default fd_sets.
+ *
+ * This function should only be called in when MHD is configured to
+ * use external select with 'select()' or with 'epoll'.  In the latter
+ * case, it will only add the single 'epoll' file descriptor used by
+ * MHD to the sets.  It's necessary to use #MHD_get_timeout() in
+ * combination with this function.
+ *
+ * This function must be called only for daemon started
+ * without #MHD_USE_INTERNAL_POLLING_THREAD flag.
+ *
+ * @param daemon daemon to get sets from
+ * @param read_fd_set read set
+ * @param write_fd_set write set
+ * @param except_fd_set except set
+ * @param max_fd increased to largest FD added (if larger
+ *               than existing value); can be NULL
+ * @param fd_setsize value of FD_SETSIZE
+ * @return #MHD_SC_OK on success, otherwise error code
+ * @ingroup event
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_get_fdset2 (struct MHD_Daemon *daemon,
+		       fd_set *read_fd_set,
+		       fd_set *write_fd_set,
+		       fd_set *except_fd_set,
+		       MHD_socket *max_fd,
+		       unsigned int fd_setsize)
+  MHD_NONNULL(1,2,3,4);
+
+
+/**
+ * Obtain the `select()` sets for this daemon.  Daemon's FDs will be
+ * added to fd_sets. To get only daemon FDs in fd_sets, call FD_ZERO
+ * for each fd_set before calling this function. Size of fd_set is
+ * determined by current value of FD_SETSIZE.  It's necessary to use
+ * #MHD_get_timeout() in combination with this function.
+ *
+ * This function could be called only for daemon started
+ * without #MHD_USE_INTERNAL_POLLING_THREAD flag.
+ *
+ * @param daemon daemon to get sets from
+ * @param read_fd_set read set
+ * @param write_fd_set write set
+ * @param except_fd_set except set
+ * @param max_fd increased to largest FD added (if larger
+ *               than existing value); can be NULL
+ * @return #MHD_YES on success, #MHD_NO if this
+ *         daemon was not started with the right
+ *         options for this call or any FD didn't
+ *         fit fd_set.
+ * @ingroup event
+ */
+#define MHD_daemon_get_fdset(daemon,read_fd_set,write_fd_set,except_fd_set,max_fd) \
+  MHD_get_fdset2((daemon),(read_fd_set),(write_fd_set),(except_fd_set),(max_fd),FD_SETSIZE)
+
+
+/**
+ * Obtain timeout value for polling function for this daemon.
+ * This function set value to amount of milliseconds for which polling
+ * function (`select()` or `poll()`) should at most block, not the
+ * timeout value set for connections.
+ * It is important to always use this function, even if connection
+ * timeout is not set, as in some cases MHD may already have more
+ * data to process on next turn (data pending in TLS buffers,
+ * connections are already ready with epoll etc.) and returned timeout
+ * will be zero.
+ *
+ * @param daemon daemon to query for timeout
+ * @param timeout set to the timeout (in milliseconds)
+ * @return #MHD_SC_OK on success, #MHD_SC_NO_TIMEOUT if timeouts are
+ *        not used (or no connections exist that would
+ *        necessitate the use of a timeout right now), otherwise
+ *        an error code
+ * @ingroup event
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_get_timeout (struct MHD_Daemon *daemon,
+			MHD_UNSIGNED_LONG_LONG *timeout)
+  MHD_NONNULL(1,2);
+
+
+/**
+ * Run webserver operations (without blocking unless in client
+ * callbacks).  This method should be called by clients in combination
+ * with #MHD_get_fdset if the client-controlled select method is used
+ * and #MHD_get_timeout().
+ *
+ * This function is a convenience method, which is useful if the
+ * fd_sets from #MHD_get_fdset were not directly passed to `select()`;
+ * with this function, MHD will internally do the appropriate `select()`
+ * call itself again.  While it is always safe to call #MHD_run (if
+ * #MHD_USE_INTERNAL_POLLING_THREAD is not set), you should call
+ * #MHD_run_from_select if performance is important (as it saves an
+ * expensive call to `select()`).
+ *
+ * @param daemon daemon to run
+ * @return #MHD_SC_OK on success
+ * @ingroup event
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_run (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
+
+
+/**
+ * Run webserver operations. This method should be called by clients
+ * in combination with #MHD_get_fdset and #MHD_get_timeout() if the
+ * client-controlled select method is used.
+ *
+ * You can use this function instead of #MHD_run if you called
+ * `select()` on the result from #MHD_get_fdset.  File descriptors in
+ * the sets that are not controlled by MHD will be ignored.  Calling
+ * this function instead of #MHD_run is more efficient as MHD will not
+ * have to call `select()` again to determine which operations are
+ * ready.
+ *
+ * This function cannot be used with daemon started with
+ * #MHD_USE_INTERNAL_POLLING_THREAD flag.
+ *
+ * @param daemon daemon to run select loop for
+ * @param read_fd_set read set
+ * @param write_fd_set write set
+ * @param except_fd_set except set
+ * @return #MHD_SC_OK on success
+ * @ingroup event
+ */
+_MHD_EXTERN enum MHD_StatusCode
+MHD_daemon_run_from_select (struct MHD_Daemon *daemon,
+			    const fd_set *read_fd_set,
+			    const fd_set *write_fd_set,
+			    const fd_set *except_fd_set)
+  MHD_NONNULL(1,2,3,4);
 
 
 /* ********************* daemon options ************** */
@@ -652,7 +1775,8 @@ typedef void
 _MHD_EXTERN void
 MHD_daemon_set_logger (struct MHD_Daemon *daemon,
 		       MHD_LoggingCallback logger,
-		       void *logger_cls);
+		       void *logger_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -669,7 +1793,8 @@ MHD_daemon_set_logger (struct MHD_Daemon *daemon,
  * @param daemon which instance to disable clock for.
  */
 _MHD_EXTERN void
-MHD_daemon_suppress_date_no_clock (struct MHD_Daemon *daemon);
+MHD_daemon_suppress_date_no_clock (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -690,7 +1815,8 @@ MHD_daemon_suppress_date_no_clock (struct MHD_Daemon *daemon);
  * @param daemon which instance to disable itc for
  */
 _MHD_EXTERN void
-MHD_daemon_disable_itc (struct MHD_Daemon *daemon);
+MHD_daemon_disable_itc (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -702,7 +1828,8 @@ MHD_daemon_disable_itc (struct MHD_Daemon *daemon);
  * @param daemon which instance to enable turbo for
  */
 _MHD_EXTERN void
-MHD_daemon_enable_turbo (struct MHD_Daemon *daemon);
+MHD_daemon_enable_turbo (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -715,7 +1842,8 @@ MHD_daemon_enable_turbo (struct MHD_Daemon *daemon);
  * @param daemon which instance to disable suspend for
  */
 _MHD_EXTERN void
-MHD_daemon_disallow_suspend_resume (struct MHD_Daemon *daemon);
+MHD_daemon_disallow_suspend_resume (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -730,7 +1858,8 @@ MHD_daemon_disallow_suspend_resume (struct MHD_Daemon *daemon);
  * @param daemon which instance to enable suspend/resume for
  */
 _MHD_EXTERN void
-MHD_daemon_disallow_upgrade (struct MHD_Daemon *daemon);
+MHD_daemon_disallow_upgrade (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -776,7 +1905,8 @@ enum MHD_FastOpenMethod
 _MHD_EXTERN enum MHD_Bool
 MHD_daemon_tcp_fastopen (struct MHD_Daemon *daemon,
 			 enum MHD_FastOpenMethod fom,
-			 unsigned int queue_length);
+			 unsigned int queue_length)
+  MHD_NONNULL(1);
 
 
 /**
@@ -790,12 +1920,12 @@ enum MHD_AddressFamily
    * other means).
    */
   MHD_AF_NONE = 0,
-  
+
   /**
    * Pick "best" available method automatically.
    */
   MHD_AF_AUTO,
-  
+
   /**
    * Use IPv4.
    */
@@ -829,7 +1959,8 @@ enum MHD_AddressFamily
 _MHD_EXTERN void
 MHD_daemon_bind_port (struct MHD_Daemon *daemon,
 		      enum MHD_AddressFamily af,
-		      uint16_t port);
+		      uint16_t port)
+  MHD_NONNULL(1);
 
 
 /**
@@ -844,7 +1975,8 @@ MHD_daemon_bind_port (struct MHD_Daemon *daemon,
 _MHD_EXTERN void
 MHD_daemon_bind_socket_address (struct MHD_Daemon *daemon,
 				const struct sockaddr *sa,
-				size_t sa_len);
+				size_t sa_len)
+  MHD_NONNULL(1);
 
 
 /**
@@ -856,7 +1988,8 @@ MHD_daemon_bind_socket_address (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN void
 MHD_daemon_listen_backlog (struct MHD_Daemon *daemon,
-			   int listen_backlog);
+			   int listen_backlog)
+  MHD_NONNULL(1);
 
 
 /**
@@ -870,7 +2003,8 @@ MHD_daemon_listen_backlog (struct MHD_Daemon *daemon,
  * @param daemon daemon to configure address reuse for
  */
 _MHD_EXTERN void
-MHD_daemon_listen_allow_address_reuse (struct MHD_Daemon *daemon);
+MHD_daemon_listen_allow_address_reuse (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -889,7 +2023,8 @@ MHD_daemon_listen_allow_address_reuse (struct MHD_Daemon *daemon);
  */
 _MHD_EXTERN void
 MHD_daemon_listen_socket (struct MHD_Daemon *daemon,
-			  MHD_socket listen_socket);
+			  MHD_socket listen_socket)
+  MHD_NONNULL(1);
 
 
 /**
@@ -929,7 +2064,8 @@ enum MHD_EventLoopSyscall
  */
 _MHD_EXTERN enum MHD_Bool
 MHD_daemon_event_loop (struct MHD_Daemon *daemon,
-		       enum MHD_EventLoopSyscall els);
+		       enum MHD_EventLoopSyscall els)
+  MHD_NONNULL(1);
 
 
 /**
@@ -973,7 +2109,19 @@ enum MHD_ProtocolStrictLevel
  */
 _MHD_EXTERN void
 MHD_daemon_protocol_strict_level (struct MHD_Daemon *daemon,
-				  enum MHD_ProtocolStrictLevel sl);
+				  enum MHD_ProtocolStrictLevel sl)
+  MHD_NONNULL(1);
+
+
+/**
+ * Use SHOUTcast.  This will cause the response to begin
+ * with the SHOUTcast "ICY" line instad of "HTTP".
+ *
+ * @param daemon daemon to set SHOUTcast option for
+ */
+_MHD_EXTERN void
+MHD_daemon_enable_shoutcast (struct MHD_Daemon *daemon)
+  MHD_NONNULL(1);
 
 
 /**
@@ -994,7 +2142,8 @@ MHD_daemon_protocol_strict_level (struct MHD_Daemon *daemon,
 _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_set_tls_backend (struct MHD_Daemon *daemon,
 			    const char *tls_backend,
-			    const char *ciphers);
+			    const char *ciphers)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1013,7 +2162,8 @@ _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_tls_key_and_cert_from_memory (struct MHD_Daemon *daemon,
 					 const char *mem_key,
 					 const char *mem_cert,
-					 const char *pass);
+					 const char *pass)
+  MHD_NONNULL(1,2,3);
 
 
 /**
@@ -1026,7 +2176,8 @@ MHD_daemon_tls_key_and_cert_from_memory (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_tls_mem_dhparams (struct MHD_Daemon *daemon,
-			     const char *dh);
+			     const char *dh)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1039,7 +2190,8 @@ MHD_daemon_tls_mem_dhparams (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_tls_mem_trust (struct MHD_Daemon *daemon,
-			  const char *mem_trust);
+			  const char *mem_trust)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1051,7 +2203,8 @@ MHD_daemon_tls_mem_trust (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_gnutls_credentials (struct MHD_Daemon *daemon,
-			       int gnutls_credentials);
+			       int gnutls_credentials)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1069,10 +2222,12 @@ MHD_daemon_gnutls_credentials (struct MHD_Daemon *daemon,
  *
  * @param daemon daemon to configure callback for
  * @param cb must be of type `gnutls_certificate_retrieve_function2 *`.
+ * @return #MHD_SC_OK on success
  */
-_MHD_EXTERN void
+_MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_gnutls_key_and_cert_from_callback (struct MHD_Daemon *daemon,
-					      void *cb);
+					      void *cb)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1130,7 +2285,8 @@ enum MHD_ThreadingModel
  */
 _MHD_EXTERN void
 MHD_daemon_threading_model (struct MHD_Daemon *daemon,
-			    enum MHD_ThreadingModel tm);
+			    enum MHD_ThreadingModel tm)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1160,7 +2316,8 @@ typedef enum MHD_Bool
 _MHD_EXTERN void
 MHD_daemon_accept_policy (struct MHD_Daemon *daemon,
 			  MHD_AcceptPolicyCallback apc,
-			  void *apc_cls);
+			  void *apc_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1174,9 +2331,9 @@ MHD_daemon_accept_policy (struct MHD_Daemon *daemon,
  * @return value to set for the "request_context" of @a request
  */
 typedef void *
-(MHD_EarlyUriLogCallback)(void *cls,
-			  const char *uri,
-			  struct MHD_Request *request);
+(*MHD_EarlyUriLogCallback)(void *cls,
+			   const char *uri,
+			   struct MHD_Request *request);
 
 
 /**
@@ -1191,7 +2348,31 @@ typedef void *
 _MHD_EXTERN void
 MHD_daemon_set_early_uri_logger (struct MHD_Daemon *daemon,
 				 MHD_EarlyUriLogCallback cb,
-				 void *cb_cls);
+				 void *cb_cls)
+  MHD_NONNULL(1);
+
+
+/**
+ * The `enum MHD_ConnectionNotificationCode` specifies types
+ * of connection notifications.
+ * @ingroup request
+ */
+enum MHD_ConnectionNotificationCode
+{
+
+  /**
+   * A new connection has been started.
+   * @ingroup request
+   */
+  MHD_CONNECTION_NOTIFY_STARTED = 0,
+
+  /**
+   * A connection is closed.
+   * @ingroup request
+   */
+  MHD_CONNECTION_NOTIFY_CLOSED = 1
+
+};
 
 
 /**
@@ -1214,9 +2395,9 @@ MHD_daemon_set_early_uri_logger (struct MHD_Daemon *daemon,
  * @ingroup request
  */
 typedef void
-(*MHD_ConnectionCompletedCallback) (void *cls,
-				    struct MHD_Connection *connection,
-				    enum MHD_ConnectionNotificationCode toe);
+(*MHD_NotifyConnectionCallback) (void *cls,
+				 struct MHD_Connection *connection,
+				 enum MHD_ConnectionNotificationCode toe);
 
 
 /**
@@ -1230,7 +2411,8 @@ typedef void
 _MHD_EXTERN void
 MHD_daemon_set_notify_connection (struct MHD_Daemon *daemon,
 				  MHD_NotifyConnectionCallback ncc,
-				  void *ncc_cls);
+				  void *ncc_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1247,7 +2429,8 @@ MHD_daemon_set_notify_connection (struct MHD_Daemon *daemon,
 _MHD_EXTERN void
 MHD_daemon_connection_memory_limit (struct MHD_Daemon *daemon,
 				    size_t memory_limit_b,
-				    size_t memory_increment_b);
+				    size_t memory_increment_b)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1260,7 +2443,8 @@ MHD_daemon_connection_memory_limit (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN void
 MHD_daemon_thread_stack_size (struct MHD_Daemon *daemon,
-			      size_t stack_limit_b);
+			      size_t stack_limit_b)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1281,7 +2465,8 @@ MHD_daemon_thread_stack_size (struct MHD_Daemon *daemon,
 _MHD_EXTERN void
 MHD_daemon_connection_limits (struct MHD_Daemon *daemon,
 			      unsigned int global_connection_limit,
-			      unsigned int ip_connection_limit);
+			      unsigned int ip_connection_limit)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1294,7 +2479,8 @@ MHD_daemon_connection_limits (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN void
 MHD_daemon_connection_default_timeout (struct MHD_Daemon *daemon,
-				       unsigned int timeout_s);
+				       unsigned int timeout_s)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1310,9 +2496,9 @@ MHD_daemon_connection_default_timeout (struct MHD_Daemon *daemon,
  * @return number of characters in @a s (excluding 0-terminator)
  */
 typedef size_t
-MHD_UnescapeCallback (void *cls,
-		      struct MHD_Request *req,
-		      char *s);
+(*MHD_UnescapeCallback) (void *cls,
+			 struct MHD_Request *req,
+			 char *s);
 
 
 /**
@@ -1329,7 +2515,8 @@ MHD_UnescapeCallback (void *cls,
 _MHD_EXTERN void
 MHD_daemon_unescape_cb (struct MHD_Daemon *daemon,
 			MHD_UnescapeCallback unescape_cb,
-			void *unescape_cb_cls);
+			void *unescape_cb_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1344,7 +2531,8 @@ MHD_daemon_unescape_cb (struct MHD_Daemon *daemon,
 _MHD_EXTERN void
 MHD_daemon_digest_auth_random (struct MHD_Daemon *daemon,
 			       size_t buf_size,
-			       const void *buf);
+			       const void *buf)
+  MHD_NONNULL(1,3);
 
 
 /**
@@ -1356,7 +2544,8 @@ MHD_daemon_digest_auth_random (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN enum MHD_StatusCode
 MHD_daemon_digest_auth_nc_length (struct MHD_Daemon *daemon,
-				  size_t nc_length);
+				  size_t nc_length)
+  MHD_NONNULL(1);
 
 
 /* ********************* connection options ************** */
@@ -1364,7 +2553,7 @@ MHD_daemon_digest_auth_nc_length (struct MHD_Daemon *daemon,
 
 /**
  * Set custom timeout for the given connection.
- * Specified as the number of seconds.  Use zero for no timeout.  
+ * Specified as the number of seconds.  Use zero for no timeout.
  * Calling this function will reset timeout timer.
  *
  * @param connection connection to configure timeout for
@@ -1372,10 +2561,74 @@ MHD_daemon_digest_auth_nc_length (struct MHD_Daemon *daemon,
  */
 _MHD_EXTERN void
 MHD_connection_set_timeout (struct MHD_Connection *connection,
-			    unsigned int timeout_s);
+			    unsigned int timeout_s)
+  MHD_NONNULL(1);
 
 
 /* **************** Request handling functions ***************** */
+
+
+/**
+ * The `enum MHD_ValueKind` specifies the source of
+ * the key-value pairs in the HTTP protocol.
+ */
+enum MHD_ValueKind
+{
+
+  /**
+   * HTTP header (request/response).
+   */
+  MHD_HEADER_KIND = 1,
+
+  /**
+   * Cookies.  Note that the original HTTP header containing
+   * the cookie(s) will still be available and intact.
+   */
+  MHD_COOKIE_KIND = 2,
+
+  /**
+   * POST data.  This is available only if a content encoding
+   * supported by MHD is used (currently only URL encoding),
+   * and only if the posted content fits within the available
+   * memory pool.  Note that in that case, the upload data
+   * given to the #MHD_AccessHandlerCallback will be
+   * empty (since it has already been processed).
+   */
+  MHD_POSTDATA_KIND = 4,
+
+  /**
+   * GET (URI) arguments.
+   */
+  MHD_GET_ARGUMENT_KIND = 8,
+
+  /**
+   * HTTP footer (only for HTTP 1.1 chunked encodings).
+   */
+  MHD_FOOTER_KIND = 16
+};
+
+
+
+/**
+ * Iterator over key-value pairs.  This iterator can be used to
+ * iterate over all of the cookies, headers, or POST-data fields of a
+ * request, and also to iterate over the headers that have been added
+ * to a response.
+ *
+ * @param cls closure
+ * @param kind kind of the header we are looking at
+ * @param key key for the value, can be an empty string
+ * @param value corresponding value, can be NULL
+ * @return #MHD_YES to continue iterating,
+ *         #MHD_NO to abort the iteration
+ * @ingroup request
+ */
+typedef int
+(*MHD_KeyValueIterator) (void *cls,
+                         enum MHD_ValueKind kind,
+                         const char *key,
+                         const char *value);
+
 
 /**
  * Get all of the headers from the request.
@@ -1392,7 +2645,8 @@ _MHD_EXTERN unsigned int
 MHD_request_get_values (struct MHD_Request *request,
 			enum MHD_ValueKind kind,
 			MHD_KeyValueIterator iterator,
-			void *iterator_cls);
+			void *iterator_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1424,7 +2678,8 @@ _MHD_EXTERN enum MHD_Bool
 MHD_request_set_value (struct MHD_Request *request,
 		       enum MHD_ValueKind kind,
 		       const char *key,
-		       const char *value);
+		       const char *value)
+  MHD_NONNULL(1,3,4);
 
 
 /**
@@ -1440,7 +2695,8 @@ MHD_request_set_value (struct MHD_Request *request,
 _MHD_EXTERN const char *
 MHD_request_lookup_value (struct MHD_Request *request,
 			  enum MHD_ValueKind kind,
-			  const char *key);
+			  const char *key)
+  MHD_NONNULL(1);
 
 
 
@@ -1539,8 +2795,30 @@ enum MHD_HTTP_StatusCode {
   MHD_HTTP_NETWORK_AUTHENTICATION_REQUIRED = 511
 
 };
+
+
+/**
+ * Returns the string reason phrase for a response code.
+ *
+ * If we don't have a string for a status code, we give the first
+ * message in that status code class.
+ */
+_MHD_EXTERN const char *
+MHD_get_reason_phrase_for (enum MHD_HTTP_StatusCode code);
+
 /** @} */ /* end of group httpcode */
 
+
+/**
+ * @defgroup versions HTTP versions
+ * These strings should be used to match against the first line of the
+ * HTTP header.
+ * @{
+ */
+#define MHD_HTTP_VERSION_1_0 "HTTP/1.0"
+#define MHD_HTTP_VERSION_1_1 "HTTP/1.1"
+
+/** @} */ /* end of group versions */
 
 
 /**
@@ -1570,7 +2848,7 @@ enum MHD_HTTP_StatusCode {
  *
  * @return action to cause a request to be suspended.
  */
-_MHD_EXTERN struct MHD_Action *
+_MHD_EXTERN const struct MHD_Action *
 MHD_action_suspend (void);
 
 
@@ -1589,17 +2867,26 @@ MHD_action_suspend (void);
  * @param request the request to resume
  */
 _MHD_EXTERN void
-MHD_request_resume (struct MHD_Request *request);
+MHD_request_resume (struct MHD_Request *request)
+  MHD_NONNULL(1);
 
 
 /* **************** Response manipulation functions ***************** */
 
 
 /**
- * Converts a @a response to an action.  If @a consume
+ * Data transmitted in response to an HTTP request.
+ * Usually the final action taken in response to
+ * receiving a request.
+ */
+struct MHD_Response;
+
+
+/**
+ * Converts a @a response to an action.  If @a destroy_after_use
  * is set, the reference to the @a response is consumed
  * by the conversion. If @a consume is #MHD_NO, then
- * the response can be converted to actions in the future.
+ * the @a response can be converted to actions in the future.
  * However, the @a response is frozen by this step and
  * must no longer be modified (i.e. by setting headers).
  *
@@ -1612,9 +2899,10 @@ MHD_request_resume (struct MHD_Request *request);
  * as a response *is* an action.  As no memory is
  * allocated, this operation cannot fail.
  */
-_MHD_EXTERN struct MHD_Action *
+_MHD_EXTERN const struct MHD_Action *
 MHD_action_from_response (struct MHD_Response *response,
-			  enum MHD_bool destroy_after_use);
+			  enum MHD_Bool destroy_after_use)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1625,12 +2913,71 @@ MHD_action_from_response (struct MHD_Response *response,
  * @param request the request for which we force HTTP 1.0 to be used
  */
 _MHD_EXTERN void
-MHD_response_option_v10_only (struct MHD_Response *response);
+MHD_response_option_v10_only (struct MHD_Response *response)
+  MHD_NONNULL(1);
 
 
 /**
- * Signature of the callback used by MHD to notify the
- * application about completed requests.
+ * The `enum MHD_RequestTerminationCode` specifies reasons
+ * why a request has been terminated (or completed).
+ * @ingroup request
+ */
+enum MHD_RequestTerminationCode
+{
+
+  /**
+   * We finished sending the response.
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_COMPLETED_OK = 0,
+
+  /**
+   * Error handling the connection (resources
+   * exhausted, other side closed connection,
+   * application error accepting request, etc.)
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_WITH_ERROR = 1,
+
+  /**
+   * No activity on the connection for the number
+   * of seconds specified using
+   * #MHD_OPTION_CONNECTION_TIMEOUT.
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_TIMEOUT_REACHED = 2,
+
+  /**
+   * We had to close the session since MHD was being
+   * shut down.
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN = 3,
+
+  /**
+   * We tried to read additional data, but the other side closed the
+   * connection.  This error is similar to
+   * #MHD_REQUEST_TERMINATED_WITH_ERROR, but specific to the case where
+   * the connection died because the other side did not send expected
+   * data.
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_READ_ERROR = 4,
+
+  /**
+   * The client terminated the connection by closing the socket
+   * for writing (TCP half-closed); MHD aborted sending the
+   * response according to RFC 2616, section 8.1.4.
+   * @ingroup request
+   */
+  MHD_REQUEST_TERMINATED_CLIENT_ABORT = 5
+
+};
+
+
+/**
+ * Signature of the callback used by MHD to notify the application
+ * about completed requests.
  *
  * @param cls client-defined closure
  * @param toe reason for request termination
@@ -1656,7 +3003,71 @@ typedef void
 _MHD_EXTERN void
 MHD_response_option_termination_callback (struct MHD_Response *response,
 					  MHD_RequestTerminationCallback termination_cb,
-					  void *termination_cb_cls);
+					  void *termination_cb_cls)
+  MHD_NONNULL(1);
+
+
+/**
+ * Callback used by libmicrohttpd in order to obtain content.  The
+ * callback is to copy at most @a max bytes of content into @a buf.  The
+ * total number of bytes that has been placed into @a buf should be
+ * returned.
+ *
+ * Note that returning zero will cause libmicrohttpd to try again.
+ * Thus, returning zero should only be used in conjunction
+ * with MHD_suspend_connection() to avoid busy waiting.
+ *
+ * @param cls extra argument to the callback
+ * @param pos position in the datastream to access;
+ *        note that if a `struct MHD_Response` object is re-used,
+ *        it is possible for the same content reader to
+ *        be queried multiple times for the same data;
+ *        however, if a `struct MHD_Response` is not re-used,
+ *        libmicrohttpd guarantees that "pos" will be
+ *        the sum of all non-negative return values
+ *        obtained from the content reader so far.
+ * @param buf where to copy the data
+ * @param max maximum number of bytes to copy to @a buf (size of @a buf)
+ * @return number of bytes written to @a buf;
+ *  0 is legal unless we are running in internal select mode (since
+ *    this would cause busy-waiting); 0 in external select mode
+ *    will cause this function to be called again once the external
+ *    select calls MHD again;
+ *  #MHD_CONTENT_READER_END_OF_STREAM (-1) for the regular
+ *    end of transmission (with chunked encoding, MHD will then
+ *    terminate the chunk and send any HTTP footers that might be
+ *    present; without chunked encoding and given an unknown
+ *    response size, MHD will simply close the connection; note
+ *    that while returning #MHD_CONTENT_READER_END_OF_STREAM is not technically
+ *    legal if a response size was specified, MHD accepts this
+ *    and treats it just as #MHD_CONTENT_READER_END_WITH_ERROR;
+ *  #MHD_CONTENT_READER_END_WITH_ERROR (-2) to indicate a server
+ *    error generating the response; this will cause MHD to simply
+ *    close the connection immediately.  If a response size was
+ *    given or if chunked encoding is in use, this will indicate
+ *    an error to the client.  Note, however, that if the client
+ *    does not know a response size and chunked encoding is not in
+ *    use, then clients will not be able to tell the difference between
+ *    #MHD_CONTENT_READER_END_WITH_ERROR and #MHD_CONTENT_READER_END_OF_STREAM.
+ *    This is not a limitation of MHD but rather of the HTTP protocol.
+ */
+typedef ssize_t
+(*MHD_ContentReaderCallback) (void *cls,
+                              uint64_t pos,
+                              char *buf,
+                              size_t max);
+
+
+/**
+ * This method is called by libmicrohttpd if we are done with a
+ * content reader.  It should be used to free resources associated
+ * with the content reader.
+ *
+ * @param cls closure
+ * @ingroup response
+ */
+typedef void
+(*MHD_ContentReaderFreeCallback) (void *cls);
 
 
 /**
@@ -1810,7 +3221,8 @@ struct MHD_UpgradeResponseHandle;
 _MHD_EXTERN enum MHD_Bool
 MHD_upgrade_operation (struct MHD_UpgradeResponseHandle *urh,
 		       enum MHD_UpgradeOperation operation,
-		       ...);
+		       ...)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1902,7 +3314,8 @@ typedef void
  */
 _MHD_EXTERN struct MHD_Response *
 MHD_response_for_upgrade (MHD_UpgradeHandler upgrade_handler,
-			  void *upgrade_handler_cls);
+			  void *upgrade_handler_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1915,7 +3328,8 @@ MHD_response_for_upgrade (MHD_UpgradeHandler upgrade_handler,
  * @ingroup response
  */
 _MHD_EXTERN void
-MHD_response_queue_for_destroy (struct MHD_Response *response);
+MHD_response_queue_for_destroy (struct MHD_Response *response)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1931,7 +3345,8 @@ MHD_response_queue_for_destroy (struct MHD_Response *response);
 _MHD_EXTERN enum MHD_Bool
 MHD_response_add_header (struct MHD_Response *response,
                          const char *header,
-			 const char *content);
+			 const char *content)
+  MHD_NONNULL(1,2,3);
 
 
 /**
@@ -1947,7 +3362,8 @@ MHD_response_add_header (struct MHD_Response *response,
 _MHD_EXTERN enum MHD_Bool
 MHD_response_add_trailer (struct MHD_Response *response,
                           const char *footer,
-                          const char *content);
+                          const char *content)
+  MHD_NONNULL(1,2,3);
 
 
 /**
@@ -1962,7 +3378,8 @@ MHD_response_add_trailer (struct MHD_Response *response,
 _MHD_EXTERN enum MHD_Bool
 MHD_response_del_header (struct MHD_Response *response,
                          const char *header,
-			 const char *content);
+			 const char *content)
+  MHD_NONNULL(1,2,3);
 
 
 /**
@@ -1978,7 +3395,8 @@ MHD_response_del_header (struct MHD_Response *response,
 _MHD_EXTERN unsigned int
 MHD_response_get_headers (struct MHD_Response *response,
                           MHD_KeyValueIterator iterator,
-			  void *iterator_cls);
+			  void *iterator_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -1991,7 +3409,8 @@ MHD_response_get_headers (struct MHD_Response *response,
  */
 _MHD_EXTERN const char *
 MHD_response_get_header (struct MHD_Response *response,
-			 const char *key);
+			 const char *key)
+  MHD_NONNULL(1,2);
 
 
 /* ************Upload and PostProcessor functions ********************** */
@@ -2002,7 +3421,7 @@ MHD_response_get_header (struct MHD_Response *response,
  *
  * @return action operation, never NULL
  */
-_MHD_EXTERN struct MHD_Action *
+_MHD_EXTERN const struct MHD_Action *
 MHD_action_continue (void);
 
 
@@ -2024,7 +3443,7 @@ MHD_action_continue (void);
  *         NULL to close the socket, or a response
  *         to discard the rest of the upload and return the data given
  */
-typedef struct MHD_Action *
+typedef const struct MHD_Action *
 (*MHD_UploadCallback) (void *cls,
 		       const char *upload_data,
 		       size_t *upload_data_size);
@@ -2038,9 +3457,10 @@ typedef struct MHD_Action *
  * @return NULL on error (out of memory)
  * @ingroup action
  */
-_MHD_EXTERN struct MHD_Action *
+_MHD_EXTERN const struct MHD_Action *
 MHD_action_process_upload (MHD_UploadCallback uc,
-			   void *uc_cls);
+			   void *uc_cls)
+  MHD_NONNULL(1);
 
 
 /**
@@ -2066,7 +3486,7 @@ MHD_action_process_upload (MHD_UploadCallback uc,
  *         NULL to close the socket, or a response
  *         to discard the rest of the upload and return the data given
  */
-typedef struct MHD_Action *
+typedef const struct MHD_Action *
 (*MHD_PostDataIterator) (void *cls,
                          enum MHD_ValueKind kind,
                          const char *key,
@@ -2102,10 +3522,11 @@ typedef struct MHD_Action *
  *         otherwise a PP handle
  * @ingroup request
  */
-_MHD_EXTERN struct MHD_Action *
+_MHD_EXTERN const struct MHD_Action *
 MHD_action_parse_post (size_t buffer_size,
 		       MHD_PostDataIterator iter,
-		       void *iter_cls);
+		       void *iter_cls)
+  MHD_NONNULL(2);
 
 
 
@@ -2182,7 +3603,14 @@ enum MHD_ConnectionInformationType
    * Get connection timeout
    * @ingroup request
    */
-  MHD_CONNECTION_INFORMATION_CONNECTION_TIMEOUT
+  MHD_CONNECTION_INFORMATION_CONNECTION_TIMEOUT,
+
+  /**
+   * Check whether the connection is suspended.
+   * @ingroup request
+   */
+  MHD_CONNECTION_INFORMATION_CONNECTION_SUSPENDED
+
 
 };
 
@@ -2228,7 +3656,7 @@ union MHD_ConnectionInformation
   /**
    * Address information for the client.
    */
-  struct sockaddr *client_addr;
+  const struct sockaddr *client_addr;
 
   /**
    * Which daemon manages this connection (useful in case there are many
@@ -2237,10 +3665,16 @@ union MHD_ConnectionInformation
   struct MHD_Daemon *daemon;
 
   /**
-   * Socket-specific client context.  Points to the same address as
-   * the "socket_context" of the #MHD_NotifyConnectionCallback.
+   * Pointer to connection-specific client context.  Points to the
+   * same address as the "socket_context" of the
+   * #MHD_NotifyConnectionCallback.
    */
-  void *socket_context;
+  void **socket_context;
+
+  /**
+   * Is this connection right now suspended?
+   */
+  enum MHD_Bool suspended;
 };
 
 
@@ -2263,7 +3697,8 @@ _MHD_EXTERN enum MHD_Bool
 MHD_connection_get_information_sz (struct MHD_Connection *connection,
 				   enum MHD_ConnectionInformationType info_type,
 				   union MHD_ConnectionInformation *return_value,
-				   size_t return_value_size);
+				   size_t return_value_size)
+  MHD_NONNULL(1,3);
 
 
 /**
@@ -2295,15 +3730,10 @@ union MHD_RequestInformation
   struct MHD_Connection *connection;
 
   /**
-   * Socket-specific client context.  Will also be given to
+   * Pointer to client context.  Will also be given to
    * the application in a #MHD_RequestTerminationCallback.
    */
-  void *request_context;
-
-  /**
-   * The suspended status of a request.
-   */
-  enum MHD_Bool suspended;
+  void **request_context;
 
   /**
    * HTTP version requested by the client.
@@ -2336,10 +3766,10 @@ enum MHD_RequestInformationType
   MHD_REQUEST_INFORMATION_CONNECTION,
 
   /**
-   * Check whether the connection is suspended.
-   * @ingroup request
+   * Returns the client-specific pointer to a `void *` that
+   * is specific to this request.
    */
-  MHD_REQUEST_INFORMATION_SUSPENDED,
+  MHD_REQUEST_INFORMATION_CLIENT_CONTEXT,
 
   /**
    * Return the HTTP version string given by the client.
@@ -2380,7 +3810,8 @@ _MHD_EXTERN enum MHD_Bool
 MHD_request_get_information_sz (struct MHD_Request *request,
 			        enum MHD_RequestInformationType info_type,
 			        union MHD_RequestInformation *return_value,
-			        size_t return_value_size);
+			        size_t return_value_size)
+  MHD_NONNULL(1,3);
 
 
 /**
@@ -2411,7 +3842,7 @@ enum MHD_DaemonInformationType
    * Request the file descriptor for the listening socket.
    * No extra arguments should be passed.
    */
-  MHD_DAEMON_INFORMATION_LISTEN_FD,
+  MHD_DAEMON_INFORMATION_LISTEN_SOCKET,
 
   /**
    * Request the file descriptor for the external epoll.
@@ -2445,9 +3876,9 @@ union MHD_DaemonInformation
 {
 
   /**
-   * Socket, returned for #MHD_DAEMON_INFORMATION_LISTEN_FD.
+   * Socket, returned for #MHD_DAEMON_INFORMATION_LISTEN_SOCKET.
    */
-  MHD_socket listen_fd;
+  MHD_socket listen_socket;
 
   /**
    * Bind port number, returned for #MHD_DAEMON_INFORMATION_BIND_PORT.
@@ -2486,7 +3917,8 @@ _MHD_EXTERN enum MHD_Bool
 MHD_daemon_get_information_sz (struct MHD_Daemon *daemon,
 			       enum MHD_DaemonInformationType info_type,
 			       union MHD_DaemonInformation *return_value,
-			       size_t return_value_size);
+			       size_t return_value_size)
+  MHD_NONNULL(1,3);
 
 /**
  * Obtain information about the given daemon.
@@ -2504,18 +3936,260 @@ MHD_daemon_get_information_sz (struct MHD_Daemon *daemon,
                                    return_value) \
 	MHD_daemon_get_information_sz((daemon), (info_type), (return_value), sizeof(union MHD_DaemonInformation));
 
-#ifdef HTTP2_SUPPORT
 
 /**
- * Set default HTTP/2 settings for the daemon.
+ * Callback for serious error condition. The default action is to print
+ * an error message and `abort()`.
  *
- * @param daemon daemon to configure
- * @return #MHD_SC_OK on success
+ * @param cls user specified value
+ * @param file where the error occured
+ * @param line where the error occured
+ * @param reason error detail, may be NULL
+ * @ingroup logging
  */
-_MHD_EXTERN enum MHD_StatusCode
-MHD_daemon_set_h2_settings (struct MHD_Daemon *daemon,
-		       const nghttp2_settings_entry *settings);
+typedef void
+(*MHD_PanicCallback) (void *cls,
+                      const char *file,
+                      unsigned int line,
+                      const char *reason);
 
-#endif /* ! HTTP2_SUPPORT */
+
+/**
+ * Sets the global error handler to a different implementation.  @a cb
+ * will only be called in the case of typically fatal, serious
+ * internal consistency issues.  These issues should only arise in the
+ * case of serious memory corruption or similar problems with the
+ * architecture.  While @a cb is allowed to return and MHD will then
+ * try to continue, this is never safe.
+ *
+ * The default implementation that is used if no panic function is set
+ * simply prints an error message and calls `abort()`.  Alternative
+ * implementations might call `exit()` or other similar functions.
+ *
+ * @param cb new error handler
+ * @param cls passed to @a cb
+ * @ingroup logging
+ */
+_MHD_EXTERN void
+MHD_set_panic_func (MHD_PanicCallback cb,
+		    void *cls);
+
+
+/**
+ * Process escape sequences ('%HH') Updates val in place; the
+ * result should be UTF-8 encoded and cannot be larger than the input.
+ * The result must also still be 0-terminated.
+ *
+ * @param val value to unescape (modified in the process)
+ * @return length of the resulting val (`strlen(val)` may be
+ *  shorter afterwards due to elimination of escape sequences)
+ */
+_MHD_EXTERN size_t
+MHD_http_unescape (char *val)
+  MHD_NONNULL(1);
+
+
+/**
+ * Types of information about MHD features,
+ * used by #MHD_is_feature_supported().
+ */
+enum MHD_Feature
+{
+  /**
+   * Get whether messages are supported. If supported then in debug
+   * mode messages can be printed to stderr or to external logger.
+   */
+  MHD_FEATURE_MESSAGES = 1,
+
+  /**
+   * Get whether HTTPS is supported.  If supported then flag
+   * #MHD_USE_TLS and options #MHD_OPTION_HTTPS_MEM_KEY,
+   * #MHD_OPTION_HTTPS_MEM_CERT, #MHD_OPTION_HTTPS_MEM_TRUST,
+   * #MHD_OPTION_HTTPS_MEM_DHPARAMS, #MHD_OPTION_HTTPS_CRED_TYPE,
+   * #MHD_OPTION_HTTPS_PRIORITIES can be used.
+   */
+  MHD_FEATURE_TLS = 2,
+
+  /**
+   * Get whether option #MHD_OPTION_HTTPS_CERT_CALLBACK is
+   * supported.
+   */
+  MHD_FEATURE_HTTPS_CERT_CALLBACK = 3,
+
+  /**
+   * Get whether IPv6 is supported. If supported then flag
+   * #MHD_USE_IPv6 can be used.
+   */
+  MHD_FEATURE_IPv6 = 4,
+
+  /**
+   * Get whether IPv6 without IPv4 is supported. If not supported
+   * then IPv4 is always enabled in IPv6 sockets and
+   * flag #MHD_USE_DUAL_STACK if always used when #MHD_USE_IPv6 is
+   * specified.
+   */
+  MHD_FEATURE_IPv6_ONLY = 5,
+
+  /**
+   * Get whether `poll()` is supported. If supported then flag
+   * #MHD_USE_POLL can be used.
+   */
+  MHD_FEATURE_POLL = 6,
+
+  /**
+   * Get whether `epoll()` is supported. If supported then Flags
+   * #MHD_USE_EPOLL and
+   * #MHD_USE_EPOLL_INTERNAL_THREAD can be used.
+   */
+  MHD_FEATURE_EPOLL = 7,
+
+  /**
+   * Get whether shutdown on listen socket to signal other
+   * threads is supported. If not supported flag
+   * #MHD_USE_ITC is automatically forced.
+   */
+  MHD_FEATURE_SHUTDOWN_LISTEN_SOCKET = 8,
+
+  /**
+   * Get whether socketpair is used internally instead of pipe to
+   * signal other threads.
+   */
+  MHD_FEATURE_SOCKETPAIR = 9,
+
+  /**
+   * Get whether TCP Fast Open is supported. If supported then
+   * flag #MHD_USE_TCP_FASTOPEN and option
+   * #MHD_OPTION_TCP_FASTOPEN_QUEUE_SIZE can be used.
+   */
+  MHD_FEATURE_TCP_FASTOPEN = 10,
+
+  /**
+   * Get whether HTTP Basic authorization is supported. If supported
+   * then functions #MHD_basic_auth_get_username_password and
+   * #MHD_queue_basic_auth_fail_response can be used.
+   */
+  MHD_FEATURE_BASIC_AUTH = 11,
+
+  /**
+   * Get whether HTTP Digest authorization is supported. If
+   * supported then options #MHD_OPTION_DIGEST_AUTH_RANDOM,
+   * #MHD_OPTION_NONCE_NC_SIZE and
+   * #MHD_digest_auth_check() can be used.
+   */
+  MHD_FEATURE_DIGEST_AUTH = 12,
+
+  /**
+   * Get whether postprocessor is supported. If supported then
+   * functions #MHD_create_post_processor(), #MHD_post_process() and
+   * #MHD_destroy_post_processor() can
+   * be used.
+   */
+  MHD_FEATURE_POSTPROCESSOR = 13,
+
+  /**
+  * Get whether password encrypted private key for HTTPS daemon is
+  * supported. If supported then option
+  * ::MHD_OPTION_HTTPS_KEY_PASSWORD can be used.
+  */
+  MHD_FEATURE_HTTPS_KEY_PASSWORD = 14,
+
+  /**
+   * Get whether reading files beyond 2 GiB boundary is supported.
+   * If supported then #MHD_create_response_from_fd(),
+   * #MHD_create_response_from_fd64 #MHD_create_response_from_fd_at_offset()
+   * and #MHD_create_response_from_fd_at_offset64() can be used with sizes and
+   * offsets larger than 2 GiB. If not supported value of size+offset is
+   * limited to 2 GiB.
+   */
+  MHD_FEATURE_LARGE_FILE = 15,
+
+  /**
+   * Get whether MHD set names on generated threads.
+   */
+  MHD_FEATURE_THREAD_NAMES = 16,
+
+  /**
+   * Get whether HTTP "Upgrade" is supported.
+   * If supported then #MHD_ALLOW_UPGRADE, #MHD_upgrade_action() and
+   * #MHD_create_response_for_upgrade() can be used.
+   */
+  MHD_FEATURE_UPGRADE = 17,
+
+  /**
+   * Get whether it's safe to use same FD for multiple calls of
+   * #MHD_create_response_from_fd() and whether it's safe to use single
+   * response generated by #MHD_create_response_from_fd() with multiple
+   * connections at same time.
+   * If #MHD_is_feature_supported() return #MHD_NO for this feature then
+   * usage of responses with same file FD in multiple parallel threads may
+   * results in incorrect data sent to remote client.
+   * It's always safe to use same file FD in multiple responses if MHD
+   * is run in any single thread mode.
+   */
+  MHD_FEATURE_RESPONSES_SHARED_FD = 18,
+
+  /**
+   * Get whether MHD support automatic detection of bind port number.
+   * @sa #MHD_DAEMON_INFO_BIND_PORT
+   */
+  MHD_FEATURE_AUTODETECT_BIND_PORT = 19,
+
+  /**
+   * Get whether MHD support SIGPIPE suppression.
+   * If SIGPIPE suppression is not supported, application must handle
+   * SIGPIPE signal by itself.
+   */
+  MHD_FEATURE_AUTOSUPPRESS_SIGPIPE = 20,
+
+  /**
+   * Get whether MHD use system's sendfile() function to send
+   * file-FD based responses over non-TLS connections.
+   * @note Since v0.9.56
+   */
+  MHD_FEATURE_SENDFILE = 21
+};
+
+
+/**
+ * Get information about supported MHD features.
+ * Indicate that MHD was compiled with or without support for
+ * particular feature. Some features require additional support
+ * by kernel. Kernel support is not checked by this function.
+ *
+ * @param feature type of requested information
+ * @return #MHD_YES if feature is supported by MHD, #MHD_NO if
+ * feature is not supported or feature is unknown.
+ * @ingroup specialized
+ */
+_MHD_EXTERN enum MHD_Bool
+MHD_is_feature_supported (enum MHD_Feature feature);
+
+
+/**
+ * What is this request waiting for?
+ */
+enum MHD_RequestEventLoopInfo
+{
+  /**
+   * We are waiting to be able to read.
+   */
+  MHD_EVENT_LOOP_INFO_READ = 0,
+
+  /**
+   * We are waiting to be able to write.
+   */
+  MHD_EVENT_LOOP_INFO_WRITE = 1,
+
+  /**
+   * We are waiting for the application to provide data.
+   */
+  MHD_EVENT_LOOP_INFO_BLOCK = 2,
+
+  /**
+   * We are finished and are awaiting cleanup.
+   */
+  MHD_EVENT_LOOP_INFO_CLEANUP = 3
+};
+
 
 #endif

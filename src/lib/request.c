@@ -24,6 +24,7 @@
  * @author Christian Grothoff
  * @author Karlson2k (Evgeny Grin)
  */
+#include "internal.h"
 
 
 /**
@@ -46,8 +47,6 @@ MHD_request_get_values (struct MHD_Request *request,
   int ret;
   struct MHD_HTTP_Header *pos;
 
-  if (NULL == request)
-    return -1;
   ret = 0;
   for (pos = request->headers_received;
        NULL != pos;
@@ -101,7 +100,7 @@ MHD_request_set_value (struct MHD_Request *request,
 {
   struct MHD_HTTP_Header *pos;
 
-  pos = MHD_pool_allocate (request->pool,
+  pos = MHD_pool_allocate (request->connection->pool,
                            sizeof (struct MHD_HTTP_Header),
                            MHD_YES);
   if (NULL == pos)
@@ -142,8 +141,6 @@ MHD_request_lookup_value (struct MHD_Request *request,
 {
   struct MHD_HTTP_Header *pos;
 
-  if (NULL == request)
-    return NULL;
   for (pos = request->headers_received;
        NULL != pos;
        pos = pos->next)

@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     Copyright (C) 2007 Daniel Pittman and Christian Grothoff
+     Copyright (C) 2007-2018 Daniel Pittman and Christian Grothoff
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
  * @author Daniel Pittman
  * @author Christian Grothoff
  */
-
 #include "internal.h"
 #include "mhd_str.h"
 
@@ -92,17 +91,20 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state)
  */
 void
 MHD_DLOG (const struct MHD_Daemon *daemon,
+	  enum MHD_StatusCode sc,
           const char *format,
           ...)
 {
   va_list va;
 
-  if (0 == (daemon->options & MHD_USE_ERROR_LOG))
+  if (NULL == daemon->logger)
     return;
-  va_start (va, format);
-  daemon->custom_error_log (daemon->custom_error_log_cls,
-                            format,
-                            va);
+  va_start (va,
+	    format);
+  daemon->logger (daemon->logger_cls,
+		  sc,
+		  format,
+		  va);
   va_end (va);
 }
 #endif
@@ -170,24 +172,24 @@ MHD_http_unescape (char *val)
  * Parse and unescape the arguments given by the client
  * as part of the HTTP request URI.
  *
+ * @param request request to add headers to
  * @param kind header kind to pass to @a cb
- * @param connection connection to add headers to
  * @param[in,out] args argument URI string (after "?" in URI),
  *        clobbered in the process!
  * @param cb function to call on each key-value pair found
  * @param[out] num_headers set to the number of headers found
- * @return #MHD_NO on failure (@a cb returned #MHD_NO),
- *         #MHD_YES for success (parsing succeeded, @a cb always
- *                               returned #MHD_YES)
+ * @return false on failure (@a cb returned false),
+ *         true for success (parsing succeeded, @a cb always
+ *                               returned true)
  */
-int
-MHD_parse_arguments_ (struct MHD_Connection *connection,
+bool
+MHD_parse_arguments_ (struct MHD_Request *request,
 		      enum MHD_ValueKind kind,
 		      char *args,
 		      MHD_ArgumentIterator_ cb,
 		      unsigned int *num_headers)
 {
-  struct MHD_Daemon *daemon = connection->daemon;
+  struct MHD_Daemon *daemon = request->daemon;
   char *equals;
   char *amper;
 
@@ -204,14 +206,14 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 	    {
 	      /* last argument, without '=' */
               MHD_unescape_plus (args);
-	      daemon->unescape_callback (daemon->unescape_callback_cls,
-					 connection,
-					 args);
-	      if (MHD_YES != cb (connection,
-				 args,
-				 NULL,
-				 kind))
-		return MHD_NO;
+	      daemon->unescape_cb (daemon->unescape_cb_cls,
+				   request,
+				   args);
+	      if (! cb (request,
+			args,
+			NULL,
+			kind))
+		return false;
 	      (*num_headers)++;
 	      break;
 	    }
@@ -219,18 +221,18 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 	  equals[0] = '\0';
 	  equals++;
           MHD_unescape_plus (args);
-	  daemon->unescape_callback (daemon->unescape_callback_cls,
-				     connection,
-				     args);
+	  daemon->unescape_cb (daemon->unescape_cb_cls,
+			       request,
+			       args);
           MHD_unescape_plus (equals);
-	  daemon->unescape_callback (daemon->unescape_callback_cls,
-				     connection,
-				     equals);
-	  if (MHD_YES != cb (connection,
-			     args,
-			     equals,
-			     kind))
-	    return MHD_NO;
+	  daemon->unescape_cb (daemon->unescape_cb_cls,
+			       request,
+			       equals);
+	  if (! cb (request,
+		    args,
+		    equals,
+		    kind))
+	    return false;
 	  (*num_headers)++;
 	  break;
 	}
@@ -242,14 +244,14 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 	{
 	  /* got 'foo&bar' or 'foo&bar=val', add key 'foo' with NULL for value */
           MHD_unescape_plus (args);
-	  daemon->unescape_callback (daemon->unescape_callback_cls,
-				     connection,
-				     args);
-	  if (MHD_YES != cb (connection,
-			     args,
-			     NULL,
-			     kind))
-	    return MHD_NO;
+	  daemon->unescape_cb (daemon->unescape_cb_cls,
+			       request,
+			       args);
+	  if (! cb (request,
+		    args,
+		    NULL,
+		    kind))
+	    return false;
 	  /* continue with 'bar' */
 	  (*num_headers)++;
 	  args = amper;
@@ -260,22 +262,22 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
       equals[0] = '\0';
       equals++;
       MHD_unescape_plus (args);
-      daemon->unescape_callback (daemon->unescape_callback_cls,
-				 connection,
-				 args);
+      daemon->unescape_cb (daemon->unescape_cb_cls,
+			   request,
+			   args);
       MHD_unescape_plus (equals);
-      daemon->unescape_callback (daemon->unescape_callback_cls,
-				 connection,
-				 equals);
-      if (MHD_YES != cb (connection,
-			 args,
+      daemon->unescape_cb (daemon->unescape_cb_cls,
+			   request,
+			   equals);
+      if (! cb (request,
+		args,
 			 equals,
-			 kind))
-        return MHD_NO;
+		kind))
+        return false;
       (*num_headers)++;
       args = amper;
     }
-  return MHD_YES;
+  return true;
 }
 
 /* end of internal.c */

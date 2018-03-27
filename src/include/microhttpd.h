@@ -126,7 +126,7 @@ typedef intptr_t ssize_t;
  * Current version of the library.
  * 0x01093001 = 1.9.30-1.
  */
-#define MHD_VERSION 0x00095900
+#define MHD_VERSION 0x00095902
 
 /**
  * MHD-internal return code for "YES".
@@ -1484,14 +1484,18 @@ enum MHD_OPTION
   MHD_OPTION_LISTEN_BACKLOG_SIZE = 28,
 
   /**
-   * If set to 1 - be strict about the protocol (as opposed to as
-   * tolerant as possible).  Specifically, at the moment, this flag
-   * causes MHD to reject HTTP 1.1 connections without a "Host" header.
-   * This is required by the standard, but of course in violation of
-   * the "be as liberal as possible in what you accept" norm.  It is
-   * recommended to set this to 1 if you are testing clients against
-   * MHD, and 0 in production.
-   * This option should be followed by an `int` argument.
+   * If set to 1 - be strict about the protocol.  Use -1 to be
+   * as tolerant as possible.
+   *
+   * Specifically, at the moment, at 1 this flag
+   * causes MHD to reject HTTP 1.1 connections without a "Host" header,
+   * and to disallow spaces in the URL or (at -1) in HTTP header key strings.
+   *
+   * These are required by some versions of the standard, but of
+   * course in violation of the "be as liberal as possible in what you
+   * accept" norm.  It is recommended to set this to 1 if you are
+   * testing clients against MHD, and 0 in production.  This option
+   * should be followed by an `int` argument.
    */
   MHD_OPTION_STRICT_FOR_CLIENT = 29,
 
@@ -2588,10 +2592,10 @@ MHD_suspend_connection (struct MHD_Connection *connection);
  * result in undefined behavior.
  *
  * If you are using this function in ``external'' select mode, you must
- * make sure to run #MHD_run() afterwards (before again calling
- * #MHD_get_fdset(), as otherwise the change may not be reflected in
- * the set returned by #MHD_get_fdset() and you may end up with a
- * connection that is stuck until the next network activity.
+ * make sure to run #MHD_run() and #MHD_get_timeout() afterwards (before 
+ * again calling #MHD_get_fdset()), as otherwise the change may not be
+ * reflected in the set returned by #MHD_get_fdset() and you may end up 
+ * with a connection that is stuck until the next network activity.
  *
  * @param connection the connection to resume
  */

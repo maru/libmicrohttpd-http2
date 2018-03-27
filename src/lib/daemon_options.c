@@ -23,7 +23,9 @@
  * @author Christian Grothoff
  */
 #include "internal.h"
-
+#if HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
 
 /**
  * Set logging method.  Specify NULL to disable logging entirely.  By
@@ -125,7 +127,7 @@ MHD_daemon_disallow_suspend_resume (struct MHD_Daemon *daemon)
 void
 MHD_daemon_disallow_upgrade (struct MHD_Daemon *daemon)
 {
-  daemon->disallow_upgrade;
+  daemon->disallow_upgrade = true;
 }
 
 
@@ -150,7 +152,7 @@ MHD_daemon_tcp_fastopen (struct MHD_Daemon *daemon,
 			 unsigned int queue_length)
 {
   daemon->fast_open_method = fom;
-  daemon->fast_open_queue_length = queue_length;
+  daemon->fo_queue_length = queue_length;
   switch (fom)
   {
   case MHD_FOM_DISABLE:
@@ -164,6 +166,7 @@ MHD_daemon_tcp_fastopen (struct MHD_Daemon *daemon,
     return MHD_NO;
 #endif
   }
+  return MHD_NO;
 }
 
 
@@ -204,7 +207,6 @@ MHD_daemon_bind_socket_address (struct MHD_Daemon *daemon,
 				const struct sockaddr *sa,
 				size_t sa_len)
 {
-  daemon->sa_given = true;
   memcpy (&daemon->listen_sa,
 	  sa,
 	  sa_len);
@@ -241,6 +243,19 @@ void
 MHD_daemon_listen_allow_address_reuse (struct MHD_Daemon *daemon)
 {
   daemon->allow_address_reuse = true;
+}
+
+
+/**
+ * Use SHOUTcast.  This will cause the response to begin
+ * with the SHOUTcast "ICY" line instad of "HTTP".
+ *
+ * @param daemon daemon to set SHOUTcast option for
+ */
+_MHD_EXTERN void
+MHD_daemon_enable_shoutcast (struct MHD_Daemon *daemon)
+{
+  daemon->enable_shoutcast = true;
 }
 
 
@@ -337,38 +352,38 @@ MHD_daemon_set_tls_backend (struct MHD_Daemon *daemon,
 			    const char *tls_backend,
 			    const char *ciphers)
 {
-#ifndef HTTPS_SUPPORT
-  return MHD_TLS_DISABLED;
+#if ! (defined(HTTPS_SUPPORT) && defined (HAVE_DLFCN_H))
+  return MHD_SC_TLS_DISABLED;
 #else
   char filename[1024];
   int res;
   MHD_TLS_PluginInit init;
 
   /* todo: .dll on W32? */
-  res = MHD_snprintf (filename,
-		      sizeof (filename),
-		      "%s/libmicrohttpd_tls_%s.so",
-		      MHD_PLUGIN_INSTALL_PREFIX,
-		      tls_backend);
+  res = MHD_snprintf_ (filename,
+		       sizeof (filename),
+		       "%s/libmicrohttpd_tls_%s.so",
+		       MHD_PLUGIN_INSTALL_PREFIX,
+		       tls_backend);
   if (0 >= res)
-    return MHD_BACKEND_UNSUPPORTED; /* string too long? */
+    return MHD_SC_TLS_BACKEND_UNSUPPORTED; /* string too long? */
   if (NULL ==
       (daemon->tls_backend_lib = dlopen (filename,
 					 RTLD_NOW | RTLD_LOCAL)))
-    return MHD_BACKEND_UNSUPPORTED; /* plugin not found */
+    return MHD_SC_TLS_BACKEND_UNSUPPORTED; /* plugin not found */
   if (NULL == (init = dlsym (daemon->tls_backend_lib,
 			     "MHD_TLS_init_" MHD_TLS_ABI_VERSION_STR)))
 
   {
     dlclose (daemon->tls_backend_lib);
     daemon->tls_backend_lib = NULL;
-    return MHD_BACKEND_UNSUPPORTED; /* possibly wrong version installed */
+    return MHD_SC_TLS_BACKEND_UNSUPPORTED; /* possibly wrong version installed */
   }
-  if (NULL == (daemon->tls_backend = init (ciphers)))
+  if (NULL == (daemon->tls_api = init (ciphers)))
   {
     dlclose (daemon->tls_backend_lib);
     daemon->tls_backend_lib = NULL;
-    return MHD_CIPHERS_INVALID; /* possibly wrong version installed */
+    return MHD_SC_TLS_CIPHERS_INVALID; /* possibly wrong version installed */
   }
   return MHD_SC_OK;
 #endif
@@ -394,14 +409,18 @@ MHD_daemon_tls_key_and_cert_from_memory (struct MHD_Daemon *daemon,
 					 const char *mem_cert,
 					 const char *pass)
 {
+#ifndef HTTPS_SUPPORT
+  return MHD_SC_TLS_DISABLED;
+#else
   struct MHD_TLS_Plugin *plugin;
-  
-  if (NULL == (plugin = daemon->tls_backend))
-    return MHD_TLS_BACKEND_UNINITIALIZED;
+
+  if (NULL == (plugin = daemon->tls_api))
+    return MHD_SC_TLS_BACKEND_UNINITIALIZED;
   return plugin->init_kcp (plugin->cls,
 			   mem_key,
 			   mem_cert,
 			   pass);
+#endif
 }
 
 
@@ -418,12 +437,16 @@ enum MHD_StatusCode
 MHD_daemon_tls_mem_dhparams (struct MHD_Daemon *daemon,
 			     const char *dh)
 {
+#ifndef HTTPS_SUPPORT
+  return MHD_SC_TLS_DISABLED;
+#else
   struct MHD_TLS_Plugin *plugin;
-  
-  if (NULL == (plugin = daemon->tls_backend))
-    return MHD_TLS_BACKEND_UNINITIALIZED;
+
+  if (NULL == (plugin = daemon->tls_api))
+    return MHD_SC_TLS_BACKEND_UNINITIALIZED;
   return plugin->init_dhparams (plugin->cls,
 				dh);
+#endif
 }
 
 
@@ -440,12 +463,16 @@ enum MHD_StatusCode
 MHD_daemon_tls_mem_trust (struct MHD_Daemon *daemon,
 			  const char *mem_trust)
 {
+#ifndef HTTPS_SUPPORT
+  return MHD_SC_TLS_DISABLED;
+#else
   struct MHD_TLS_Plugin *plugin;
-  
-  if (NULL == (plugin = daemon->tls_backend))
-    return MHD_TLS_BACKEND_UNINITIALIZED;
+
+  if (NULL == (plugin = daemon->tls_api))
+    return MHD_SC_TLS_BACKEND_UNINITIALIZED;
   return plugin->init_mem_trust (plugin->cls,
 				 mem_trust);
+#endif
 }
 
 
@@ -460,11 +487,15 @@ enum MHD_StatusCode
 MHD_daemon_gnutls_credentials (struct MHD_Daemon *daemon,
 			       int gnutls_credentials)
 {
+#ifndef HTTPS_SUPPORT
+  return MHD_SC_TLS_DISABLED;
+#else
   struct MHD_TLS_Plugin *plugin;
-  
-  if (NULL == (plugin = daemon->tls_backend))
-    return MHD_TLS_BACKEND_UNINITIALIZED;
-  return MHD_TLS_BACKEND_OPERATION_UNSUPPORTED;
+
+  if (NULL == (plugin = daemon->tls_api))
+    return MHD_SC_TLS_BACKEND_UNINITIALIZED;
+  return MHD_SC_TLS_BACKEND_OPERATION_UNSUPPORTED;
+#endif
 }
 
 
@@ -483,16 +514,21 @@ MHD_daemon_gnutls_credentials (struct MHD_Daemon *daemon,
  *
  * @param daemon daemon to configure callback for
  * @param cb must be of type `gnutls_certificate_retrieve_function2 *`.
+ * @return #MHD_SC_OK on success
  */
-void
+enum MHD_StatusCode
 MHD_daemon_gnutls_key_and_cert_from_callback (struct MHD_Daemon *daemon,
 					      void *cb)
 {
+#ifndef HTTPS_SUPPORT
+  return MHD_SC_TLS_DISABLED;
+#else
   struct MHD_TLS_Plugin *plugin;
-  
-  if (NULL == (plugin = daemon->tls_backend))
-    return MHD_TLS_BACKEND_UNINITIALIZED;
-  return MHD_TLS_BACKEND_OPERATION_UNSUPPORTED;
+
+  if (NULL == (plugin = daemon->tls_api))
+    return MHD_SC_TLS_BACKEND_UNINITIALIZED;
+  return MHD_SC_TLS_BACKEND_OPERATION_UNSUPPORTED;
+#endif
 }
 
 
@@ -532,7 +568,7 @@ MHD_daemon_accept_policy (struct MHD_Daemon *daemon,
 
 /**
  * Register a callback to be called first for every request
- * (before any parsing of the header).  Makes it easy to 
+ * (before any parsing of the header).  Makes it easy to
  * log the full URL.
  *
  * @param daemon daemon for which to set the logger
@@ -643,7 +679,7 @@ void
 MHD_daemon_connection_default_timeout (struct MHD_Daemon *daemon,
 				       unsigned int timeout_s)
 {
-  daemon->connection_default_timeout_s = timeout_s;
+  daemon->connection_default_timeout = (time_t) timeout_s;
 }
 
 
@@ -686,6 +722,9 @@ MHD_daemon_digest_auth_random (struct MHD_Daemon *daemon,
   daemon->digest_auth_random_buf = buf;
   daemon->digest_auth_random_buf_size = buf_size;
 #else
+  (void) daemon;
+  (void) buf_size;
+  (void) buf;
   MHD_PANIC ("digest authentication not supported by this build");
 #endif
 }
@@ -710,7 +749,7 @@ MHD_daemon_digest_auth_nc_length (struct MHD_Daemon *daemon,
       MHD_DLOG (daemon,
 		_("Specified value for NC_SIZE too large\n"));
 #endif
-      return MHD_DIGEST_AUTH_NC_LENGTH_TOO_BIG;
+      return MHD_SC_DIGEST_AUTH_NC_LENGTH_TOO_BIG;
     }
   if (0 < nc_length)
     {
@@ -725,13 +764,15 @@ MHD_daemon_digest_auth_nc_length (struct MHD_Daemon *daemon,
 		    _("Failed to allocate memory for nonce-nc map: %s\n"),
 		    MHD_strerror_ (errno));
 #endif
-	  return MHD_DIGEST_AUTH_NC_ALLOCATION_FAILURE;
+	  return MHD_SC_DIGEST_AUTH_NC_ALLOCATION_FAILURE;
 	}
     }
   daemon->digest_nc_length = nc_length;
   return MHD_SC_OK;
 #else
-  return MHD_DIGEST_AUTH_NOT_SUPPORTED_BY_BUILD;
+  (void) daemon;
+  (void) nc_length;
+  return MHD_SC_DIGEST_AUTH_NOT_SUPPORTED_BY_BUILD;
 #endif
 }
 

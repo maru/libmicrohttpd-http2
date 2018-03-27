@@ -498,12 +498,13 @@ static int
 socket_start_extra_buffering (struct MHD_Connection *connection)
 {
   int res = MHD_NO;
-  (void)connection; /* Mute compiler warning. */
 #if defined(TCP_CORK) || defined(TCP_NOPUSH)
   const MHD_SCKT_OPT_BOOL_ on_val = 1;
 #if defined(TCP_NODELAY)
   const MHD_SCKT_OPT_BOOL_ off_val = 0;
 #endif /* TCP_NODELAY */
+  (void) connection; /* mute compiler warning, assertion below
+			may be compiled out! */
   mhd_assert(NULL != connection);
 #if defined(TCP_NOPUSH) && !defined(TCP_CORK)
   /* Buffer data before sending */
@@ -1221,8 +1222,9 @@ try_ready_chunked_body (struct MHD_Connection *connection)
        (0 == response->total_size) )
     {
       /* end of message, signal other side! */
-      strcpy (connection->write_buffer,
-              "0\r\n");
+      memcpy (connection->write_buffer,
+              "0\r\n",
+              3);
       connection->write_buffer_append_offset = 3;
       connection->write_buffer_send_offset = 0;
       response->total_size = connection->response_write_position;
@@ -1428,6 +1430,7 @@ build_header_response (struct MHD_Connection *connection)
   struct MHD_HTTP_Header *pos;
   char code[256];
   char date[128];
+  size_t datelen;
   char content_length_buf[128];
   size_t content_length_len;
   char *data;
@@ -1482,7 +1485,8 @@ build_header_response (struct MHD_Connection *connection)
 			 sizeof (date), "Date: ", "\r\n");
       else
         date[0] = '\0';
-      size += strlen (date);
+      datelen = strlen (date);
+      size += datelen;
     }
   else
     {
@@ -1490,6 +1494,7 @@ build_header_response (struct MHD_Connection *connection)
       size = 2;
       kind = MHD_FOOTER_KIND;
       off = 0;
+      datelen = 0;
     }
 
   /* calculate extra headers we need to add, such as 'Connection: close',
@@ -1499,7 +1504,6 @@ build_header_response (struct MHD_Connection *connection)
   must_add_keep_alive = MHD_NO;
   must_add_content_length = MHD_NO;
   response_has_close = false;
-  response_has_keepalive = false;
   switch (connection->state)
     {
     case MHD_CONNECTION_FOOTERS_RECEIVED:
@@ -1633,6 +1637,7 @@ build_header_response (struct MHD_Connection *connection)
       break;
     default:
       mhd_assert (0);
+      return MHD_NO;
     }
 
   if (MHD_CONN_MUST_CLOSE != connection->keepalive)
@@ -1734,9 +1739,10 @@ build_header_response (struct MHD_Connection *connection)
     }
   if (MHD_CONNECTION_FOOTERS_RECEIVED == connection->state)
     {
-      strcpy (&data[off],
-              date);
-      off += strlen (date);
+      memcpy (&data[off],
+              date,
+	      datelen);
+      off += datelen;
     }
   memcpy (&data[off],
           "\r\n",
@@ -1965,9 +1971,6 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
         case MHD_CONNECTION_CLOSED:
 	  connection->event_loop_info = MHD_EVENT_LOOP_INFO_CLEANUP;
           return;       /* do nothing, not even reading */
-        case MHD_CONNECTION_IN_CLEANUP:
-          mhd_assert (0);
-          break;
 #ifdef UPGRADE_SUPPORT
         case MHD_CONNECTION_UPGRADE:
           mhd_assert (0);
@@ -2230,6 +2233,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
   char *http_version;
   char *args;
   unsigned int unused_num_headers;
+  size_t uri_len;
 
   if (NULL == (uri = memchr (line,
                              ' ',
@@ -2246,6 +2250,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
   if ((size_t)(uri - line) == line_len)
     {
       curi = "";
+      uri_len = 0;
       uri = NULL;
       connection->version = "";
       args = NULL;
@@ -2278,6 +2283,15 @@ parse_initial_message_line (struct MHD_Connection *connection,
                          '?',
                          line_len - (uri - line));
         }
+      uri_len = http_version - uri;
+    }
+  if ( (1 <= daemon->strict_for_client) &&
+       (NULL != memchr (curi,
+                        ' ',
+                        uri_len)) )
+    {
+      /* space exists in URI and we are supposed to be strict, reject */
+      return MHD_NO;
     }
   if (NULL != daemon->uri_log_callback)
     {
@@ -2317,6 +2331,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
 static void
 call_connection_handler (struct MHD_Connection *connection)
 {
+  struct MHD_Daemon *daemon = connection->daemon;
   size_t processed;
 
   if (NULL != connection->response)
@@ -2324,14 +2339,14 @@ call_connection_handler (struct MHD_Connection *connection)
   processed = 0;
   connection->client_aware = true;
   if (MHD_NO ==
-      connection->daemon->default_handler (connection->daemon->default_handler_cls,
-					   connection,
-                                           connection->url,
-					   connection->method,
-					   connection->version,
-					   NULL,
-                                           &processed,
-					   &connection->client_context))
+      daemon->default_handler (daemon->default_handler_cls,
+                               connection,
+                               connection->url,
+                               connection->method,
+                               connection->version,
+                               NULL,
+                               &processed,
+                               &connection->client_context))
     {
       /* serious internal error, close connection */
       CONNECTION_CLOSE_ERROR (connection,
@@ -2339,7 +2354,6 @@ call_connection_handler (struct MHD_Connection *connection)
       return;
     }
 }
-
 
 
 /**
@@ -2352,6 +2366,7 @@ call_connection_handler (struct MHD_Connection *connection)
 static void
 process_request_body (struct MHD_Connection *connection)
 {
+  struct MHD_Daemon *daemon = connection->daemon;
   size_t available;
   int instant_retry;
   char *buffer_head;
@@ -2509,14 +2524,14 @@ process_request_body (struct MHD_Connection *connection)
       left_unprocessed = to_be_processed;
       connection->client_aware = true;
       if (MHD_NO ==
-          connection->daemon->default_handler (connection->daemon->default_handler_cls,
-                                               connection,
-                                               connection->url,
-                                               connection->method,
-                                               connection->version,
-                                               buffer_head,
-                                               &left_unprocessed,
-                                               &connection->client_context))
+          daemon->default_handler (daemon->default_handler_cls,
+                                   connection,
+                                   connection->url,
+                                   connection->method,
+                                   connection->version,
+                                   buffer_head,
+                                   &left_unprocessed,
+                                   &connection->client_context))
         {
           /* serious internal error, close connection */
           CONNECTION_CLOSE_ERROR (connection,
@@ -2540,9 +2555,9 @@ process_request_body (struct MHD_Connection *connection)
 	  /* client did not process all upload data, complain if
 	     the setup was incorrect, which may prevent us from
 	     handling the rest of the request */
-	  if ( (0 != (connection->daemon->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
+	  if ( (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
 	       (! connection->suspended) )
-	    MHD_DLOG (connection->daemon,
+	    MHD_DLOG (daemon,
 		      _("WARNING: incomplete upload processing and connection not suspended may result in hung connection.\n"));
 #endif
 	}
@@ -3200,9 +3215,6 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
       return;
     case MHD_CONNECTION_CLOSED:
       return;
-    case MHD_CONNECTION_IN_CLEANUP:
-      mhd_assert (0);
-      return;
 #ifdef UPGRADE_SUPPORT
     case MHD_CONNECTION_UPGRADE:
       mhd_assert (0);
@@ -3712,12 +3724,12 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           if ( (NULL != daemon->notify_completed) &&
                (connection->client_aware) )
           {
-            connection->client_aware = false;
 	    daemon->notify_completed (daemon->notify_completed_cls,
 				      connection,
 				      &connection->client_context,
 				      MHD_REQUEST_TERMINATED_COMPLETED_OK);
           }
+          connection->client_aware = false;
           if ( (MHD_CONN_USE_KEEPALIVE != connection->keepalive) ||
                (connection->read_closed) )
             {
@@ -3751,7 +3763,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
               connection->read_buffer_size
                 = connection->daemon->pool_size / 2;
             }
-	  connection->client_aware = false;
           connection->client_context = NULL;
           connection->continue_message_write_offset = 0;
           connection->responseCode = 0;
@@ -3923,8 +3934,7 @@ MHD_get_connection_info (struct MHD_Connection *connection,
       return (const union MHD_ConnectionInfo *) &connection->connection_timeout_dummy;
     case MHD_CONNECTION_INFO_REQUEST_HEADER_SIZE:
       if ( (MHD_CONNECTION_HEADERS_RECEIVED > connection->state) ||
-           (MHD_CONNECTION_CLOSED == connection->state) ||
-           (MHD_CONNECTION_IN_CLEANUP == connection->state) )
+           (MHD_CONNECTION_CLOSED == connection->state) )
         return NULL; /* invalid, too early! */
       return (const union MHD_ConnectionInfo *) &connection->header_size;
     default:

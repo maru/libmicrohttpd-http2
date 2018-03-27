@@ -26,6 +26,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <limits.h>
 #include <sys/stat.h>
@@ -53,7 +54,7 @@ test_secure_get (void * cls, char *cipher_suite, int proto_version)
   else
     port = 3070;
 
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
                         MHD_USE_ERROR_LOG, port,
                         NULL, NULL, &http_ahc, NULL,
                         MHD_OPTION_HTTPS_MEM_KEY, srv_signed_key_pem,
@@ -86,7 +87,9 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
   char *aes256_sha = "AES256-SHA";
-  (void)argc; (void)argv;       /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);

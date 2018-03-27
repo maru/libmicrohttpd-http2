@@ -27,6 +27,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include "tls_test_common.h"
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
 #include <gcrypt.h>
@@ -112,6 +113,8 @@ main (int argc, char *const *argv)
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
 
+  set_http_version(argv[0], 1);
+
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
@@ -126,7 +129,7 @@ main (int argc, char *const *argv)
   gnutls_global_init ();
   gnutls_global_set_log_level (11);
 
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
                         MHD_USE_ERROR_LOG, port,
                         NULL, NULL, &http_dummy_ahc, NULL,
                         MHD_OPTION_CONNECTION_TIMEOUT, TIME_OUT,

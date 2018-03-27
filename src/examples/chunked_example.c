@@ -19,10 +19,8 @@
 /**
  * @file chunked_example.c
  * @brief example for generating chunked encoding with libmicrohttpd
- *        and add a trailer at the end of the response.
  * @author Christian Grothoff
  * @author Karlson2k (Evgeny Grin)
- * @author Maru Berezin
  */
 
 #include "platform.h"

@@ -19,7 +19,6 @@
 /**
  * @file minimal_example.c
  * @brief minimal example for how to use libmicrohttpd
- *        and configure the HTTP/2 server settings.
  * @author Christian Grothoff
  * @author Maru Berezin
  */

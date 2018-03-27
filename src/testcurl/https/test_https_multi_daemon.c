@@ -26,6 +26,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <limits.h>
 #include <sys/stat.h>
@@ -61,7 +62,7 @@ test_concurent_daemon_pair (void *cls,
       port2 = 3051;
     }
 
-  d1 = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
+  d1 = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
                          MHD_USE_ERROR_LOG, port1,
                          NULL, NULL, &http_ahc, NULL,
                          MHD_OPTION_HTTPS_MEM_KEY, srv_key_pem,
@@ -82,7 +83,7 @@ test_concurent_daemon_pair (void *cls,
       port1 = (int)dinfo->port;
     }
 
-  d2 = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
+  d2 = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
                          MHD_USE_ERROR_LOG, port2,
                          NULL, NULL, &http_ahc, NULL,
                          MHD_OPTION_HTTPS_MEM_KEY, srv_key_pem,
@@ -128,7 +129,9 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   FILE *cert;
   const char *aes256_sha = "AES256-SHA";
-  (void)argc; (void)argv;       /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);

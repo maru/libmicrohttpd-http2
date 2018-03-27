@@ -25,6 +25,7 @@
  */
 #include "mhd_options.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <microhttpd.h>
 
 #if defined(CPU_COUNT) && (CPU_COUNT+0) < 2
@@ -57,7 +58,7 @@ testInternalGet (int poll_flag)
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
                         0, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 1;
@@ -70,7 +71,7 @@ testMultithreadedGet (int poll_flag)
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG  | poll_flag,
                         0, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 2;
@@ -83,7 +84,7 @@ testMultithreadedPoolGet (int poll_flag)
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | poll_flag,
                         0, NULL, NULL, &ahc_echo, "GET",
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT, MHD_OPTION_END);
   if (d == NULL)
@@ -97,7 +98,7 @@ testExternalGet ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         0, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
   if (d == NULL)
     return 8;
@@ -110,7 +111,9 @@ int
 main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
-  (void)argc; (void)argv; /* Unused. Silent compiler warning. */
+  (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 0);
 
   errorCount += testInternalGet (0);
   errorCount += testMultithreadedGet (0);

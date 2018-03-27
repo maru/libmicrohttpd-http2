@@ -26,6 +26,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
 #include <gcrypt.h>
@@ -114,7 +115,7 @@ test_query_session ()
   cbc.pos = 0;
 
   /* setup test */
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_TLS |
                         MHD_USE_ERROR_LOG, port,
                         NULL, NULL, &query_session_ahc, NULL,
 			MHD_OPTION_HTTPS_PRIORITIES, "NORMAL:+ARCFOUR-128",
@@ -150,7 +151,7 @@ test_query_session ()
   curl_easy_setopt (c, CURLOPT_VERBOSE, 1);
 #endif
   curl_easy_setopt (c, CURLOPT_URL, url);
-  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 10L);
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
@@ -192,6 +193,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   const char *ssl_version;
   (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
 #ifdef MHD_HTTPS_REQUIRE_GRYPT
   gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);

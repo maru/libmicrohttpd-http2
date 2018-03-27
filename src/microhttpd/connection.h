@@ -198,5 +198,8 @@ MHD_connection_epoll_update_ (struct MHD_Connection *connection);
 void
 get_date_string (char *date, size_t date_len, char *header, char *end_of_line);
 
+int
+need_100_continue (struct MHD_Connection *connection);
+
 #endif /* ! HTTP2_SUPPORT */
 #endif

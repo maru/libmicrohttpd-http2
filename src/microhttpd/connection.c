@@ -705,12 +705,6 @@ MHD_get_connection_values (struct MHD_Connection *connection,
                            MHD_KeyValueIterator iterator,
                            void *iterator_cls)
 {
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    /* Future implementation */
-    exit(0);
-#endif /* HTTP2_SUPPORT */
-
   int ret;
   struct MHD_HTTP_Header *pos;
 
@@ -879,15 +873,15 @@ MHD_lookup_header_token_ci (const struct MHD_Connection *connection,
  * @param connection connection to test
  * @return 0 if we don't need 100 CONTINUE, 1 if we do
  */
-static int
+int
 need_100_continue (struct MHD_Connection *connection)
 {
   const char *expect;
 
   return ( (NULL == connection->response) &&
 	   (NULL != connection->version) &&
-       (MHD_str_equal_caseless_(connection->version,
-			     MHD_HTTP_VERSION_1_1)) &&
+       (!MHD_str_equal_caseless_(connection->version,
+			     MHD_HTTP_VERSION_1_0)) &&
 	   (NULL != (expect = MHD_lookup_connection_value (connection,
 							   MHD_HEADER_KIND,
 							   MHD_HTTP_HEADER_EXPECT))) &&

@@ -29,6 +29,7 @@
 
 #include "platform.h"
 #include "microhttpd.h"
+#include "test_helpers.h"
 #include <sys/stat.h>
 #include <limits.h>
 #include <curl/curl.h>
@@ -142,6 +143,8 @@ main (int argc, char *const *argv)
   const char *ssl_version;
   int port;
   (void)argc;   /* Unused. Silent compiler warning. */
+
+  set_http_version(argv[0], 1);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;

@@ -26,6 +26,7 @@
 
 #include "MHD_config.h"
 #include "platform.h"
+#include "test_helpers.h"
 #include <curl/curl.h>
 #include <microhttpd.h>
 #include <stdlib.h>
@@ -52,7 +53,6 @@
 
 #define POST_DATA "name=daniel&project=curl"
 
-static int oneone;
 
 struct CBC
 {
@@ -171,20 +171,21 @@ testInternalPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
+  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     {
       port = 1370;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -208,10 +209,7 @@ testInternalPost ()
   curl_easy_setopt (c, CURLOPT_POST, 1L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -244,20 +242,21 @@ testMultithreadedPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
+  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     {
       port = 1371;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -281,10 +280,7 @@ testMultithreadedPost ()
   curl_easy_setopt (c, CURLOPT_POST, 1L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -317,20 +313,21 @@ testMultithreadedPoolPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
+  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     {
       port = 1372;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL,
                         MHD_OPTION_THREAD_POOL_SIZE, CPU_COUNT,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
@@ -355,10 +352,7 @@ testMultithreadedPoolPost ()
   curl_easy_setopt (c, CURLOPT_POST, 1L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -405,13 +399,14 @@ testExternalPost ()
   time_t start;
   struct timeval tv;
   int port;
+  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     {
       port = 1373;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
@@ -419,7 +414,7 @@ testExternalPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_NOTIFY_COMPLETED, &completed_cb, NULL,
 			MHD_OPTION_END);
@@ -443,10 +438,7 @@ testExternalPost ()
   curl_easy_setopt (c, CURLOPT_POST, 1L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -639,25 +631,29 @@ testMultithreadedPostCancelPart(int flags)
   int result = 0;
   struct CRBC crbc;
   int port;
+  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else
     {
       port = 1374;
-      if (oneone)
+      if (http_version == CURL_HTTP_VERSION_1_1)
         port += 10;
     }
 
   /* Don't test features that aren't available with HTTP/1.0 in
    * HTTP/1.0 mode. */
-  if (!oneone && (flags & (FLAG_EXPECT_CONTINUE | FLAG_CHUNKED)))
+  if ((http_version == CURL_HTTP_VERSION_1_0) && (flags & (FLAG_EXPECT_CONTINUE | FLAG_CHUNKED)))
+    return 0;
+
+  if ((http_version > CURL_HTTP_VERSION_1_1) && (flags & FLAG_CHUNKED))
     return 0;
 
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+  d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         port, NULL, NULL, &ahc_cancel, NULL,
 			MHD_OPTION_END);
   if (d == NULL)
@@ -687,10 +683,7 @@ testMultithreadedPostCancelPart(int flags)
   curl_easy_setopt (c, CURLOPT_POST, 1L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
-  if (oneone)
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-  else
-    curl_easy_setopt (c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+  curl_easy_setopt (c, CURLOPT_HTTP_VERSION, http_version);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
@@ -770,8 +763,8 @@ main (int argc, char *const *argv)
   unsigned int errorCount = 0;
   (void)argc;   /* Unused. Silent compiler warning. */
 
-  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
+  set_http_version(argv[0], 1);
+
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testMultithreadedPostCancel ();

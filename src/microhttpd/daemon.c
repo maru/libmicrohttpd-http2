@@ -2613,6 +2613,13 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_suspend_stream (connection);
+    }
+#endif /* HTTP2_SUPPORT */
+
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
     {
@@ -5470,7 +5477,7 @@ MHD_start_daemon_va (unsigned int flags,
   MHD_DLOG (daemon,  _("Using debug build of libmicrohttpd.\n") );
 #endif /* HAVE_MESSAGES */
 #endif /* ! NDEBUG */
-  
+
   if ( (0 != (*pflags & MHD_USE_ITC)) &&
        (0 == daemon->worker_pool_size) )
     {
@@ -5572,7 +5579,7 @@ MHD_start_daemon_va (unsigned int flags,
     {
       /* try to open listen socket */
       int domain;
-      
+
 #ifdef HAVE_INET6
       domain = (*pflags & MHD_USE_IPv6) ? PF_INET6 : PF_INET;
 #else  /* ! HAVE_INET6 */
@@ -5580,7 +5587,7 @@ MHD_start_daemon_va (unsigned int flags,
 	goto free_and_fail;
       domain = PF_INET;
 #endif /* ! HAVE_INET6 */
-      
+
       listen_fd = MHD_socket_create_listen_(domain);
       if (MHD_INVALID_SOCKET == listen_fd)
 	{

@@ -1478,12 +1478,22 @@ MHD_http2_session_delete (struct MHD_Connection *connection)
     stream = next;
   }
 
-  MHD_pool_destroy (h2->pool);
-  h2->pool = NULL;
-  nghttp2_session_del (h2->session);
-  free (h2);
-  connection->h2 = NULL;
-  connection->state = MHD_CONNECTION_HTTP2_CLOSED;
+  if (NULL != h2->pool)
+  {
+    MHD_pool_destroy (h2->pool);
+    h2->pool = NULL;
+  }
+  if (NULL != h2->session)
+  {
+    nghttp2_session_del (h2->session);
+    h2->session = NULL;
+  }
+  if (NULL != connection->h2)
+  {
+    free (h2);
+    connection->h2 = NULL;
+  }
+  connection->state = MHD_CONNECTION_CLOSED;
   connection->pool = NULL;
   connection->read_buffer = NULL;
   connection->read_buffer_size = 0;
@@ -1650,7 +1660,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
                                   [connection->write_buffer_send_offset],
                                   connection->write_buffer_append_offset -
                                     connection->write_buffer_send_offset);
-      // ENTER("send_cls ret=%d", ret);
+      // ENTER("send_cls ret=%ld", ret);
       if (ret < 0)
       {
         if (MHD_ERR_AGAIN_ == ret)
@@ -1672,7 +1682,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
     connection->write_buffer_append_offset = 0;
     connection->write_buffer_send_offset = 0;
 
-    /* FILL WRITE BUFFER */
+    /* Fill write buffer */
     if (http2_fill_write_buffer(h2->session, h2) != 0)
     {
       MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
@@ -1734,7 +1744,10 @@ MHD_http2_handle_idle (struct MHD_Connection *connection)
       return MHD_NO;
     }
   }
-  // ENTER("[id=%zu]", connection->h2->session_id);
+  if (connection->state == MHD_CONNECTION_HTTP2_CLOSED)
+    return MHD_NO;
+
+  // ENTER("[id=%d] %s", (connection->h2 ? (int)connection->h2->session_id : -1), MHD_state_to_string (connection->state));
   if (connection->write_buffer_append_offset - connection->write_buffer_send_offset != 0)
   {
     MHD_update_last_activity_ (connection);
@@ -1746,14 +1759,30 @@ MHD_http2_handle_idle (struct MHD_Connection *connection)
   }
 
   /* TODO: resume all deferred streams */
-  if (connection->h2->deferred_stream > 0)
+  if (connection->h2 && connection->h2->deferred_stream > 0)
   {
     nghttp2_session_resume_data(connection->h2->session, connection->h2->deferred_stream);
+    struct http2_stream *stream;
+    stream = nghttp2_session_get_stream_user_data (connection->h2->session, connection->h2->deferred_stream);
+    if (stream == NULL)
+      return 0;
+    size_t unused = 0;
+    return http2_call_connection_handler (connection, stream, NULL, &unused);
   }
 
   return MHD_YES;
 }
 
+
+/**
+ * Suspend handling of network data for the current stream.
+ * @param connection connection to handle
+ */
+void
+MHD_http2_suspend_stream (struct MHD_Connection *connection)
+{
+  connection->h2->deferred_stream = connection->h2->current_stream_id;
+}
 
 /**
  * Queue a response to be transmitted to the client (as soon as

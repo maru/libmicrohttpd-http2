@@ -150,7 +150,7 @@ struct http2_stream
    * is already set.
    */
   unsigned int response_code;
-  
+
   /**
    * How many more bytes of the body do we expect
    * to read? #MHD_SIZE_UNKNOWN for unknown.
@@ -311,6 +311,14 @@ int
 MHD_http2_queue_response (struct MHD_Connection *connection,
                           unsigned int status_code,
                           struct MHD_Response *response);
+
+
+/**
+ * Suspend handling of network data for the current stream.
+ * @param connection connection to handle
+ */
+void
+MHD_http2_suspend_stream (struct MHD_Connection *connection);
 
 #endif /* HTTP2_SUPPORT */
 

@@ -221,6 +221,7 @@ testGet (int type, int pool_count, int poll_flag)
   cbc.buf = buf;
   cbc.size = 2048;
   cbc.pos = 0;
+  memset(cbc.buf, 0, cbc.size);
   if (pool_count > 0) {
     d = MHD_start_daemon (use_http2 | type | MHD_USE_ERROR_LOG | MHD_USE_ITC | poll_flag,
                           port, NULL, NULL, &ahc_echo, "GET",
@@ -282,7 +283,10 @@ testGet (int type, int pool_count, int poll_flag)
     }
 
   cbc.pos = 0;
-  if (CURLE_OK != (errornum = curl_easy_perform (c)))
+  memset(cbc.buf, 0, cbc.size);
+  errornum = curl_easy_perform (c);
+  if (((errornum != CURLE_OK) && (http_version < CURL_HTTP_VERSION_2)) ||
+      ((errornum != CURLE_OK) && (errornum != CURLE_RECV_ERROR) && (http_version >= CURL_HTTP_VERSION_2)))
     {
       fprintf (stderr,
                "curl_easy_perform failed: `%s'\n",

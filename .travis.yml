@@ -15,7 +15,7 @@ install:
   - |
     cd ~/build/ &&
     curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.xz |
-    tar Jzf - &&
+    tar Jxf - &&
     cd nghttp2-${NGHTTP2_VERSION} &&
     CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --enable-lib-only &&
     make && sudo make install

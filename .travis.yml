@@ -2,9 +2,8 @@ language: c
 compiler: gcc
 sudo: false
 env:
-  NGHTTP2_VERSION=1.24.0
-  CURL_VERSION=7.49.0
-  CURL_DIR=curl-${CURL_VERSION}
+  NGHTTP2_VERSION=1.31.0
+  CURL_VERSION=7.50.0
   PREFIX_DIR=/usr/local
 addons:
   apt:
@@ -15,17 +14,17 @@ addons:
 install:
   - |
     cd ~/build/ &&
-    curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.gz |
-    tar xzf - &&
+    curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.xz |
+    tar Jzf - &&
     cd nghttp2-${NGHTTP2_VERSION} &&
     CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --enable-lib-only &&
     make && sudo make install
   - |
     cd ~/build/ &&
     curl -L https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz |
-    tar xzf - &&
-    cd ${CURL_DIR} &&
-    CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --with-nghttp2 --without-ssl --with-gnutls &&
+    tar zxf - &&
+    cd curl-${CURL_VERSION} &&
+    CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --with-nghttp2=${PREFIX_DIR} --without-ssl --with-gnutls &&
     make && sudo make install
   - cd ~/build/maru/libmicrohttpd-http2/
 before_script:
@@ -37,7 +36,7 @@ script:
     echo '#undef HAVE_INET6' >> MHD_config.h &&
     make && make check
   - |
-    ./configure --prefix=${PREFIX_DIR} --enable-https --enable-http2 --with-nghttp2 --disable-doc --enable-silent-rules --enable-asserts &&
+    ./configure --prefix=${PREFIX_DIR} --enable-https --enable-http2 --with-nghttp2=${PREFIX_DIR} --disable-doc --enable-silent-rules --enable-asserts &&
     echo '#undef HAVE_INET6' >> MHD_config.h &&
     make && make check
 after_failure:

@@ -192,6 +192,12 @@ set_http_version(const char *prog_name, int allow_1_0)
 #ifdef HTTP2_SUPPORT
   if (has_in_name(prog_name, "_http2"))
     {
+#ifdef HAVE_CURL
+      if (0 == (CURL_VERSION_HTTP2 & curl_version_info(CURLVERSION_NOW)->features))
+        {
+          abort();
+        }
+#endif /* HAVE_CURL */
       http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
       use_http2 = MHD_USE_HTTP2;
     }

@@ -96,9 +96,7 @@ main (int argc, char *const *argv)
     }
   d = MHD_start_daemon (MHD_USE_AUTO | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | use_http2,
                         port,
-                        NULL, NULL, &ahc_echo, NULL,
-                        MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 5,
-                        MHD_OPTION_END);
+                        NULL, NULL, &ahc_echo, NULL, MHD_OPTION_END);
   if (d == NULL)
     return 1;
   (void) getc (stdin);

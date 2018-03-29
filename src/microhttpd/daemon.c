@@ -780,8 +780,8 @@ urh_from_fdset (struct MHD_UpgradeResponseHandle *urh,
  * @param p pollfd array to update
  */
 static void
-urh_update_pollfd(struct MHD_UpgradeResponseHandle *urh,
-                  struct pollfd p[2])
+urh_update_pollfd (struct MHD_UpgradeResponseHandle *urh,
+		   struct pollfd p[2])
 {
   p[0].events = 0;
   p[1].events = 0;
@@ -821,12 +821,13 @@ urh_update_pollfd(struct MHD_UpgradeResponseHandle *urh,
  * @param p pollfd array to set
  */
 static void
-urh_to_pollfd(struct MHD_UpgradeResponseHandle *urh,
-              struct pollfd p[2])
+urh_to_pollfd (struct MHD_UpgradeResponseHandle *urh,
+	       struct pollfd p[2])
 {
   p[0].fd = urh->connection->socket_fd;
   p[1].fd = urh->mhd.socket;
-  urh_update_pollfd(urh, p);
+  urh_update_pollfd (urh,
+		     p);
 }
 
 
@@ -836,8 +837,8 @@ urh_to_pollfd(struct MHD_UpgradeResponseHandle *urh,
  * @param p 'poll()' processed pollfd.
  */
 static void
-urh_from_pollfd(struct MHD_UpgradeResponseHandle *urh,
-                struct pollfd p[2])
+urh_from_pollfd (struct MHD_UpgradeResponseHandle *urh,
+		 struct pollfd p[2])
 {
   /* Reset read/write ready, preserve error state. */
   urh->app.celi &= (~MHD_EPOLL_STATE_READ_READY & ~MHD_EPOLL_STATE_WRITE_READY);
@@ -1941,7 +1942,7 @@ thread_main_handle_connection (void *data)
 	  num_ready = MHD_SYS_select_ (maxsock + 1,
                                        &rs,
                                        &ws,
-                                       NULL,
+                                       &es,
                                        tvp);
 	  if (num_ready < 0)
 	    {
@@ -2069,21 +2070,18 @@ thread_main_handle_connection (void *data)
         }
 #endif /* UPGRADE_SUPPORT */
     }
-  if (MHD_CONNECTION_IN_CLEANUP != con->state)
-    {
 #if DEBUG_CLOSE
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (con->daemon,
-                _("Processing thread terminating. Closing connection\n"));
+  MHD_DLOG (con->daemon,
+            _("Processing thread terminating. Closing connection\n"));
 #endif
 #endif
-      if (MHD_CONNECTION_CLOSED != con->state)
-	MHD_connection_close_ (con,
-                               (daemon->shutdown) ?
-                               MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
-                               MHD_REQUEST_TERMINATED_WITH_ERROR);
-      MHD_connection_handle_idle (con);
-    }
+  if (MHD_CONNECTION_CLOSED != con->state)
+    MHD_connection_close_ (con,
+                           (daemon->shutdown) ?
+                           MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
+                           MHD_REQUEST_TERMINATED_WITH_ERROR);
+  MHD_connection_handle_idle (con);
 exit:
   if (NULL != con->response)
     {
@@ -2709,9 +2707,8 @@ MHD_suspend_connection (struct MHD_Connection *connection)
 void
 MHD_resume_connection (struct MHD_Connection *connection)
 {
-  struct MHD_Daemon *daemon;
+  struct MHD_Daemon *daemon = connection->daemon;
 
-  daemon = connection->daemon;
   if (0 == (daemon->options & MHD_TEST_ALLOW_SUSPEND_RESUME))
     MHD_PANIC (_("Cannot resume connections without enabling MHD_ALLOW_SUSPEND_RESUME!\n"));
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
@@ -2786,7 +2783,7 @@ resume_suspended_connections (struct MHD_Daemon *daemon)
           DLL_insert (daemon->connections_head,
                       daemon->connections_tail,
                       pos);
-          if (!used_thr_p_c)
+          if (! used_thr_p_c)
             {
               /* Reset timeout timer on resume. */
               if (0 != pos->connection_timeout)
@@ -2823,6 +2820,15 @@ resume_suspended_connections (struct MHD_Daemon *daemon)
           /* Data forwarding was finished (for TLS connections) AND
            * application was closed upgraded connection.
            * Insert connection into cleanup list. */
+
+          if ( (NULL != daemon->notify_completed) &&
+               (0 == (daemon->options & MHD_USE_THREAD_PER_CONNECTION)) &&
+               (pos->client_aware) )
+            daemon->notify_completed (daemon->notify_completed_cls,
+                                      pos,
+                                      &pos->client_context,
+                                      MHD_REQUEST_TERMINATED_COMPLETED_OK);
+          pos->client_aware = false;
           DLL_insert (daemon->cleanup_head,
                       daemon->cleanup_tail,
                       pos);
@@ -3386,8 +3392,10 @@ MHD_run_from_select (struct MHD_Daemon *daemon,
   if (0 != (daemon->options & MHD_TEST_ALLOW_SUSPEND_RESUME))
     resume_suspended_connections (daemon);
 
-  return internal_run_from_select (daemon, read_fd_set,
-                                   write_fd_set, except_fd_set);
+  return internal_run_from_select (daemon,
+                                   read_fd_set,
+                                   write_fd_set,
+                                   except_fd_set);
 }
 
 
@@ -3814,7 +3822,7 @@ MHD_poll_listen_socket (struct MHD_Daemon *daemon,
     }
 
   if (0 != (daemon->options & MHD_TEST_ALLOW_SUSPEND_RESUME))
-    (void)resume_suspended_connections (daemon);
+    (void) resume_suspended_connections (daemon);
 
   if (MHD_NO == may_block)
     timeout = 0;
@@ -4104,10 +4112,12 @@ MHD_epoll (struct MHD_Daemon *daemon,
   if ( (daemon->was_quiesced) &&
        (daemon->listen_socket_in_epoll) )
   {
-    if (0 != epoll_ctl (daemon->epoll_fd,
-                        EPOLL_CTL_DEL,
-                        ls,
-                        NULL))
+    if ( (0 != epoll_ctl (daemon->epoll_fd,
+                          EPOLL_CTL_DEL,
+                          ls,
+                          NULL)) &&
+         (ENOENT != errno) ) /* ENOENT can happen due to race with
+                                #MHD_quiesce_daemon() */
       MHD_PANIC ("Failed to remove listen FD from epoll set\n");
     daemon->listen_socket_in_epoll = false;
   }
@@ -4419,7 +4429,7 @@ close_connection (struct MHD_Connection *pos)
 
   mhd_assert (! pos->suspended);
   mhd_assert (! pos->resuming);
-  if (pos->connection_timeout == pos->daemon->connection_timeout)
+  if (pos->connection_timeout == daemon->connection_timeout)
     XDLL_remove (daemon->normal_timeout_head,
 		 daemon->normal_timeout_tail,
 		 pos);
@@ -4467,6 +4477,8 @@ MHD_polling_thread (void *cls)
   /* Resume any pending for resume connections, join
    * all connection's threads (if any) and finally cleanup
    * everything. */
+  if (0 != (MHD_TEST_ALLOW_SUSPEND_RESUME & daemon->options))
+    resume_suspended_connections (daemon);
   close_all_connections (daemon);
 
   return (MHD_THRD_RTRN_TYPE_)0;
@@ -4609,10 +4621,12 @@ MHD_quiesce_daemon (struct MHD_Daemon *daemon)
        (-1 != daemon->epoll_fd) &&
        (daemon->listen_socket_in_epoll) )
     {
-      if (0 != epoll_ctl (daemon->epoll_fd,
-			  EPOLL_CTL_DEL,
-			  ret,
-			  NULL))
+      if ( (0 != epoll_ctl (daemon->epoll_fd,
+                            EPOLL_CTL_DEL,
+                            ret,
+                            NULL)) &&
+           (ENOENT != errno) ) /* ENOENT can happen due to race with
+                                  #MHD_epoll() */
 	MHD_PANIC ("Failed to remove listen FD from epoll set\n");
       daemon->listen_socket_in_epoll = false;
     }
@@ -6357,7 +6371,8 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
           daemon->worker_pool[i].shutdown = true;
           if (MHD_ITC_IS_VALID_(daemon->worker_pool[i].itc))
             {
-              if (! MHD_itc_activate_ (daemon->worker_pool[i].itc, "e"))
+              if (! MHD_itc_activate_ (daemon->worker_pool[i].itc,
+                                       "e"))
                 MHD_PANIC (_("Failed to signal shutdown via inter-thread communication channel."));
             }
           else
@@ -6388,37 +6403,32 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
       if (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD))
         { /* Worker daemon or single daemon with internal thread(s). */
           mhd_assert (0 == daemon->worker_pool_size);
-          if (0 != (MHD_TEST_ALLOW_SUSPEND_RESUME & daemon->options))
-            resume_suspended_connections (daemon);
-
-          if (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD))
-            {
-              /* Separate thread(s) is used for polling sockets. */
-              if (MHD_ITC_IS_VALID_(daemon->itc))
-                {
-                  if (! MHD_itc_activate_ (daemon->itc, "e"))
-                    MHD_PANIC (_("Failed to signal shutdown via inter-thread communication channel"));
-                }
-              else
-                {
+	  /* Separate thread(s) is used for polling sockets. */
+	  if (MHD_ITC_IS_VALID_ (daemon->itc))
+	    {
+	      if (! MHD_itc_activate_ (daemon->itc,
+                                       "e"))
+		MHD_PANIC (_("Failed to signal shutdown via inter-thread communication channel"));
+	    }
+	  else
+	    {
 #ifdef HAVE_LISTEN_SHUTDOWN
-                  if (MHD_INVALID_SOCKET != fd)
-                    {
-                      if (NULL == daemon->master)
-                        (void) shutdown (fd,
-                                         SHUT_RDWR);
-                    }
-                  else
+	      if (MHD_INVALID_SOCKET != fd)
+		{
+		  if (NULL == daemon->master)
+		    (void) shutdown (fd,
+				     SHUT_RDWR);
+		}
+	      else
 #endif /* HAVE_LISTEN_SHUTDOWN */
-                    mhd_assert (false); /* Should never happen */
-                }
+		mhd_assert (false); /* Should never happen */
+	    }
 
-              if (! MHD_join_thread_ (daemon->pid.handle))
-                {
-                  MHD_PANIC (_("Failed to join a thread\n"));
-                }
-              /* close_all_connections() was called in daemon thread. */
-            }
+	  if (! MHD_join_thread_ (daemon->pid.handle))
+	    {
+	      MHD_PANIC (_("Failed to join a thread\n"));
+	    }
+	  /* close_all_connections() was called in daemon thread. */
         }
       else
         {

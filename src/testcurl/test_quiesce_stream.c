@@ -125,6 +125,15 @@ http_ContentReaderCallback (void *cls,
 }
 
 
+static void
+free_crc_data (void *crc_data)
+{
+  struct ContentReaderUserdata *userdata = crc_data;
+
+  free (userdata);
+}
+
+
 static int
 http_AccessHandlerCallback (void *cls,
                             struct MHD_Connection *connection,
@@ -163,7 +172,7 @@ http_AccessHandlerCallback (void *cls,
                                          32 * 1024,
                                          &http_ContentReaderCallback,
                                          *con_cls,
-                                         NULL);
+                                         &free_crc_data);
   ret = MHD_queue_response (connection,
                             MHD_HTTP_OK,
                             response);

@@ -1,3 +1,18 @@
+Sat Mar 10 12:15:35 CET 2018
+	Upgrade to gettext-0.19.8.1. Switching to more canonical
+	gettext integration. -CG
+
+Fri Mar  2 21:44:24 CET 2018
+	Ensure MHD_RequestCompletedCallback is always called from
+	the correct thread (even on shutdown and for upgraded connections). -CG
+
+Tue Feb 27 23:27:02 CET 2018
+	Ensure MHD_RequestCompletedCallback is also called for
+	upgraded connections. -CG
+
+Fri Feb 16 03:09:33 CET 2018
+	Fixing #5278 as suggested by reporter. -CG/texec
+
 Thu Feb  1 10:12:22 CET 2018
 	Releasing GNU libicrohttpd 0.9.59. -CG
 

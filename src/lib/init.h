@@ -16,24 +16,15 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
-
 /**
  * @file lib/init.h
  * @brief functions to initialize library
  * @author Christian Grothoff
  */
-#include "internal.h"
-
-
 #ifndef INIT_H
 #define INIT_H
 
-/**
- * Globally initialise library.
- */
-void
-MHD_init(void);
-
+#include "internal.h"
 
 #ifdef _AUTOINIT_FUNCS_ARE_SUPPORTED
 /**

@@ -31,11 +31,14 @@
  *
  * @param cls NULL
  * @param request the request to apply the action to
+ * @return #MHD_SC_OK on success
  */
-static void
+static enum MHD_StatusCode
 suspend_action (void *cls,
 		struct MHD_Request *request)
 {
+  (void) cls;
+  struct MHD_Connection *connection = request->connection;
   struct MHD_Daemon *daemon = connection->daemon;
 
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
@@ -44,11 +47,12 @@ suspend_action (void *cls,
       /* suspending again while we didn't even complete resuming yet */
       connection->resuming = false;
       MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
-      return;
+      return MHD_SC_OK;
     }
-  if (0 == (daemon->options & MHD_USE_THREAD_PER_CONNECTION))
+  if (daemon->threading_model != MHD_TM_THREAD_PER_CONNECTION)
     {
-      if (connection->connection_timeout == daemon->connection_timeout)
+      if (connection->connection_timeout ==
+	  daemon->connection_default_timeout)
         XDLL_remove (daemon->normal_timeout_head,
                      daemon->normal_timeout_tail,
                      connection);
@@ -88,6 +92,7 @@ suspend_action (void *cls,
     }
 #endif
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+  return MHD_SC_OK;
 }
 
 
@@ -118,10 +123,10 @@ suspend_action (void *cls,
  *
  * @return action to cause a request to be suspended.
  */
-struct MHD_Action *
+const struct MHD_Action *
 MHD_action_suspend (void)
 {
-  static MHD_Action suspend = {
+  static const struct MHD_Action suspend = {
     .action = &suspend_action,
     .action_cls = NULL
   };

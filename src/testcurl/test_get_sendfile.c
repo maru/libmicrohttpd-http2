@@ -569,9 +569,11 @@ main (int argc, char *const *argv)
     tmp = "/tmp";
   sourcefile = malloc (strlen (tmp) + 32);
   sprintf (sourcefile,
-	   "%s/%s",
+	   "%s/%s%s",
 	   tmp,
-	   "test-mhd-sendfile");
+	   "test-mhd-sendfile",
+	   (http_version == CURL_HTTP_VERSION_1_1)  ? "11" :
+     (http_version == CURL_HTTP_VERSION_1_0)  ? "" : "http2");
   f = fopen (sourcefile, "w");
   if (NULL == f)
     {

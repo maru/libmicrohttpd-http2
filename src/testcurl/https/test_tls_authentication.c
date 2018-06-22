@@ -87,7 +87,8 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
   char *aes256_sha = "AES256-SHA";
-  (void)argc;   /* Unused. Silent compiler warning. */
+  FILE *crt;
+  (void)argc;       /* Unused. Silent compiler warning. */
 
   set_http_version(argv[0], 1);
 
@@ -106,13 +107,13 @@ main (int argc, char *const *argv)
       return 77;
     }
 
-  if (setup_ca_cert () == NULL)
+  if (NULL == (crt = setup_ca_cert ()))
     {
       fprintf (stderr, MHD_E_TEST_FILE_CREAT);
       curl_global_cleanup ();
       return 99;
     }
-
+  fclose (crt);
   if (curl_uses_nss_ssl() == 0)
     {
       aes256_sha = "rsa_aes_256_sha";

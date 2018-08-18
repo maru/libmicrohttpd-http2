@@ -2470,6 +2470,8 @@ internal_add_connection (struct MHD_Daemon *daemon,
                   );
       gnutls_priority_set (connection->tls_session,
 			   daemon->priority_cache);
+      gnutls_session_set_ptr (connection->tls_session,
+			      connection);
 
 #ifdef HAS_ALPN
       /* Set ALPN protocols */
@@ -2527,8 +2529,6 @@ internal_add_connection (struct MHD_Daemon *daemon,
       goto cleanup;
 #endif /* ! HTTPS_SUPPORT */
     }
-  gnutls_session_set_ptr (connection->tls_session,
-			  connection);
 
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
   /* Firm check under lock. */

@@ -28,7 +28,7 @@ install:
     make && sudo make install
   - cd ~/build/maru/libmicrohttpd-http2/
 before_script:
-  - autoreconf -fi
+  - ./bootstrap
 script:
   - export LD_LIBRARY_PATH=${PREFIX_DIR}/lib
   - |

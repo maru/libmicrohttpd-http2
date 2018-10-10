@@ -486,12 +486,6 @@ test_put_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_put_chunked_http2_SOURCES = \
-  test_put_chunked.c
-test_put_chunked_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  @LIBCURL@
-
 test_large_put_inc_http2_SOURCES = \
   test_large_put.c
 test_large_put_inc_http2_LDADD = \

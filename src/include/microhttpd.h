@@ -1151,9 +1151,7 @@ enum MHD_FLAG
   MHD_USE_AUTO_INTERNAL_THREAD = MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD,
 
   /**
-   * Run using HTTP2 only (otherwise, MHD will just support HTTP/1).
-   * If you want MHD to support both HTTP/1 and HTTP/2,
-   * see https://github.com/maru/libmicrohttpd-http2/issues/7
+   * Use both protocols HTTP/1 and HTTP/2.
    */
   MHD_USE_HTTP2 = 131072
 
@@ -1512,7 +1510,7 @@ enum MHD_OPTION
    * Settings parameters and their default values are defined in
    * https://tools.ietf.org/html/rfc7540#section-6.5.2
    */
-  MHD_OPTION_H2_SETTINGS = 30
+  MHD_OPTION_H2_SETTINGS = 7540
 
 };
 
@@ -2592,9 +2590,9 @@ MHD_suspend_connection (struct MHD_Connection *connection);
  * result in undefined behavior.
  *
  * If you are using this function in ``external'' select mode, you must
- * make sure to run #MHD_run() and #MHD_get_timeout() afterwards (before 
+ * make sure to run #MHD_run() and #MHD_get_timeout() afterwards (before
  * again calling #MHD_get_fdset()), as otherwise the change may not be
- * reflected in the set returned by #MHD_get_fdset() and you may end up 
+ * reflected in the set returned by #MHD_get_fdset() and you may end up
  * with a connection that is stuck until the next network activity.
  *
  * @param connection the connection to resume
@@ -3525,7 +3523,7 @@ enum MHD_FEATURE
    * Get whether HTTP/2 is supported. If supported then flag
    * #MHD_USE_HTTP2 can be used.
    */
-  MHD_FEATURE_HTTP2 = 22,
+  MHD_FEATURE_HTTP2 = 7540,
 
 };
 

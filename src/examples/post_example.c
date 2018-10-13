@@ -730,30 +730,16 @@ main (int argc, char *const *argv)
   fd_set es;
   MHD_socket max;
   MHD_UNSIGNED_LONG_LONG mhd_timeout;
-  int use_http2 = 0;
-  uint16_t port;
 
-  switch (argc)
+  if (argc != 2)
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
-
   /* initialize PRNG */
   srand ((unsigned int) time (NULL));
-  d = MHD_start_daemon (MHD_USE_ERROR_LOG | use_http2,
-                        port,
+  d = MHD_start_daemon (MHD_USE_ERROR_LOG,
+                        atoi (argv[1]),
                         NULL, NULL,
 			&create_response, NULL,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 15,

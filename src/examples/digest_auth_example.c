@@ -102,23 +102,10 @@ main (int argc, char *const *argv)
   ssize_t len;
   size_t off;
   struct MHD_Daemon *d;
-  int use_http2 = 0;
-  uint16_t port;
 
-  switch (argc)
+  if (argc != 2)
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
   fd = open("/dev/urandom", O_RDONLY);
@@ -144,8 +131,8 @@ main (int argc, char *const *argv)
       off += len;
     }
   (void) close(fd);
-  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | use_http2,
-                        port,
+  d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
+                        atoi (argv[1]),
                         NULL, NULL, &ahc_echo, PAGE,
 			MHD_OPTION_DIGEST_AUTH_RANDOM, sizeof(rnd), rnd,
 			MHD_OPTION_NONCE_NC_SIZE, 300,

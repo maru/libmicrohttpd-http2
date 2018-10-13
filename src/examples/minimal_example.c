@@ -20,7 +20,6 @@
  * @file minimal_example.c
  * @brief minimal example for how to use libmicrohttpd
  * @author Christian Grothoff
- * @author Maru Berezin
  */
 
 #include "platform.h"
@@ -66,49 +65,22 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
-  int use_http2 = 0;
-  uint16_t port;
 
-  switch (argc)
+  if (argc != 2)
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
-
-#ifdef HTTP2_SUPPORT
-  /* Default HTTP2 server settings */
-  nghttp2_settings_entry settings[3];
-  int slen = 0;
-  settings[slen].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-  settings[slen].value = 100;
-  ++slen;
-#endif /* HTTP2_SUPPORT */
-
-  d = MHD_start_daemon (use_http2 |
-                        /* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
+  d = MHD_start_daemon (/* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
                         MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
                         /* MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_POLL, */
-			/* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_POLL, */
-			/* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
-                        port,
+                        /* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_POLL, */
+                        /* MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, */
+                        atoi (argv[1]),
                         NULL, NULL, &ahc_echo, PAGE,
-			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
-			MHD_OPTION_STRICT_FOR_CLIENT, (int) 1,
-#ifdef HTTP2_SUPPORT
-                        MHD_OPTION_H2_SETTINGS, slen, settings,
-#endif /* HTTP2_SUPPORT */
-			MHD_OPTION_END);
+                        MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
+                        MHD_OPTION_STRICT_FOR_CLIENT, (int) 1,
+                        MHD_OPTION_END);
   if (d == NULL)
     return 1;
   (void) getc (stdin);

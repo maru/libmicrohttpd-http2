@@ -52,10 +52,6 @@
 #endif /* MHD_HTTPS_REQUIRE_GRYPT */
 #endif /* HTTPS_SUPPORT */
 
-#ifdef HTTP2_SUPPORT
-#include "connection_http2.h"
-#endif /* HTTP2_SUPPORT */
-
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -568,7 +564,6 @@ MHD_init_daemon_certificate (struct MHD_Daemon *daemon)
 #endif
   return -1;
 }
-
 
 /**
  * Initialize security aspects of the HTTPS daemon
@@ -1114,8 +1109,13 @@ call_handlers (struct MHD_Connection *con,
       if ( (MHD_EVENT_LOOP_INFO_READ == con->event_loop_info) &&
 	   read_ready)
         {
+#ifdef HTTP2_SUPPORT
+          con->handle_read_cls (con);
+          ret = con->handle_idle_cls (con);
+#else
           MHD_connection_handle_read (con);
           ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
       /* No need to check value of 'ret' here as closed connection
@@ -1123,8 +1123,13 @@ call_handlers (struct MHD_Connection *con,
       if ( (MHD_EVENT_LOOP_INFO_WRITE == con->event_loop_info) &&
 	   write_ready)
         {
+#ifdef HTTP2_SUPPORT
+          con->handle_write_cls (con);
+          ret = con->handle_idle_cls (con);
+#else
           MHD_connection_handle_write (con);
           ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
     }
@@ -1132,13 +1137,21 @@ call_handlers (struct MHD_Connection *con,
     {
       MHD_connection_close_ (con,
                              MHD_REQUEST_TERMINATED_WITH_ERROR);
+#ifdef HTTP2_SUPPORT
+      return con->handle_idle_cls (con);
+#else
       return MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
     }
 
   if (!states_info_processed)
     { /* Connection is not read or write ready, but external conditions
        * may be changed and need to be processed. */
+#ifdef HTTP2_SUPPORT
+      ret = con->handle_idle_cls (con);
+#else
       ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
     }
   /* Fast track for fast connections. */
   /* If full request was read by single read_handler() invocation
@@ -1154,9 +1167,14 @@ call_handlers (struct MHD_Connection *con,
     {
       if (MHD_CONNECTION_HEADERS_SENDING == con->state)
         {
+#ifdef HTTP2_SUPPORT
+          con->handle_write_cls (con);
+          ret = con->handle_idle_cls (con);
+#else
           MHD_connection_handle_write (con);
           /* Always call 'MHD_connection_handle_idle()' after each read/write. */
           ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
         }
       /* If all headers were sent by single write_handler() and
        * response body is prepared by single MHD_connection_handle_idle()
@@ -1164,8 +1182,13 @@ call_handlers (struct MHD_Connection *con,
       if ((MHD_CONNECTION_NORMAL_BODY_READY == con->state) ||
           (MHD_CONNECTION_CHUNKED_BODY_READY == con->state))
         {
+#ifdef HTTP2_SUPPORT
+          con->handle_write_cls (con);
+          ret = con->handle_idle_cls (con);
+#else
           MHD_connection_handle_write (con);
           ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
         }
     }
 
@@ -1844,7 +1867,11 @@ thread_main_handle_connection (void *data)
         {
           MHD_update_last_activity_ (con); /* Reset timeout timer. */
           /* Process response queued during suspend and update states. */
+#ifdef HTTP2_SUPPORT
+          con->handle_idle_cls (con);
+#else
           MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           was_suspended = false;
         }
 
@@ -2081,7 +2108,11 @@ thread_main_handle_connection (void *data)
                            (daemon->shutdown) ?
                            MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
                            MHD_REQUEST_TERMINATED_WITH_ERROR);
+#ifdef HTTP2_SUPPORT
+  con->handle_idle_cls (con);
+#else
   MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
 exit:
   if (NULL != con->response)
     {
@@ -2140,6 +2171,7 @@ MHD_tls_push_func_(gnutls_transport_ptr_t trnsp,
 }
 #endif /* MHD_TLSLIB_DONT_SUPPRESS_SIGPIPE */
 #endif /* HTTPS_SUPPORT */
+
 
 /**
  * Add another client connection to the set of connections
@@ -2347,6 +2379,9 @@ internal_add_connection (struct MHD_Daemon *daemon,
   connection->sk_nonblck = non_blck;
   connection->daemon = daemon;
   connection->last_activity = MHD_monotonic_sec_counter();
+#ifdef HTTP2_SUPPORT
+  MHD_set_h1_callbacks (connection);  /* Default protocol */
+#endif /* HTTP2_SUPPORT */
 
   if (0 == (daemon->options & MHD_USE_TLS))
     {
@@ -2417,23 +2452,6 @@ internal_add_connection (struct MHD_Daemon *daemon,
       goto cleanup;
 #endif /* ! HTTPS_SUPPORT */
     }
-
-#ifdef HTTP2_SUPPORT
-  /* Set http version  */
-  if (0 != (daemon->options & MHD_USE_HTTP2))
-    {
-      /*
-       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
-       * only HTTP/2 connections will be handled.
-       */
-      connection->http_version = HTTP_VERSION(2, 0);
-      connection->state = MHD_CONNECTION_HTTP2_INIT;
-    }
-  else
-    {
-      connection->http_version = HTTP_VERSION(1, 1);
-    }
-#endif /* ! HTTP2_SUPPORT */
 
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
   /* Firm check under lock. */
@@ -2612,7 +2630,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               connection);
   connection->suspended = true;
 #ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
+  if (0 == strcmp(connection->version, MHD_HTTP_VERSION_2_0))
     {
       MHD_http2_suspend_stream (connection);
     }
@@ -4338,7 +4356,11 @@ MHD_epoll (struct MHD_Daemon *daemon,
   while (NULL != (pos = prev))
     {
       prev = pos->prevX;
+#ifdef HTTP2_SUPPORT
+      pos->handle_idle_cls (pos);
+#else
       MHD_connection_handle_idle (pos);
+#endif /* HTTP2_SUPPORT */
     }
   /* Connections with the default timeout are sorted by prepending
      them to the head of the list whenever we touch the connection;
@@ -4348,7 +4370,11 @@ MHD_epoll (struct MHD_Daemon *daemon,
   while (NULL != (pos = prev))
     {
       prev = pos->prevX;
+#ifdef HTTP2_SUPPORT
+      pos->handle_idle_cls (pos);
+#else
       MHD_connection_handle_idle (pos);
+#endif /* HTTP2_SUPPORT */
       if (MHD_CONNECTION_CLOSED != pos->state)
 	break; /* sorted by timeout, no need to visit the rest! */
     }
@@ -5018,11 +5044,11 @@ parse_options_va (struct MHD_Daemon *daemon,
 #endif /* HAVE_MESSAGES */
 	  break;
 #ifdef HTTP2_SUPPORT
-        case MHD_OPTION_H2_SETTINGS:
+        case MHD_OPTION_HTTP2_SETTINGS:
           daemon->h2_settings_len = va_arg (ap,
                                         size_t);
           daemon->h2_settings = va_arg (ap,
-                                        nghttp2_settings_entry *);
+                                        h2_settings_entry *);
           break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
@@ -5122,7 +5148,7 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
 #ifdef HTTP2_SUPPORT
-		case MHD_OPTION_H2_SETTINGS:
+		case MHD_OPTION_HTTP2_SETTINGS:
 #endif /* ! HTTP2_SUPPORT */
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
@@ -5345,10 +5371,6 @@ MHD_start_daemon_va (unsigned int flags,
       return NULL;
 #endif /* ! UPGRADE_SUPPORT */
     }
-#ifndef HTTP2_SUPPORT
-  if (0 != (*pflags & MHD_USE_HTTP2))
-    return NULL;
-#endif /* ! HTTP2_SUPPORT */
 
   if (NULL == dh)
     return NULL;
@@ -5412,9 +5434,6 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
-#ifdef HTTP2_SUPPORT
-  gettimeofday(&tm_start, NULL);
-#endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;
@@ -6744,13 +6763,6 @@ MHD_is_feature_supported(enum MHD_FEATURE feature)
 #else
       return MHD_NO;
 #endif
-    case MHD_FEATURE_HTTP2:
-#ifdef HTTP2_SUPPORT
-      return MHD_YES;
-#else
-      return MHD_NO;
-#endif
-
     }
   return MHD_NO;
 }

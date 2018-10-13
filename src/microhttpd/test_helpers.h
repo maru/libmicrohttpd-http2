@@ -30,6 +30,10 @@
 #include <curl/curl.h>
 #include "microhttpd.h"
 
+#ifdef HTTP2_SUPPORT
+#include "microhttpd_http2.h"
+#endif /* HTTP2_SUPPORT */
+
 /**
  * Check whether program name contains specific @a marker string.
  * Only last component in pathname is checked for marker presence,

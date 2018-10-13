@@ -1557,18 +1557,16 @@ MHD_http2_session_start (struct MHD_Connection *connection)
  * Read data from the connection.
  *
  * @param connection connection to handle
- * @return #MHD_YES if no error
- *         #MHD_NO otherwise, connection must be closed.
  */
-int
+void
 MHD_http2_handle_read (struct MHD_Connection *connection)
 {
   if (connection->state == MHD_CONNECTION_HTTP2_INIT)
   {
-    return MHD_NO;
+    return; // MHD_NO;
   }
   struct http2_conn *h2 = connection->h2;
-  if (h2 == NULL) return MHD_NO;
+  if (h2 == NULL) return; // MHD_NO;
   // ENTER("[id=%zu]", h2->session_id);
 
   connection->state = MHD_CONNECTION_HTTP2_BUSY;
@@ -1588,11 +1586,11 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
       {
         connection_close_error (connection,
                                 _("Socket is unexpectedly disconnected when reading request.\n"));
-        return MHD_NO;
+        return; // MHD_NO;
       }
       connection_close_error (connection,
                               _("Connection socket is closed due to unexpected error when reading request.\n"));
-      return MHD_NO;
+      return; // MHD_NO;
     }
 
     /* Remote side closed connection. */
@@ -1601,7 +1599,7 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
       connection->read_closed = true;
       MHD_connection_close_ (connection,
                              MHD_REQUEST_TERMINATED_CLIENT_ABORT);
-      return MHD_NO;
+      return; // MHD_NO;
     }
 
     MHD_update_last_activity_ (connection);
@@ -1629,7 +1627,7 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
   MHD_connection_epoll_update_ (connection);
 #endif /* EPOLL_SUPPORT */
 
-  return MHD_YES;
+  return; // MHD_YES;
 }
 
 
@@ -1637,14 +1635,12 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
  * Write data to the connection.
  *
  * @param connection connection to handle
- * @return #MHD_YES if no error
- *         #MHD_NO otherwise, connection must be closed.
  */
-int
+void
 MHD_http2_handle_write (struct MHD_Connection *connection)
 {
   struct http2_conn *h2 = connection->h2;
-  if (h2 == NULL) return MHD_NO;
+  if (h2 == NULL) return; // MHD_NO;
   // ENTER("[id=%zu]", h2->session_id);
 
   connection->state = MHD_CONNECTION_HTTP2_BUSY;
@@ -1668,10 +1664,10 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
           /* TODO: Transmission could not be accomplished. Try again. */
           connection->state = MHD_CONNECTION_HTTP2_IDLE;
           ENTER(" =================== ADD WRITE EVENT ================== ret=%zd", ret);
-          return MHD_YES;
+          return; // MHD_YES;
         }
         MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-        return MHD_NO;
+        return; // MHD_NO;
       }
       connection->write_buffer_send_offset += ret;
       MHD_update_last_activity_ (connection);
@@ -1686,7 +1682,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
     if (http2_fill_write_buffer(h2->session, h2) != 0)
     {
       MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-      return MHD_NO;
+      return; // MHD_NO;
     }
 
     // ENTER("http2_fill_write_buffer: send=%d append=%d = %d", connection->write_buffer_send_offset, connection->write_buffer_append_offset, connection->write_buffer_append_offset - connection->write_buffer_send_offset);
@@ -1712,7 +1708,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
       (connection->write_buffer_append_offset - connection->write_buffer_send_offset == 0))
   {
     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
-    return MHD_NO;
+    return; // MHD_NO;
   }
   MHD_update_last_activity_ (connection);
   connection->state = MHD_CONNECTION_HTTP2_IDLE;
@@ -1720,7 +1716,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
 #ifdef EPOLL_SUPPORT
   MHD_connection_epoll_update_ (connection);
 #endif /* EPOLL_SUPPORT */
-  return MHD_YES;
+  return; // MHD_YES;
 }
 
 
@@ -1840,6 +1836,61 @@ MHD_http2_queue_response (struct MHD_Connection *connection,
   MHD_connection_epoll_update_ (connection);
 #endif /* EPOLL_SUPPORT */
   return MHD_YES;
+}
+
+
+
+/**
+ * Set HTTP/1 read/idle/write callbacks for this connection.
+ * Handle data from/to socket.
+ *
+ * @param connection connection to initialize
+ */
+void
+MHD_set_h1_callbacks (struct MHD_Connection *connection)
+{
+  connection->handle_read_cls = &MHD_connection_handle_read;
+  connection->handle_idle_cls = &MHD_connection_handle_idle;
+  connection->handle_write_cls = &MHD_connection_handle_write;
+}
+
+
+/**
+ * Set HTTP/2 read/idle/write callbacks for this connection.
+ * Handle data from/to socket.
+ *
+ * @param connection connection to initialize
+ */
+void
+MHD_set_h2_callbacks (struct MHD_Connection *connection)
+{
+  MHD_set_h1_callbacks(connection);
+  // connection->handle_read_cls = &MHD_http2_handle_read;
+  // connection->handle_idle_cls = &MHD_http2_handle_idle;
+  // connection->handle_write_cls = &MHD_http2_handle_write;
+
+/*
+  connection->handle_read_cls = &h2_connection_handle_read;
+  connection->handle_idle_cls = &h2_connection_handle_idle;
+  connection->handle_write_cls = &h2_connection_handle_write;
+*/
+
+}
+
+
+void h2_connection_handle_read (struct MHD_Connection *conn)
+{
+
+}
+
+int h2_connection_handle_idle (struct MHD_Connection *conn)
+{
+
+}
+
+void h2_connection_handle_write (struct MHD_Connection *conn)
+{
+
 }
 
 #endif /* HTTP2_SUPPORT */

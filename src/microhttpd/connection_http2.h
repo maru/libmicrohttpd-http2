@@ -31,9 +31,8 @@
 #include "internal.h"
 
 #ifdef HTTP2_SUPPORT
-#ifdef USE_NGHTTP2
-#include <nghttp2/nghttp2.h>
-#endif /* USE_NGHTTP2 */
+
+struct timeval tm_start;
 
 #define H2_HEADER_METHOD     ":method"
 #define H2_HEADER_METHOD_LEN 7
@@ -47,6 +46,46 @@
 #define H2_HEADER_COOKIE_LEN 6
 #define H2_HEADER_CONTENT_LENGTH     "content-length"
 #define H2_HEADER_CONTENT_LENGTH_LEN 14
+
+
+/** States in a state machine for an HTTP/2 connection. **/
+enum MHD_CONNECTION_STATE_HTTP2
+{
+  /**
+   * Connection just started (no preface sent or received).
+   */
+  MHD_CONNECTION_HTTP2_INIT = 128,
+
+  /**
+   * Expecting incoming data.
+   */
+  MHD_CONNECTION_HTTP2_IDLE,
+
+  /**
+   * Reading/writing in process.
+   */
+  MHD_CONNECTION_HTTP2_BUSY,
+
+  /**
+   * Client sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_REMOTE,
+
+  /**
+   * Server sent GOAWAY frame.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED_LOCAL,
+
+  /**
+   * Connection closed.
+   */
+  MHD_CONNECTION_HTTP2_CLOSED,
+
+  /**
+   * This connection is finished (only to be freed)
+   */
+  MHD_CONNECTION_HTTP2_IN_CLEANUP
+};
 
 /**
  * HTTP/2 stream.
@@ -196,7 +235,7 @@ struct http2_conn
   /**
    * Session settings.
    */
-  nghttp2_settings_entry *settings;
+  h2_settings_entry *settings;
 
   /**
    * Number of entries in settings.
@@ -258,10 +297,8 @@ MHD_http2_session_start (struct MHD_Connection *connection);
  * Read data from the connection.
  *
  * @param conn the connection struct
- * @return #MHD_YES if no error
- *         #MHD_NO otherwise, connection must be closed.
  */
-int
+void
 MHD_http2_handle_read (struct MHD_Connection *connection);
 
 
@@ -269,10 +306,8 @@ MHD_http2_handle_read (struct MHD_Connection *connection);
  * Write data to the connection.
  *
  * @param conn the connection struct
- * @return #MHD_YES if no error
- *         #MHD_NO otherwise, connection must be closed.
  */
-int
+void
 MHD_http2_handle_write (struct MHD_Connection *connection);
 
 
@@ -319,6 +354,22 @@ MHD_http2_queue_response (struct MHD_Connection *connection,
  */
 void
 MHD_http2_suspend_stream (struct MHD_Connection *connection);
+
+
+void
+MHD_set_h1_callbacks (struct MHD_Connection *connection);
+
+void
+MHD_set_h2_callbacks (struct MHD_Connection *connection);
+
+void
+h2_connection_handle_read (struct MHD_Connection *conn);
+
+int
+h2_connection_handle_idle (struct MHD_Connection *conn);
+
+void
+h2_connection_handle_write (struct MHD_Connection *conn);
 
 #endif /* HTTP2_SUPPORT */
 

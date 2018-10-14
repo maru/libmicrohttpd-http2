@@ -30,8 +30,6 @@
 
 #define MHD_HTTP_VERSION_2_0 "HTTP/2"
 
-#define HTTP_VERSION(major, minor) (1000*(major) + (minor))
-
 #include <nghttp2/nghttp2.h>
 
 typedef nghttp2_settings_entry h2_settings_entry;

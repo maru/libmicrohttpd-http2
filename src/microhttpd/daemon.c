@@ -2453,6 +2453,24 @@ internal_add_connection (struct MHD_Daemon *daemon,
 #endif /* ! HTTPS_SUPPORT */
     }
 
+// printf("connection->http_version %d\n", connection->http_version);
+#ifdef HTTP2_SUPPORT
+  /* Set http version  */
+  if (0 != (daemon->options & MHD_USE_HTTP2))
+    {
+      /*
+       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
+       * only HTTP/2 connections will be handled.
+       */
+      connection->http_version = HTTP_VERSION(2, 0);
+      connection->state = MHD_CONNECTION_HTTP2_INIT;
+    }
+  else
+    {
+      connection->http_version = HTTP_VERSION(1, 1);
+    }
+#endif /* ! HTTP2_SUPPORT */
+
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
   /* Firm check under lock. */
   if (daemon->connections >= daemon->connection_limit)
@@ -2630,7 +2648,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               connection);
   connection->suspended = true;
 #ifdef HTTP2_SUPPORT
-  if (0 == strcmp(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       MHD_http2_suspend_stream (connection);
     }
@@ -5434,6 +5452,9 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+#ifdef HTTP2_SUPPORT
+  gettimeofday(&tm_start, NULL);
+#endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;

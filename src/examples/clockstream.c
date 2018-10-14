@@ -27,6 +27,7 @@
 
 #include "platform.h"
 #include <microhttpd.h>
+#include <microhttpd_http2.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <limits.h>
@@ -197,19 +198,17 @@ main (int argc,
   int use_http2 = 0;
   uint16_t port;
 
-  switch (argc)
+  if (argc == 2)
     {
-    case 2:
       port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
+    }
+  else if ( (argc == 3) && (strcmp(argv[1], "-h2") == 0) )
+    {
+      use_http2 = MHD_USE_HTTP2;
+      port = atoi (argv[2]);
+    }
+  else
+    {
       printf ("%s [-h2] PORT\n", argv[0]);
       return 1;
     }

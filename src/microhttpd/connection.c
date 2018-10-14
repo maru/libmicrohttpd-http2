@@ -942,7 +942,7 @@ MHD_connection_close_ (struct MHD_Connection *connection,
   struct MHD_Response *resp = connection->response;
 
 #ifdef HTTP2_SUPPORT
-  if (connection->version && MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       MHD_http2_session_delete (connection);
     }
@@ -1282,7 +1282,7 @@ keepalive_possible (struct MHD_Connection *connection)
     return MHD_NO;
 
 #ifdef HTTP2_SUPPORT
-  if (MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     return MHD_YES;
 #endif /* HTTP2_SUPPORT */
 
@@ -2883,7 +2883,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
 
 #ifdef HTTP2_SUPPORT
-  if (connection->version && MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       if (MHD_CONNECTION_INIT ==connection->state)
         connection->state = MHD_CONNECTION_HTTP2_INIT;
@@ -3010,7 +3010,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
-  if (MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       MHD_http2_handle_write (connection);
       return;
@@ -3327,7 +3327,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
-  if (connection->version && MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       if (connection->state == MHD_CONNECTION_CLOSED)
         {
@@ -4016,10 +4016,9 @@ MHD_queue_response (struct MHD_Connection *connection,
   if ( (NULL == connection) ||
        (NULL == response) ||
        (NULL != connection->response) ||
-       ( ( (MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_1_1)) ||
-           (MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_1_0)) ) &&
+       ( (connection->http_version < HTTP_VERSION(2, 0)) &&
          (MHD_CONNECTION_HEADERS_PROCESSED != connection->state) &&
-         (MHD_CONNECTION_FOOTERS_RECEIVED != connection->state) ) )
+	 (MHD_CONNECTION_FOOTERS_RECEIVED != connection->state) ) )
     return MHD_NO;
   daemon = connection->daemon;
 
@@ -4059,7 +4058,7 @@ MHD_queue_response (struct MHD_Connection *connection,
 #endif /* UPGRADE_SUPPORT */
 
 #ifdef HTTP2_SUPPORT
-  if (MHD_str_equal_caseless_(connection->version, MHD_HTTP_VERSION_2_0))
+  if (connection->http_version == HTTP_VERSION(2, 0))
     {
       return MHD_http2_queue_response (connection, status_code, response);
     }

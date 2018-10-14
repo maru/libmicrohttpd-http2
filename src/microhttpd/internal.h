@@ -1026,7 +1026,13 @@ struct MHD_Connection
    */
   bool resuming;
 
+  /**
+   * HTTP version number; 1.1 = 1001
+   */
+  int http_version;
+
 #ifdef HTTP2_SUPPORT
+
   /**
    * Function used for reading data from the socket.
    */
@@ -1050,6 +1056,7 @@ struct MHD_Connection
 #endif /* HTTP2_SUPPORT */
 };
 
+#define HTTP_VERSION(major, minor) (1000*(major) + (minor))
 
 #ifdef UPGRADE_SUPPORT
 /**

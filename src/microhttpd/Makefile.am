@@ -307,7 +307,7 @@ test_options_SOURCES = \
   test_options.c
 test_options_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la
-
+ 
 test_start_stop_http2_SOURCES = \
   test_start_stop.c
 test_start_stop_http2_LDADD = \

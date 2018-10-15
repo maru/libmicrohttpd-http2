@@ -33,3 +33,5 @@
 /authorization_example
 upgrade_example
 /timeout
+!http2_*.c
+http2_*

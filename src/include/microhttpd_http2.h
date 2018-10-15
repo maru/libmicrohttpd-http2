@@ -86,4 +86,31 @@ enum MHD_FEATURE_HTTP2
 };
 
 
+/**
+ * Function used for reading data from the socket.
+ *
+ * @param conn the connection struct
+ */
+typedef void
+(*ConnectionReadCallback) (struct MHD_Connection *conn);
+
+/**
+ * Function used for data processing.
+ *
+ * @param conn the connection struct
+ * @return #MHD_YES if we should continue to process the
+ *         connection (not dead yet), #MHD_NO if it died
+ */
+typedef int
+(*ConnectionIdleCallback) (struct MHD_Connection *conn);
+
+/**
+ * Function used for writing data to the socket.
+ *
+ * @param conn the connection struct
+ */
+typedef void
+(*ConnectionWriteCallback) (struct MHD_Connection *conn);
+
+
 #endif /* MICROHTTPD_HTTP2_H */

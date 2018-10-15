@@ -28,6 +28,7 @@
 #ifndef HTTP2_H
 #define HTTP2_H
 
+#include "microhttpd_http2.h"
 #include "internal.h"
 
 #ifdef HTTP2_SUPPORT
@@ -86,6 +87,7 @@ enum MHD_CONNECTION_STATE_HTTP2
    */
   MHD_CONNECTION_HTTP2_IN_CLEANUP
 };
+
 
 /**
  * HTTP/2 stream.

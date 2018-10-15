@@ -25,8 +25,8 @@
  * @author maru (Maru Berezin)
  */
 
-#include "connection_http2.h"
-#include "connection_http2_helper.h"
+#include "http2/http2.h"
+#include "http2/helper.h"
 #include "mhd_mono_clock.h"
 #include "connection.h"
 #include "memorypool.h"

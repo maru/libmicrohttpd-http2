@@ -45,7 +45,7 @@
 
 #ifdef HTTP2_SUPPORT
 #include "microhttpd_http2.h"
-#include "connection_http2.h"
+#include "http2/http2.h"
 #endif /* HTTP2_SUPPORT */
 
 

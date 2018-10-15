@@ -139,7 +139,7 @@ endif
 
 if ENABLE_HTTP2
 libmicrohttpd_la_SOURCES += \
-  connection_http2.c connection_http2.h
+  http2/connection.c http2/http2.h
 endif
 
 
@@ -307,7 +307,7 @@ test_options_SOURCES = \
   test_options.c
 test_options_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la
- 
+
 test_start_stop_http2_SOURCES = \
   test_start_stop.c
 test_start_stop_http2_LDADD = \

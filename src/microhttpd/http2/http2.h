@@ -20,7 +20,7 @@
 */
 
 /**
- * @file microhttpd/connection_http2.h
+ * @file microhttpd/http2.h
  * @brief Methods for managing HTTP/2 connections
  * @author maru (Maru Berezin)
  */

@@ -96,6 +96,8 @@ main (int argc, char *const *argv)
 {
   struct MHD_Daemon *daemon;
   int port;
+  char url[255];
+  CURL *curl;
   (void)argc;   /* Unused. Silent compiler warning. */
 
   set_http_version(argv[0], 0);
@@ -125,10 +127,12 @@ main (int argc, char *const *argv)
       port = (int)dinfo->port;
     }
 
-  CURL *curl = curl_easy_init ();
+  curl = curl_easy_init ();
   /* curl_easy_setopt(curl, CURLOPT_POST, 1L); */
-  char url[255];
-  sprintf (url, "http://127.0.0.1:%d", port);
+  snprintf (url,
+            sizeof (url),
+            "http://127.0.0.1:%d",
+            port);
   curl_easy_setopt (curl, CURLOPT_URL, url);
   curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, write_data);
   curl_easy_setopt (curl, CURLOPT_HTTP_VERSION, http_version);

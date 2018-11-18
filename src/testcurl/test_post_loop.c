@@ -151,7 +151,11 @@ testInternalPost ()
       c = curl_easy_init ();
       cbc.pos = 0;
       buf[0] = '\0';
-      sprintf (url, "http://127.0.0.1:%d/hw%d", port, i);
+      snprintf (url,
+                sizeof (url),
+                "http://127.0.0.1:%d/hw%d",
+                port,
+                i);
       curl_easy_setopt (c, CURLOPT_URL, url);
       curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
@@ -212,7 +216,9 @@ testMultithreadedPost ()
   cbc.buf = buf;
   cbc.size = 2048;
   d = MHD_start_daemon (use_http2 | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG,
-                        port, NULL, NULL, &ahc_echo, NULL, MHD_OPTION_END);
+                        port, NULL, NULL,
+                        &ahc_echo, NULL,
+                        MHD_OPTION_END);
   if (d == NULL)
     return 16;
   if (0 == port)
@@ -230,7 +236,11 @@ testMultithreadedPost ()
       c = curl_easy_init ();
       cbc.pos = 0;
       buf[0] = '\0';
-      sprintf (url, "http://127.0.0.1:%d/hw%d", port, i);
+      snprintf (url,
+                sizeof (url),
+                "http://127.0.0.1:%d/hw%d",
+                port,
+                i);
       curl_easy_setopt (c, CURLOPT_URL, url);
       curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
@@ -310,7 +320,11 @@ testMultithreadedPoolPost ()
       c = curl_easy_init ();
       cbc.pos = 0;
       buf[0] = '\0';
-      sprintf (url, "http://127.0.0.1:%d/hw%d", port, i);
+      snprintf (url,
+                sizeof (url),
+                "http://127.0.0.1:%d/hw%d",
+                port,
+                i);
       curl_easy_setopt (c, CURLOPT_URL, url);
       curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
@@ -413,7 +427,11 @@ testExternalPost ()
       c = curl_easy_init ();
       cbc.pos = 0;
       buf[0] = '\0';
-      sprintf (url, "http://127.0.0.1:%d/hw%d", port, i);
+      snprintf (url,
+                sizeof (url),
+                "http://127.0.0.1:%d/hw%d",
+                port,
+                i);
       curl_easy_setopt (c, CURLOPT_URL, url);
       curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
       curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);

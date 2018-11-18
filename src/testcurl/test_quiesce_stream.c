@@ -229,7 +229,10 @@ main (int argc, char *const *argv)
         { MHD_stop_daemon (daemon); return 32; }
       port = (int)dinfo->port;
     }
-  sprintf(command_line, "curl %s -s http://127.0.0.1:%d", use_http_version, port);
+  snprintf (command_line,
+            sizeof (command_line),
+            "curl %s -s http://127.0.0.1:%d",
+            use_http_version, port);
 
   if (0 != system (command_line))
     {

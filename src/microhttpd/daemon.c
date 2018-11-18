@@ -1739,7 +1739,8 @@ thread_main_connection_upgrade (struct MHD_Connection *con)
 #endif
               break;
             }
-          urh_from_pollfd(urh, p);
+          urh_from_pollfd (urh,
+                           p);
           process_urh (urh);
         }
     }
@@ -3724,7 +3725,8 @@ MHD_poll_all (struct MHD_Daemon *daemon,
     struct pollfd *p;
     MHD_socket ls;
 
-    p = MHD_calloc_ ((2 + num_connections), sizeof (struct pollfd));
+    p = MHD_calloc_ ((2 + num_connections),
+                     sizeof (struct pollfd));
     if (NULL == p)
       {
 #ifdef HAVE_MESSAGES
@@ -3863,7 +3865,8 @@ MHD_poll_all (struct MHD_Daemon *daemon,
         if ((p[poll_server+i].fd != urh->connection->socket_fd) ||
             (p[poll_server+i+1].fd != urh->mhd.socket))
           break;
-        urh_from_pollfd(urh, &(p[poll_server+i]));
+        urh_from_pollfd (urh,
+                         &p[poll_server+i]);
         i += 2;
         process_urh (urh);
         /* Finished forwarding? */

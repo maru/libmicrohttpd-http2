@@ -7,11 +7,20 @@ endif
 
 if HAVE_GNUTLS_SNI
   TEST_HTTPS_SNI = test_https_sni
+if ENABLE_HTTP2
+  TEST_HTTPS_SNI += test_https_sni_http2
+endif
 endif
 
 if HAVE_POSIX_THREADS
-  HTTPS_PARALLEL_TESTS = test_https_get_parallel \
+  HTTPS_PARALLEL_TESTS = \
+    test_https_get_parallel \
     test_https_get_parallel_threads
+if ENABLE_HTTP2
+  HTTPS_PARALLEL_TESTS += \
+	test_https_get_parallel_http2 \
+    test_https_get_parallel_threads_http2
+endif
 endif
 
 CPU_COUNT_DEF = -DCPU_COUNT=$(CPU_COUNT)
@@ -22,42 +31,51 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/src/platform \
   $(LIBCURL_CPPFLAGS) $(MHD_TLS_LIB_CPPFLAGS)
 
-check_PROGRAMS = \
+THREAD_ONLY_TESTS = \
   test_tls_options \
   test_tls_authentication \
-  test_https_multi_daemon \
-  test_https_get \
-  $(TEST_HTTPS_SNI) \
-  test_https_get_select \
   $(HTTPS_PARALLEL_TESTS) \
+  $(TEST_HTTPS_SNI) \
   test_https_session_info \
   test_https_time_out \
+  test_https_multi_daemon \
+  test_https_get \
   test_empty_response
 
 if ENABLE_HTTP2
-check_PROGRAMS += \
+THREAD_ONLY_TESTS += \
   test_tls_options_http2 \
   test_tls_authentication_http2 \
-  test_https_multi_daemon_http2 \
-  test_https_get_http2 \
-  test_https_get_select_http2 \
   test_https_session_info_http2 \
   test_https_time_out_http2 \
+  test_https_multi_daemon_http2 \
+  test_https_get_http2 \
   test_empty_response_http2
-if HAVE_GNUTLS_SNI
-check_PROGRAMS += test_https_sni_http2
 endif
-if HAVE_POSIX_THREADS
+
+check_PROGRAMS = \
+  test_https_get_select
+if ENABLE_HTTP2
 check_PROGRAMS += \
-	test_https_get_parallel_http2 \
-  test_https_get_parallel_threads_http2
-endif
+  test_https_get_select_http2
 endif
 
-EXTRA_DIST = cert.pem key.pem \
-  host1.crt host1.key host2.crt host2.key
+if USE_POSIX_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
+endif
+if USE_W32_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
+endif
 
-TESTS = $(check_PROGRAMS)
+EXTRA_DIST = \
+  cert.pem key.pem \
+  host1.crt host1.key \
+  host2.crt host2.key
+
+TESTS = \
+  $(check_PROGRAMS)
 
 
 test_https_time_out_SOURCES = \

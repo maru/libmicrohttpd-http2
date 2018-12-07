@@ -573,43 +573,44 @@ main (int argc, char *const *argv)
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
-  start_time = now();
-  errorCount += testInternalPost ();
-  return errorCount != 0;       /* 0 == pass */
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_THREADS))
+    {
+      start_time = now();
+      errorCount += testInternalPost ();
 
-  http_version_val = (http_version > CURL_HTTP_VERSION_1_1) ? 2.0 : (http_version == CURL_HTTP_VERSION_1_1 ? 1.1 : 1.0);
-  snprintf(counter, sizeof(counter), "Sequential POSTs (http/%0.1f)", http_version_val);
-  fprintf (stderr,
-     "%s: Sequential POSTs (http/%0.1f) %f/s\n",
-	   "internal select", http_version_val,
-	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
-  GAUGER ("internal select",
-	  counter,
-	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
-	  "requests/s");
+      http_version_val = (http_version > CURL_HTTP_VERSION_1_1) ? 2.0 : (http_version == CURL_HTTP_VERSION_1_1 ? 1.1 : 1.0);
+      snprintf(counter, sizeof(counter), "Sequential POSTs (http/%0.1f)", http_version_val);
+      fprintf (stderr,
+         "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+    	   "internal select", http_version_val,
+    	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
+      GAUGER ("internal select",
+    	  counter,
+    	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
+    	  "requests/s");
 
-  start_time = now();
-  errorCount += testMultithreadedPost ();
-  fprintf (stderr,
-	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
-	   "multithreaded post", http_version_val,
-	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
-  GAUGER ("Multithreaded select",
-	  counter,
-	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
-	  "requests/s");
+      start_time = now();
+      errorCount += testMultithreadedPost ();
+      fprintf (stderr,
+    	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+    	   "multithreaded post", http_version_val,
+    	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
+      GAUGER ("Multithreaded select",
+    	  counter,
+    	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
+    	  "requests/s");
 
-  start_time = now();
-  errorCount += testMultithreadedPoolPost ();
-  fprintf (stderr,
-	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
-	   "thread with pool", http_version_val,
-	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
-  GAUGER ("thread with pool",
-	  counter,
-	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
-	  "requests/s");
-
+      start_time = now();
+      errorCount += testMultithreadedPoolPost ();
+      fprintf (stderr,
+    	   "%s: Sequential POSTs (http/%0.1f) %f/s\n",
+    	   "thread with pool", http_version_val,
+    	   (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0));
+      GAUGER ("thread with pool",
+    	  counter,
+    	  (double) 1000 * LOOPCOUNT / (now() - start_time + 1.0),
+    	  "requests/s");
+    }
   start_time = now();
   errorCount += testExternalPost ();
   fprintf (stderr,

@@ -70,8 +70,10 @@
 #define MHD_PANIC(msg) do { mhd_panic (mhd_panic_cls, __FILE__, __LINE__, NULL); BUILTIN_NOT_REACHED; } while (0)
 #endif
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #include "mhd_threads.h"
 #include "mhd_locks.h"
+#endif
 #include "mhd_sockets.h"
 #include "mhd_itc_types.h"
 
@@ -338,11 +340,13 @@ struct MHD_Response
   void *upgrade_handler_cls;
 #endif /* UPGRADE_SUPPORT */
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * Mutex to synchronize access to @e data, @e size and
    * @e reference_count.
    */
   MHD_mutex_ mutex;
+#endif
 
   /**
    * Set to #MHD_SIZE_UNKNOWN if size is not known.
@@ -778,11 +782,13 @@ struct MHD_Connection
    */
   struct sockaddr *addr;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * Thread handle for this connection (if we are using
    * one thread per connection).
    */
   MHD_thread_handle_ID_ pid;
+#endif
 
   /**
    * Size of @e read_buffer (in bytes).  This value indicates
@@ -896,10 +902,12 @@ struct MHD_Connection
    */
   bool read_closed;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * Set to `true` if the thread has been joined.
    */
   bool thread_joined;
+#endif
 
   /**
    * Are we currently inside the "idle" handler (to avoid recursively
@@ -1469,10 +1477,12 @@ struct MHD_Daemon
    */
   struct MHD_Daemon *master;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * Worker daemons (one per thread)
    */
   struct MHD_Daemon *worker_pool;
+#endif
 
   /**
    * Table storing number of connections per IP
@@ -1489,6 +1499,7 @@ struct MHD_Daemon
    */
   size_t pool_increment;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * Size of threads created by MHD.
    */
@@ -1514,6 +1525,7 @@ struct MHD_Daemon
    * "manual_timeout" DLLs.
    */
   MHD_mutex_ cleanup_connection_mutex;
+#endif
 
   /**
    * Listen socket.
@@ -1560,7 +1572,8 @@ struct MHD_Daemon
 #endif
 
   /**
-   * Inter-thread communication channel.
+   * Inter-thread communication channel (also used to unblock
+   * select() in non-threaded code).
    */
   struct MHD_itc_ itc;
 
@@ -1743,10 +1756,12 @@ struct MHD_Daemon
    */
   struct MHD_NonceNc *nnc;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /**
    * A rw-lock for synchronizing access to @e nnc.
    */
   MHD_mutex_ nnc_lock;
+#endif
 
   /**
    * Size of `digest_auth_random.

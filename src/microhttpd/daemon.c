@@ -26,7 +26,9 @@
  * @author Karlson2k (Evgeny Grin)
  */
 #include "platform.h"
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #include "mhd_threads.h"
+#endif
 #include "internal.h"
 #include "response.h"
 #include "connection.h"
@@ -34,7 +36,9 @@
 #include "mhd_limits.h"
 #include "autoinit_funcs.h"
 #include "mhd_mono_clock.h"
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #include "mhd_locks.h"
+#endif
 #include "mhd_sockets.h"
 #include "mhd_itc.h"
 #include "mhd_compat.h"
@@ -181,12 +185,17 @@ static int mhd_winsock_inited_ = 0;
  * Track global initialisation
  */
 volatile int global_init_count = 0;
+
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #ifdef MHD_MUTEX_STATIC_DEFN_INIT_
 /**
  * Global initialisation mutex
  */
 MHD_MUTEX_STATIC_DEFN_INIT_(global_init_mutex_);
 #endif /* MHD_MUTEX_STATIC_DEFN_INIT_ */
+#endif
+
+
 /**
  * Check whether global initialisation was performed
  * and call initialiser if necessary.
@@ -194,14 +203,18 @@ MHD_MUTEX_STATIC_DEFN_INIT_(global_init_mutex_);
 void
 MHD_check_global_init_ (void)
 {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #ifdef MHD_MUTEX_STATIC_DEFN_INIT_
   MHD_mutex_lock_chk_(&global_init_mutex_);
 #endif /* MHD_MUTEX_STATIC_DEFN_INIT_ */
+#endif
   if (0 == global_init_count++)
     MHD_init ();
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #ifdef MHD_MUTEX_STATIC_DEFN_INIT_
   MHD_mutex_unlock_chk_(&global_init_mutex_);
 #endif /* MHD_MUTEX_STATIC_DEFN_INIT_ */
+#endif
 }
 #endif /* ! _AUTOINIT_FUNCS_ARE_SUPPORTED */
 
@@ -263,7 +276,11 @@ struct MHD_IPCount
 static void
 MHD_ip_count_lock (struct MHD_Daemon *daemon)
 {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_(&daemon->per_ip_connection_mutex);
+#else
+  (void) daemon;
+#endif
 }
 
 
@@ -275,7 +292,11 @@ MHD_ip_count_lock (struct MHD_Daemon *daemon)
 static void
 MHD_ip_count_unlock (struct MHD_Daemon *daemon)
 {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_(&daemon->per_ip_connection_mutex);
+#else
+  (void) daemon;
+#endif
 }
 
 
@@ -1205,7 +1226,7 @@ call_handlers (struct MHD_Connection *con,
   /* Note: no need to check for read buffer availability for
    * TLS read-ready connection in 'read info' state as connection
    * without space in read buffer will be market as 'info block'. */
-  if ( (!con->daemon->data_already_pending) &&
+  if ( (! con->daemon->data_already_pending) &&
        (0 == (con->daemon->options & MHD_USE_THREAD_PER_CONNECTION)) )
     {
       if (MHD_EVENT_LOOP_INFO_BLOCK == con->event_loop_info)
@@ -1258,7 +1279,7 @@ cleanup_upgraded_connection (struct MHD_Connection *connection)
 /**
  * Performs bi-directional forwarding on upgraded HTTPS connections
  * based on the readyness state stored in the @a urh handle.
- * @remark To be called only from thread that process
+ * @remark To be called only from thread that processes
  * connection's recv(), send() and response.
  *
  * @param urh handle to process
@@ -1601,7 +1622,7 @@ process_urh (struct MHD_UpgradeResponseHandle *urh)
 }
 #endif /* HTTPS_SUPPORT  && UPGRADE_SUPPORT */
 
-
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 #ifdef UPGRADE_SUPPORT
 /**
  * Main function of the thread that handles an individual connection
@@ -2144,6 +2165,7 @@ exit:
     }
   return (MHD_THRD_RTRN_TYPE_) 0;
 }
+#endif
 
 
 /**
@@ -2289,10 +2311,13 @@ internal_add_connection (struct MHD_Daemon *daemon,
 			 bool non_blck)
 {
   struct MHD_Connection *connection;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   unsigned int i;
+#endif
   int eno = 0;
 
   /* Direct add to master daemon could happen only with "external" add mode. */
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   mhd_assert ((NULL == daemon->worker_pool) || (external_add));
   if ((external_add) && (NULL != daemon->worker_pool))
     {
@@ -2318,6 +2343,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
 #endif
       return MHD_NO;
     }
+#endif
 
   if ( (! MHD_SCKT_FD_FITS_FDSET_(client_socket,
                                   NULL)) &&
@@ -2548,11 +2574,15 @@ internal_add_connection (struct MHD_Daemon *daemon,
 #endif /* ! HTTPS_SUPPORT */
     }
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   /* Firm check under lock. */
   if (daemon->connections >= daemon->connection_limit)
     {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
       /* above connection limit - reject */
 #ifdef HAVE_MESSAGES
       MHD_DLOG (daemon,
@@ -2573,14 +2603,15 @@ internal_add_connection (struct MHD_Daemon *daemon,
   DLL_insert (daemon->connections_head,
 	      daemon->connections_tail,
 	      connection);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
-
+#endif
   if (NULL != daemon->notify_connection)
     daemon->notify_connection (daemon->notify_connection_cls,
                                connection,
                                &connection->socket_context,
                                MHD_CONNECTION_NOTIFY_STARTED);
-
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /* attempt to create handler thread */
   if (0 != (daemon->options & MHD_USE_THREAD_PER_CONNECTION))
     {
@@ -2601,6 +2632,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
     }
   else
     connection->pid = daemon->pid;
+#endif
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
     {
@@ -2661,7 +2693,9 @@ internal_add_connection (struct MHD_Daemon *daemon,
   MHD_ip_limit_del (daemon,
                     addr,
                     addrlen);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   if (0 == (daemon->options & MHD_USE_THREAD_PER_CONNECTION))
     {
       XDLL_remove (daemon->normal_timeout_head,
@@ -2671,7 +2705,9 @@ internal_add_connection (struct MHD_Daemon *daemon,
   DLL_remove (daemon->connections_head,
 	      daemon->connections_tail,
 	      connection);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   MHD_pool_destroy (connection->pool);
   free (connection->addr);
   free (connection);
@@ -2697,12 +2733,16 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
 {
   struct MHD_Daemon *daemon = connection->daemon;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   if (connection->resuming)
     {
       /* suspending again while we didn't even complete resuming yet */
       connection->resuming = false;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
       return;
     }
   if (0 == (daemon->options & MHD_USE_THREAD_PER_CONNECTION))
@@ -2754,7 +2794,9 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
       connection->epoll_state |= MHD_EPOLL_STATE_SUSPENDED;
     }
 #endif
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 }
 
 
@@ -2825,10 +2867,14 @@ MHD_resume_connection (struct MHD_Connection *connection)
 
   if (0 == (daemon->options & MHD_TEST_ALLOW_SUSPEND_RESUME))
     MHD_PANIC (_("Cannot resume connections without enabling MHD_ALLOW_SUSPEND_RESUME!\n"));
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   connection->resuming = true;
   daemon->resuming = true;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   if ( (MHD_ITC_IS_VALID_(daemon->itc)) &&
        (! MHD_itc_activate_ (daemon->itc, "r")) )
     {
@@ -2856,11 +2902,13 @@ resume_suspended_connections (struct MHD_Daemon *daemon)
   struct MHD_Connection *prev = NULL;
   int ret;
   const bool used_thr_p_c = (0 != (daemon->options & MHD_USE_THREAD_PER_CONNECTION));
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   mhd_assert (NULL == daemon->worker_pool);
-
+#endif
   ret = MHD_NO;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
-
+#endif
   if (daemon->resuming)
     {
       prev = daemon->suspended_connections_tail;
@@ -2953,7 +3001,9 @@ resume_suspended_connections (struct MHD_Daemon *daemon)
 #endif /* UPGRADE_SUPPORT */
       pos->resuming = false;
     }
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   if ( (used_thr_p_c) &&
        (MHD_NO != ret) )
     { /* Wake up suspended connections. */
@@ -3116,9 +3166,13 @@ MHD_accept_connection (struct MHD_Daemon *daemon)
             }
           else
             {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
               MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
               daemon->at_limit = true;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
               MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 #ifdef HAVE_MESSAGES
               MHD_DLOG (daemon,
                         _("Hit process or system resource limit at %u connections, temporarily suspending accept(). Consider setting a lower MHD_OPTION_CONNECTION_LIMIT.\n"),
@@ -3180,18 +3234,21 @@ MHD_cleanup_connections (struct MHD_Daemon *daemon)
 {
   struct MHD_Connection *pos;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
   while (NULL != (pos = daemon->cleanup_tail))
     {
       DLL_remove (daemon->cleanup_head,
 		  daemon->cleanup_tail,
 		  pos);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
-
       if ( (0 != (daemon->options & MHD_USE_THREAD_PER_CONNECTION)) &&
 	   (! pos->thread_joined) &&
            (! MHD_join_thread_ (pos->pid.handle)) )
         MHD_PANIC (_("Failed to join a thread\n"));
+#endif
 #ifdef UPGRADE_SUPPORT
       cleanup_upgraded_connection (pos);
 #endif /* UPGRADE_SUPPORT */
@@ -3249,11 +3306,15 @@ MHD_cleanup_connections (struct MHD_Daemon *daemon)
 	free (pos->addr);
       free (pos);
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
       daemon->connections--;
       daemon->at_limit = false;
     }
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 }
 
 
@@ -4551,9 +4612,9 @@ close_connection (struct MHD_Connection *pos)
     }
   MHD_connection_close_ (pos,
                          MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN);
-
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
-
+#endif
   mhd_assert (! pos->suspended);
   mhd_assert (! pos->resuming);
   if (pos->connection_timeout == daemon->connection_timeout)
@@ -4570,11 +4631,13 @@ close_connection (struct MHD_Connection *pos)
   DLL_insert (daemon->cleanup_head,
 	      daemon->cleanup_tail,
 	      pos);
-
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 }
 
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 /**
  * Thread that runs the polling loop until the daemon
  * is explicitly shut down.
@@ -4610,6 +4673,7 @@ MHD_polling_thread (void *cls)
 
   return (MHD_THRD_RTRN_TYPE_)0;
 }
+#endif
 
 
 /**
@@ -4629,6 +4693,7 @@ unescape_wrapper (void *cls,
                   char *val)
 {
   (void) cls; /* Mute compiler warning. */
+
   (void) connection; /* Mute compiler warning. */
   return MHD_http_unescape (val);
 }
@@ -4702,7 +4767,9 @@ MHD_start_daemon (unsigned int flags,
 MHD_socket
 MHD_quiesce_daemon (struct MHD_Daemon *daemon)
 {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   unsigned int i;
+#endif
   MHD_socket ret;
 
   ret = daemon->listen_fd;
@@ -4718,6 +4785,7 @@ MHD_quiesce_daemon (struct MHD_Daemon *daemon)
       return MHD_INVALID_SOCKET;
     }
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if (NULL != daemon->worker_pool)
     for (i = 0; i < daemon->worker_pool_size; i++)
       {
@@ -4742,6 +4810,7 @@ MHD_quiesce_daemon (struct MHD_Daemon *daemon)
               MHD_PANIC (_("Failed to signal quiesce via inter-thread communication channel"));
           }
       }
+#endif
   daemon->was_quiesced = true;
 #ifdef EPOLL_SUPPORT
   if ( (0 != (daemon->options & MHD_USE_EPOLL)) &&
@@ -4901,6 +4970,7 @@ parse_options_va (struct MHD_Daemon *daemon,
           daemon->uri_log_callback_cls = va_arg (ap,
                                                  void *);
           break;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
         case MHD_OPTION_THREAD_POOL_SIZE:
           daemon->worker_pool_size = va_arg (ap,
                                              unsigned int);
@@ -4955,6 +5025,7 @@ parse_options_va (struct MHD_Daemon *daemon,
 		}
 	    }
           break;
+#endif
 #ifdef HTTPS_SUPPORT
         case MHD_OPTION_HTTPS_MEM_KEY:
           pstr = va_arg (ap,
@@ -5133,10 +5204,12 @@ parse_options_va (struct MHD_Daemon *daemon,
                   void *);
 #endif
           break;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
         case MHD_OPTION_THREAD_STACK_SIZE:
           daemon->thread_stack_size = va_arg (ap,
                                               size_t);
           break;
+#endif
 #ifdef TCP_FASTOPEN
         case MHD_OPTION_TCP_FASTOPEN_QUEUE_SIZE:
           daemon->fastopen_queue_size = va_arg (ap,
@@ -5513,7 +5586,9 @@ MHD_start_daemon_va (unsigned int flags,
 #endif
   const struct sockaddr *servaddr = NULL;
   socklen_t addrlen;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   unsigned int i;
+#endif
   enum MHD_FLAG eflags; /* same type as in MHD_Daemon */
   enum MHD_FLAG *pflags;
 
@@ -5703,8 +5778,11 @@ MHD_start_daemon_va (unsigned int flags,
 #endif /* HAVE_MESSAGES */
 #endif /* ! NDEBUG */
 
-  if ( (0 != (*pflags & MHD_USE_ITC)) &&
-       (0 == daemon->worker_pool_size) )
+  if ( (0 != (*pflags & MHD_USE_ITC))
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
+       && (0 == daemon->worker_pool_size)
+#endif
+       )
     {
       if (! MHD_itc_init_ (daemon->itc))
         {
@@ -5772,6 +5850,7 @@ MHD_start_daemon_va (unsigned int flags,
 	}
     }
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if (! MHD_mutex_init_ (&daemon->nnc_lock))
     {
 #ifdef HAVE_MESSAGES
@@ -5787,10 +5866,12 @@ MHD_start_daemon_va (unsigned int flags,
       return NULL;
     }
 #endif
+#endif
 
-  /* Thread pooling currently works only with internal select thread mode */
+  /* Thread pooling currently works only with internal select thread model */
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if ( (0 == (*pflags & MHD_USE_INTERNAL_POLLING_THREAD)) &&
-       (daemon->worker_pool_size > 0) )
+        (daemon->worker_pool_size > 0) )
     {
 #ifdef HAVE_MESSAGES
       MHD_DLOG (daemon,
@@ -5798,7 +5879,7 @@ MHD_start_daemon_va (unsigned int flags,
 #endif
       goto free_and_fail;
     }
-
+#endif
   if ( (MHD_INVALID_SOCKET == daemon->listen_fd) &&
        (0 == (*pflags & MHD_USE_NO_LISTEN_SOCKET)) )
     {
@@ -6123,8 +6204,11 @@ MHD_start_daemon_va (unsigned int flags,
                 _("Failed to set nonblocking mode on listening socket: %s\n"),
                 MHD_socket_last_strerr_());
 #endif
-      if (0 != (*pflags & MHD_USE_EPOLL) ||
-          daemon->worker_pool_size > 0)
+      if (0 != (*pflags & MHD_USE_EPOLL)
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
+          || (daemon->worker_pool_size > 0)
+#endif
+	  )
         {
            /* Accept must be non-blocking. Multiple children may wake up
             * to handle a new connection, but only one will win the race.
@@ -6149,8 +6233,11 @@ MHD_start_daemon_va (unsigned int flags,
     }
 
 #ifdef EPOLL_SUPPORT
-  if ( (0 != (*pflags & MHD_USE_EPOLL)) &&
-       (0 == daemon->worker_pool_size) )
+  if ( (0 != (*pflags & MHD_USE_EPOLL))
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
+       && (0 == daemon->worker_pool_size)
+#endif
+       )
     {
       if (0 != (*pflags & MHD_USE_THREAD_PER_CONNECTION))
 	{
@@ -6165,6 +6252,7 @@ MHD_start_daemon_va (unsigned int flags,
     }
 #endif /* EPOLL_SUPPORT */
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if (! MHD_mutex_init_ (&daemon->per_ip_connection_mutex))
     {
 #ifdef HAVE_MESSAGES
@@ -6184,12 +6272,15 @@ MHD_start_daemon_va (unsigned int flags,
           MHD_DLOG (daemon,
                     _("MHD failed to initialize IP connection limit mutex\n"));
 #endif
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
           MHD_mutex_destroy_chk_ (&daemon->cleanup_connection_mutex);
+#endif
           if (MHD_INVALID_SOCKET != listen_fd)
             MHD_socket_close_chk_ (listen_fd);
           goto free_and_fail;
         }
     }
+#endif
 
 #ifdef HTTPS_SUPPORT
   /* initialize HTTPS daemon certificate aspects & send / recv functions */
@@ -6202,12 +6293,15 @@ MHD_start_daemon_va (unsigned int flags,
 #endif
       if (MHD_INVALID_SOCKET != listen_fd)
         MHD_socket_close_chk_ (listen_fd);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       if (0 == daemon->worker_pool_size)
         MHD_mutex_destroy_chk_ (&daemon->cleanup_connection_mutex);
       MHD_mutex_destroy_chk_ (&daemon->per_ip_connection_mutex);
+#endif
       goto free_and_fail;
     }
 #endif /* HTTPS_SUPPORT */
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if ( (0 != (*pflags & MHD_USE_INTERNAL_POLLING_THREAD)) &&
        (0 == (*pflags & MHD_USE_NO_LISTEN_SOCKET)) )
     {
@@ -6331,6 +6425,7 @@ MHD_start_daemon_va (unsigned int flags,
             }
         }
     }
+#endif
 #ifdef HTTPS_SUPPORT
   /* API promises to never use the password after initialization,
      so we additionally NULL it here to not deref a dangling pointer. */
@@ -6339,6 +6434,7 @@ MHD_start_daemon_va (unsigned int flags,
 
   return daemon;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 thread_failed:
   /* If no worker threads created, then shut down normally. Calling
      MHD_stop_daemon (as we do below) doesn't work here since it
@@ -6361,6 +6457,7 @@ thread_failed:
   daemon->worker_pool_size = i;
   MHD_stop_daemon (daemon);
   return NULL;
+#endif
 
  free_and_fail:
   /* clean up basic memory state in 'daemon' and return NULL to
@@ -6386,7 +6483,9 @@ thread_failed:
 #endif /* EPOLL_SUPPORT */
 #ifdef DAUTH_SUPPORT
   free (daemon->nnc);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_destroy_chk_ (&daemon->nnc_lock);
+#endif
 #endif
 #ifdef HTTPS_SUPPORT
   if (0 != (*pflags & MHD_USE_TLS))
@@ -6420,7 +6519,9 @@ close_all_connections (struct MHD_Daemon *daemon)
   struct MHD_UpgradeResponseHandle *urhn;
   const bool used_tls = (0 != (daemon->options & MHD_USE_TLS));
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   mhd_assert (NULL == daemon->worker_pool);
+#endif
   mhd_assert (daemon->shutdown);
   /* give upgraded HTTPS connections a chance to finish */
   /* 'daemon->urh_head' is not used in thread-per-connection mode. */
@@ -6448,7 +6549,9 @@ close_all_connections (struct MHD_Daemon *daemon)
     }
   /* first, make sure all threads are aware of shutdown; need to
      traverse DLLs in peace... */
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 #ifdef UPGRADE_SUPPORT
   if (upg_allowed)
     {
@@ -6502,6 +6605,7 @@ close_all_connections (struct MHD_Daemon *daemon)
 #endif
     }
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   /* now, collect per-connection threads */
   if (used_thr_p_c)
     {
@@ -6524,6 +6628,7 @@ close_all_connections (struct MHD_Daemon *daemon)
       }
     }
   MHD_mutex_unlock_chk_ (&daemon->cleanup_connection_mutex);
+#endif
 
 #ifdef UPGRADE_SUPPORT
   /* Finished threads with "upgraded" connections need to be moved
@@ -6540,9 +6645,11 @@ close_all_connections (struct MHD_Daemon *daemon)
   /* now that we're alone, move everyone to cleanup */
   while (NULL != (pos = daemon->connections_tail))
   {
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
     if ( (0 != (daemon->options & MHD_USE_THREAD_PER_CONNECTION)) &&
          (! pos->thread_joined) )
       MHD_PANIC (_("Failed to join a thread\n"));
+#endif
     close_connection (pos);
   }
   MHD_cleanup_connections (daemon);
@@ -6559,7 +6666,9 @@ void
 MHD_stop_daemon (struct MHD_Daemon *daemon)
 {
   MHD_socket fd;
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   unsigned int i;
+#endif
 
   if (NULL == daemon)
     return;
@@ -6570,6 +6679,7 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
   else
     fd = daemon->listen_fd;
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if (NULL != daemon->worker_pool)
     { /* Master daemon with worker pool. */
       mhd_assert (1 < daemon->worker_pool_size);
@@ -6609,7 +6719,9 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
 #endif /* EPOLL_SUPPORT */
     }
   else
+#endif
     { /* Worker daemon or single daemon. */
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       if (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD))
         { /* Worker daemon or single daemon with internal thread(s). */
           mhd_assert (0 == daemon->worker_pool_size);
@@ -6641,6 +6753,7 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
 	  /* close_all_connections() was called in daemon thread. */
         }
       else
+#endif
         {
           /* No internal threads are used for polling sockets. */
           close_all_connections (daemon);
@@ -6659,7 +6772,9 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
 #endif /* HTTPS_SUPPORT && UPGRADE_SUPPORT */
 #endif /* EPOLL_SUPPORT */
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_destroy_chk_ (&daemon->cleanup_connection_mutex);
+#endif
     }
 
   if (NULL == daemon->master)
@@ -6695,10 +6810,13 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
 
 #ifdef DAUTH_SUPPORT
       free (daemon->nnc);
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_destroy_chk_ (&daemon->nnc_lock);
 #endif
+#endif
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       MHD_mutex_destroy_chk_ (&daemon->per_ip_connection_mutex);
-
+#endif
       free (daemon);
     }
 }
@@ -6741,6 +6859,7 @@ MHD_get_daemon_info (struct MHD_Daemon *daemon,
            * at the same time. */
           MHD_cleanup_connections (daemon);
         }
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
       else if (daemon->worker_pool)
         {
           unsigned int i;
@@ -6752,6 +6871,7 @@ MHD_get_daemon_info (struct MHD_Daemon *daemon,
               daemon->connections += daemon->worker_pool[i].connections;
             }
         }
+#endif
       return (const union MHD_DaemonInfo *) &daemon->connections;
     case MHD_DAEMON_INFO_FLAGS:
       return (const union MHD_DaemonInfo *) &daemon->options;
@@ -6963,6 +7083,13 @@ MHD_is_feature_supported(enum MHD_FEATURE feature)
 #else
       return MHD_NO;
 #endif
+    case MHD_FEATURE_THREADS:
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
+      return MHD_YES;
+#else
+      return MHD_NO;
+#endif
+
     }
   return MHD_NO;
 }

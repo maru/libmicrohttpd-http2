@@ -421,9 +421,12 @@ main (int argc, char *const *argv)
     }
 #endif /* _WIN32 */
 
-  errorCount += testInternalGet ();
-  errorCount += testMultithreadedGet ();
-  errorCount += testMultithreadedPoolGet ();
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_THREADS))
+    {
+      errorCount += testInternalGet ();
+      errorCount += testMultithreadedGet ();
+      errorCount += testMultithreadedPoolGet ();
+    }
   errorCount += testExternalGet ();
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);

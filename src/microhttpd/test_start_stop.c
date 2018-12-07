@@ -53,6 +53,7 @@ ahc_echo (void *cls,
 }
 
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
 static int
 testInternalGet (int poll_flag)
 {
@@ -79,6 +80,7 @@ testMultithreadedGet (int poll_flag)
   return 0;
 }
 
+
 static int
 testMultithreadedPoolGet (int poll_flag)
 {
@@ -92,6 +94,8 @@ testMultithreadedPoolGet (int poll_flag)
   MHD_stop_daemon (d);
   return 0;
 }
+#endif
+
 
 static int
 testExternalGet ()
@@ -99,8 +103,10 @@ testExternalGet ()
   struct MHD_Daemon *d;
 
   d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
-                        0, NULL, NULL, &ahc_echo, "GET", MHD_OPTION_END);
-  if (d == NULL)
+                        0, NULL, NULL,
+			&ahc_echo, "GET",
+			MHD_OPTION_END);
+  if (NULL == d)
     return 8;
   MHD_stop_daemon (d);
   return 0;
@@ -108,17 +114,21 @@ testExternalGet ()
 
 
 int
-main (int argc, char *const *argv)
+main (int argc,
+      char *const *argv)
 {
   unsigned int errorCount = 0;
-  (void)argc;   /* Unused. Silent compiler warning. */
+  (void) argc; /* Unused. Silence compiler warning. */
 
   set_http_version(argv[0], 0);
 
+#if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   errorCount += testInternalGet (0);
   errorCount += testMultithreadedGet (0);
   errorCount += testMultithreadedPoolGet (0);
+#endif
   errorCount += testExternalGet ();
+#if defined (MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_POLL))
     {
       errorCount += testInternalGet(MHD_USE_POLL);
@@ -130,7 +140,10 @@ main (int argc, char *const *argv)
       errorCount += testInternalGet(MHD_USE_EPOLL);
       errorCount += testMultithreadedPoolGet(MHD_USE_EPOLL);
     }
-  if (errorCount != 0)
-    fprintf (stderr, "Error (code: %u)\n", errorCount);
+#endif
+  if (0 != errorCount)
+    fprintf (stderr,
+	     "Error (code: %u)\n",
+	     errorCount);
   return errorCount != 0;       /* 0 == pass */
 }

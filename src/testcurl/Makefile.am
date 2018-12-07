@@ -16,11 +16,39 @@ AM_CPPFLAGS = \
 -I$(top_srcdir)/src/include \
 $(LIBCURL_CPPFLAGS)
 
+
+THREAD_ONLY_TESTS = \
+  test_urlparse \
+  test_long_header \
+  test_long_header11 \
+  test_iplimit11 \
+  test_termination \
+  test_timeout
+
+
+
+if HAVE_POSIX_THREADS
+THREAD_ONLY_TESTS += \
+  test_quiesce \
+  test_concurrent_stop \
+  perf_get_concurrent
+
+if HAVE_CURL_BINARY
+THREAD_ONLY_TESTS += \
+  test_quiesce_stream
+endif
+endif
+
+if ENABLE_DAUTH
+  THREAD_ONLY_TESTS += \
+    test_digestauth \
+    test_digestauth_with_arguments
+endif
+
 if HAVE_CURL
 check_PROGRAMS = \
   test_get \
   test_get_sendfile \
-  test_urlparse \
   test_delete \
   test_put \
   test_process_headers \
@@ -32,13 +60,8 @@ check_PROGRAMS = \
   test_put11 \
   test_large_put11 \
   test_large_put_inc11 \
-  test_long_header \
-  test_long_header11 \
   test_get_chunked \
   test_put_chunked \
-  test_iplimit11 \
-  test_termination \
-  test_timeout \
   test_callback \
   perf_get
 
@@ -120,6 +143,21 @@ if ENABLE_HTTP2
   test_digestauth_http2 test_digestauth_http2_direct \
   test_digestauth_with_arguments_http2 test_digestauth_with_arguments_http2_direct
 endif
+endif
+
+if HAVE_FORK_WAITPID
+if HAVE_CURL_BINARY
+check_PROGRAMS += test_get_response_cleanup
+endif
+endif
+
+if USE_POSIX_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
+endif
+if USE_W32_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
 endif
 
 TESTS = $(check_PROGRAMS)

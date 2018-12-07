@@ -15,6 +15,10 @@ AM_CPPFLAGS = \
 
 EXTRA_DIST = README socat.c
 
+THREAD_ONLY_TESTS = \
+  test_long_header \
+  test_long_header11
+
 check_PROGRAMS = \
   test_get \
   test_get_chunked \
@@ -27,9 +31,7 @@ check_PROGRAMS = \
   test_post11 \
   test_post_form11 \
   test_put11 \
-  test_put_large11 \
-  test_long_header \
-  test_long_header11
+  test_put_large11
 
 if ENABLE_HTTP2
 check_PROGRAMS += \
@@ -39,8 +41,18 @@ check_PROGRAMS += \
   test_post_form_http2 \
   test_put_http2 \
   test_put_chunked_http2 \
-  test_put_large_http2 \
+  test_put_large_http2
+THREAD_ONLY_TESTS += \
   test_long_header_http2
+endif
+
+if USE_POSIX_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
+endif
+if USE_W32_THREADS
+check_PROGRAMS +=
+  $(THREAD_ONLY_TESTS)
 endif
 
 TESTS = $(check_PROGRAMS)

@@ -60,11 +60,11 @@ check_PROGRAMS += \
 endif
 
 if USE_POSIX_THREADS
-check_PROGRAMS +=
+check_PROGRAMS += \
   $(THREAD_ONLY_TESTS)
 endif
 if USE_W32_THREADS
-check_PROGRAMS +=
+check_PROGRAMS += \
   $(THREAD_ONLY_TESTS)
 endif
 

@@ -218,13 +218,13 @@ connection_add_header (struct MHD_Connection *connection,
 int
 parse_cookie_header (struct MHD_Connection *connection);
 
-int
+bool
 socket_flush_possible (struct MHD_Connection *connection);
 
-int
+bool
 socket_start_no_buffering_flush (struct MHD_Connection *connection);
 
-int
+bool
 socket_start_normal_buffering (struct MHD_Connection *connection);
 
 #endif /* ! HTTP2_SUPPORT */

@@ -1479,7 +1479,7 @@ process_urh (struct MHD_UpgradeResponseHandle *urh)
           if (GNUTLS_E_INTERRUPTED != res)
             {
               urh->app.celi &= ~MHD_EPOLL_STATE_WRITE_READY;
-              if (GNUTLS_E_INTERRUPTED != res)
+              if (GNUTLS_E_AGAIN != res)
                 {
                   /* TLS connection shut down or
                    * persistent / unrecoverable error. */

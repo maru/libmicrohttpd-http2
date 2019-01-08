@@ -74,6 +74,11 @@ noinst_PROGRAMS += \
 endif
 
 
+if HAVE_ZLIB
+noinst_PROGRAMS += \
+ http_compression
+endif
+
 if HAVE_W32
 AM_CFLAGS += -DWINDOWS
 endif
@@ -204,6 +209,14 @@ https_fileserver_example_CPPFLAGS = \
  $(AM_CPPFLAGS) $(GNUTLS_CPPFLAGS)
 https_fileserver_example_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+http_compression_SOURCES = \
+ http_compression.c
+http_compression_LDADD = \
+ $(top_builddir)/src/microhttpd/libmicrohttpd.la
+if HAVE_ZLIB
+ http_compression_LDADD += -lz
+endif
 
 http2_clockstream_SOURCES = \
  http2_clockstream.c

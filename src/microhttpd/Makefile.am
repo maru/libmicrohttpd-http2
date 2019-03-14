@@ -139,7 +139,7 @@ endif
 
 if ENABLE_HTTP2
 libmicrohttpd_la_SOURCES += \
-  http2/connection.c http2/http2.h
+  http2/h2_connection.c http2/h2_upgrade.c http2/h2.h
 endif
 
 

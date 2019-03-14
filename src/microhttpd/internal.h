@@ -45,7 +45,7 @@
 
 #ifdef HTTP2_SUPPORT
 #include "microhttpd_http2.h"
-#include "http2/http2.h"
+#include "http2/h2.h"
 #endif /* HTTP2_SUPPORT */
 
 
@@ -1756,7 +1756,8 @@ struct MHD_Daemon
 
 #ifdef HTTP2_SUPPORT
   /**
-   * HTTP/2 settings.
+   * HTTP/2 settings array.
+   * https://nghttp2.org/documentation/enums.html?#c.nghttp2_settings_id
    */
   h2_settings_entry *h2_settings;
 
@@ -1764,6 +1765,18 @@ struct MHD_Daemon
    * Number of entries in h2_settings.
    */
   size_t h2_settings_len;
+
+  /**
+   * Inspect first bytes to detect HTTP/2 connection.
+   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
+   */
+  int h2_direct;
+
+  /**
+   * Allow HTTP/1 upgrade to HTTP/2.
+   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
+   */
+  int h2_upgrade;
 #endif /* HTTP2_SUPPORT */
 
 };

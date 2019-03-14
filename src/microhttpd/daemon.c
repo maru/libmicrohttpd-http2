@@ -2380,7 +2380,9 @@ internal_add_connection (struct MHD_Daemon *daemon,
   connection->daemon = daemon;
   connection->last_activity = MHD_monotonic_sec_counter();
 #ifdef HTTP2_SUPPORT
-  MHD_set_h1_callbacks (connection);  /* Default protocol */
+  /* Default protocol */
+  connection->http_version = HTTP_VERSION(1, 1);
+  MHD_set_h1_callbacks (connection);
 #endif /* HTTP2_SUPPORT */
 
   if (0 == (daemon->options & MHD_USE_TLS))
@@ -2452,24 +2454,6 @@ internal_add_connection (struct MHD_Daemon *daemon,
       goto cleanup;
 #endif /* ! HTTPS_SUPPORT */
     }
-
-// printf("connection->http_version %d\n", connection->http_version);
-#ifdef HTTP2_SUPPORT
-  /* Set http version  */
-  if (0 != (daemon->options & MHD_USE_HTTP2))
-    {
-      /*
-       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
-       * only HTTP/2 connections will be handled.
-       */
-      connection->http_version = HTTP_VERSION(2, 0);
-      connection->state = MHD_CONNECTION_HTTP2_INIT;
-    }
-  else
-    {
-      connection->http_version = HTTP_VERSION(1, 1);
-    }
-#endif /* ! HTTP2_SUPPORT */
 
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
   /* Firm check under lock. */
@@ -2647,12 +2631,6 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      MHD_http2_suspend_stream (connection);
-    }
-#endif /* HTTP2_SUPPORT */
 
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
@@ -5050,7 +5028,7 @@ parse_options_va (struct MHD_Daemon *daemon,
                                                 unsigned int);
 	  break;
 	case MHD_OPTION_STRICT_FOR_CLIENT:
-          daemon->strict_for_client = va_arg (ap, int);;
+          daemon->strict_for_client = va_arg (ap, int);
 #ifdef HAVE_MESSAGES
 	  if ( (0 != (daemon->options & MHD_USE_PEDANTIC_CHECKS)) &&
 	       (1 != daemon->strict_for_client) )
@@ -5062,12 +5040,16 @@ parse_options_va (struct MHD_Daemon *daemon,
 #endif /* HAVE_MESSAGES */
 	  break;
 #ifdef HTTP2_SUPPORT
-        case MHD_OPTION_HTTP2_SETTINGS:
-          daemon->h2_settings_len = va_arg (ap,
-                                        size_t);
-          daemon->h2_settings = va_arg (ap,
-                                        h2_settings_entry *);
-          break;
+  case MHD_OPTION_HTTP2_SETTINGS:
+    daemon->h2_settings_len = va_arg (ap, size_t);
+    daemon->h2_settings = va_arg (ap, h2_settings_entry *);
+    break;
+  case MHD_OPTION_HTTP2_DIRECT:
+    daemon->h2_direct = va_arg (ap, int) ? 1 : 0;
+    break;
+  case MHD_OPTION_HTTP2_UPGRADE:
+    daemon->h2_upgrade = va_arg (ap, int) ? 1 : 0;
+    break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
@@ -5125,6 +5107,10 @@ parse_options_va (struct MHD_Daemon *daemon,
                   break;
                   /* all options taking 'int' */
                 case MHD_OPTION_STRICT_FOR_CLIENT:
+#ifdef HTTP2_SUPPORT
+                case MHD_OPTION_HTTP2_DIRECT:
+                case MHD_OPTION_HTTP2_UPGRADE:
+#endif /* ! HTTP2_SUPPORT */
                   if (MHD_YES != parse_options (daemon,
                                                 servaddr,
                                                 opt,

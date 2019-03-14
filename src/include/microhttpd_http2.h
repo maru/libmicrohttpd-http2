@@ -22,7 +22,7 @@
 /**
  * @file microhttpd_http2.h
  * @brief interface for HTTP2 support
- * @author maru (Maru Berezin)
+ * @author Maru Berezin
  */
 
 #ifndef MICROHTTPD_HTTP2_H
@@ -34,8 +34,8 @@
 
 typedef nghttp2_settings_entry h2_settings_entry;
 
-#define ALPN_HTTP_2_0_LENGTH NGHTTP2_PROTO_VERSION_ID_LEN
-#define ALPN_HTTP_2_0 NGHTTP2_PROTO_VERSION_ID
+#define ALPN_HTTP_2_0_LENGTH  NGHTTP2_PROTO_VERSION_ID_LEN
+#define ALPN_HTTP_2_0         NGHTTP2_PROTO_VERSION_ID
 
 /**
  * @brief Flags for the `struct MHD_Daemon`.
@@ -43,9 +43,9 @@ typedef nghttp2_settings_entry h2_settings_entry;
 enum MHD_FLAG_HTTP2
 {
   /**
-   * Use both protocols HTTP/1 and HTTP/2.
+   * Enables protocol HTTP/2.
    */
-  MHD_USE_HTTP2 = 536870912
+  MHD_USE_HTTP2 = 536870912,
 };
 
 /**
@@ -68,7 +68,18 @@ enum MHD_OPTION_HTTP2
    * Settings parameters and their default values are defined in
    * https://tools.ietf.org/html/rfc7540#section-6.5.2
    */
-  MHD_OPTION_HTTP2_SETTINGS = 7540
+  MHD_OPTION_HTTP2_SETTINGS = 7540,
+
+  /**
+   * Clients can connect directly using HTTP/2.
+   */
+  MHD_OPTION_HTTP2_DIRECT = 7541,
+
+  /**
+   * Clients can upgrade from HTTP/1.1 to HTTP/2.
+   */
+  MHD_OPTION_HTTP2_UPGRADE = 7542,
+
 };
 
 

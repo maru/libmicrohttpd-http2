@@ -1,7 +1,7 @@
 /*
   This file is part of libmicrohttpd
   Copyright (C) 2007-2017 Daniel Pittman and Christian Grothoff
-  Copyright (C) 2017 Maru Berezin
+  Copyright (C) 2018 Maru Berezin
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 /**
  * @file microhttpd/connection_http2_helper.h
  * @brief Methods for printing HTTP/2 frames
- * @author maru (Maru Berezin), inspired from nghttpd
+ * @author Maru Berezin, inspired from nghttpd
  */
 
 

@@ -228,11 +228,11 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
       }
 
 #ifdef HAVE_MESSAGES
-    MHD_DLOG (connection->daemon,
-              _("The negotiated protocol: %s\n"), selected.data);
+      MHD_DLOG (connection->daemon,
+    _("The negotiated protocol: %s\n"), selected.data);
 #endif /* HAVE_MESSAGES */
 #endif /* HAS_ALPN */
-	  return true;
+	    return true;
 	}
       if ( (GNUTLS_E_AGAIN == ret) ||
 	   (GNUTLS_E_INTERRUPTED == ret) )

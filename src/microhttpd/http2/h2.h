@@ -1,7 +1,7 @@
 /*
   This file is part of libmicrohttpd
   Copyright (C) 2007-2017 Daniel Pittman and Christian Grothoff
-  Copyright (C) 2017 Maru Berezin
+  Copyright (C) 2018 Maru Berezin
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 /**
  * @file microhttpd/http2.h
  * @brief Methods for managing HTTP/2 connections
- * @author maru (Maru Berezin)
+ * @author Maru Berezin
  */
 
 #ifndef HTTP2_H

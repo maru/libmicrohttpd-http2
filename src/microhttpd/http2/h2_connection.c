@@ -1559,7 +1559,7 @@ MHD_http2_session_start (struct MHD_Connection *connection)
  * @param connection connection to handle
  */
 void
-MHD_http2_handle_read (struct MHD_Connection *connection)
+h2_connection_handle_read (struct MHD_Connection *connection)
 {
   if (connection->state == MHD_CONNECTION_HTTP2_INIT)
   {
@@ -1637,7 +1637,7 @@ MHD_http2_handle_read (struct MHD_Connection *connection)
  * @param connection connection to handle
  */
 void
-MHD_http2_handle_write (struct MHD_Connection *connection)
+h2_connection_handle_write (struct MHD_Connection *connection)
 {
   struct http2_conn *h2 = connection->h2;
   if (h2 == NULL) return; // MHD_NO;
@@ -1728,7 +1728,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection)
  *         #MHD_NO otherwise, connection must be closed.
  */
 int
-MHD_http2_handle_idle (struct MHD_Connection *connection)
+h2_connection_handle_idle (struct MHD_Connection *connection)
 {
   if (connection->state == MHD_CONNECTION_HTTP2_INIT)
   {
@@ -1849,6 +1849,9 @@ MHD_http2_queue_response (struct MHD_Connection *connection,
 void
 MHD_set_h1_callbacks (struct MHD_Connection *connection)
 {
+  connection->version = MHD_HTTP_VERSION_1_1;
+  connection->http_version = HTTP_VERSION(1, 1);
+
   connection->handle_read_cls = &MHD_connection_handle_read;
   connection->handle_idle_cls = &MHD_connection_handle_idle;
   connection->handle_write_cls = &MHD_connection_handle_write;
@@ -1864,33 +1867,12 @@ MHD_set_h1_callbacks (struct MHD_Connection *connection)
 void
 MHD_set_h2_callbacks (struct MHD_Connection *connection)
 {
-  MHD_set_h1_callbacks(connection);
-  // connection->handle_read_cls = &MHD_http2_handle_read;
-  // connection->handle_idle_cls = &MHD_http2_handle_idle;
-  // connection->handle_write_cls = &MHD_http2_handle_write;
+  connection->version = MHD_HTTP_VERSION_2_0;
+  connection->http_version = HTTP_VERSION(2, 0);
 
-/*
   connection->handle_read_cls = &h2_connection_handle_read;
   connection->handle_idle_cls = &h2_connection_handle_idle;
   connection->handle_write_cls = &h2_connection_handle_write;
-*/
-
-}
-
-
-void h2_connection_handle_read (struct MHD_Connection *conn)
-{
-
-}
-
-int h2_connection_handle_idle (struct MHD_Connection *conn)
-{
-
-}
-
-void h2_connection_handle_write (struct MHD_Connection *conn)
-{
-
 }
 
 #endif /* HTTP2_SUPPORT */

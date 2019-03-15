@@ -2888,7 +2888,7 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
       if (MHD_CONNECTION_INIT ==connection->state)
         connection->state = MHD_CONNECTION_HTTP2_INIT;
 
-      MHD_http2_handle_read (connection);
+      h2_connection_handle_read (connection);
       return;
     }
 #endif /* HTTP2_SUPPORT */
@@ -3012,7 +3012,7 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
 #ifdef HTTP2_SUPPORT
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      MHD_http2_handle_write (connection);
+      h2_connection_handle_write (connection);
       return;
     }
 #endif /* HTTP2_SUPPORT */
@@ -3335,7 +3335,7 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           connection->in_idle = false;
           return MHD_NO;
         }
-      MHD_http2_handle_idle (connection);
+      h2_connection_handle_idle (connection);
     }
   else
 #endif /* HTTP2_SUPPORT */

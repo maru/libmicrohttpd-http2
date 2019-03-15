@@ -143,7 +143,7 @@ send_tls_adapter (struct MHD_Connection *connection,
  * @return true on success, false otherwise
  */
 bool
-MHD_tls_set_alpn_protocols (struct MHD_Connection *connection)
+MHD_TLS_set_alpn_protocols (struct MHD_Connection *connection)
 {
   int ret;
 
@@ -211,8 +211,6 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
                  ALPN_HTTP_2_0_LENGTH)) )
       {
         selected.data = (unsigned char *)ALPN_HTTP_2_0;
-        connection->version = MHD_HTTP_VERSION_2_0;
-        connection->http_version = HTTP_VERSION(2, 0);
         MHD_set_h2_callbacks (connection);
       }
     else
@@ -220,8 +218,6 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
       {
         /* Default HTTP version */
         selected.data = (unsigned char *)ALPN_HTTP_1_1;
-        connection->version = MHD_HTTP_VERSION_1_1;
-        connection->http_version = HTTP_VERSION(1, 1);
 #ifdef HTTP2_SUPPORT
         MHD_set_h1_callbacks (connection);
 #endif /* HTTP2_SUPPORT */

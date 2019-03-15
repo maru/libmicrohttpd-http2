@@ -301,7 +301,7 @@ MHD_http2_session_start (struct MHD_Connection *connection);
  * @param conn the connection struct
  */
 void
-MHD_http2_handle_read (struct MHD_Connection *connection);
+h2_connection_handle_read (struct MHD_Connection *connection);
 
 
 /**
@@ -310,7 +310,7 @@ MHD_http2_handle_read (struct MHD_Connection *connection);
  * @param conn the connection struct
  */
 void
-MHD_http2_handle_write (struct MHD_Connection *connection);
+h2_connection_handle_write (struct MHD_Connection *connection);
 
 
 /**
@@ -321,7 +321,7 @@ MHD_http2_handle_write (struct MHD_Connection *connection);
  *         #MHD_NO otherwise, connection must be closed.
  */
 int
-MHD_http2_handle_idle (struct MHD_Connection *connection);
+h2_connection_handle_idle (struct MHD_Connection *connection);
 
 
 /**

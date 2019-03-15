@@ -55,7 +55,7 @@ MHD_set_https_callbacks (struct MHD_Connection *connection);
  * @return true on success, false otherwise
  */
 bool
-MHD_tls_set_alpn_protocols (struct MHD_Connection *connection);
+MHD_TLS_set_alpn_protocols (struct MHD_Connection *connection);
 
 #endif /* HAS_ALPN */
 

@@ -2381,7 +2381,6 @@ internal_add_connection (struct MHD_Daemon *daemon,
   connection->last_activity = MHD_monotonic_sec_counter();
 #ifdef HTTP2_SUPPORT
   /* Default protocol */
-  connection->http_version = HTTP_VERSION(1, 1);
   MHD_set_h1_callbacks (connection);
 #endif /* HTTP2_SUPPORT */
 
@@ -2409,7 +2408,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
 
 #ifdef HAS_ALPN
       /* Set ALPN protocols */
-      MHD_tls_set_alpn_protocols (connection);
+      MHD_TLS_set_alpn_protocols (connection);
 #endif /* HAS_ALPN */
 
       switch (daemon->cred_type)
@@ -2631,6 +2630,13 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      MHD_http2_suspend_stream (connection);
+    }
+#endif /* HTTP2_SUPPORT */
 
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
@@ -5439,7 +5445,13 @@ MHD_start_daemon_va (unsigned int flags,
     }
 #endif /* HTTPS_SUPPORT */
 #ifdef HTTP2_SUPPORT
-  gettimeofday(&tm_start, NULL);
+  if (0 != (*pflags & MHD_USE_HTTP2))
+    {
+      gettimeofday(&tm_start, NULL);
+      int is_tls = (0 != (*pflags & MHD_USE_TLS)) ? 1 : 0;
+      daemon->h2_direct = is_tls ? 0 : 1;
+      daemon->h2_upgrade = is_tls ? 0 : 1;
+    }
 #endif /* HTTP2_SUPPORT */
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;

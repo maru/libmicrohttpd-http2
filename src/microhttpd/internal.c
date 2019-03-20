@@ -163,7 +163,7 @@ MHD_http_unescape (char *val)
 	}
     }
   *wpos = '\0'; /* add 0-terminator */
-  return wpos - val; /* = strlen(val) */
+  return wpos - val;
 }
 
 
@@ -191,6 +191,7 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
   struct MHD_Daemon *daemon = connection->daemon;
   char *equals;
   char *amper;
+  size_t len;
 
   *num_headers = 0;
   while ( (NULL != args) &&
@@ -211,6 +212,7 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 	      if (MHD_YES != cb (connection,
 				 args,
 				 NULL,
+				 0,
 				 kind))
 		return MHD_NO;
 	      (*num_headers)++;
@@ -224,12 +226,13 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 				     connection,
 				     args);
           MHD_unescape_plus (equals);
-	  daemon->unescape_callback (daemon->unescape_callback_cls,
-				     connection,
-				     equals);
+	  len = daemon->unescape_callback (daemon->unescape_callback_cls,
+					   connection,
+					   equals);
 	  if (MHD_YES != cb (connection,
 			     args,
 			     equals,
+			     len,
 			     kind))
 	    return MHD_NO;
 	  (*num_headers)++;
@@ -249,6 +252,7 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 	  if (MHD_YES != cb (connection,
 			     args,
 			     NULL,
+			     0,
 			     kind))
 	    return MHD_NO;
 	  /* continue with 'bar' */
@@ -265,12 +269,13 @@ MHD_parse_arguments_ (struct MHD_Connection *connection,
 				 connection,
 				 args);
       MHD_unescape_plus (equals);
-      daemon->unescape_callback (daemon->unescape_callback_cls,
-				 connection,
-				 equals);
+      len = daemon->unescape_callback (daemon->unescape_callback_cls,
+				       connection,
+				       equals);
       if (MHD_YES != cb (connection,
 			 args,
 			 equals,
+			 len,
 			 kind))
         return MHD_NO;
       (*num_headers)++;

@@ -36,62 +36,12 @@
 
 #ifdef HTTP2_SUPPORT
 
-// /** States in a state machine for an HTTP/2 connection. **/
-// enum MHD_CONNECTION_STATE_HTTP2
-// {
-//   /**
-//    * Connection just started (no preface sent or received).
-//    */
-//   MHD_CONNECTION_HTTP2_INIT = MHD_CONNECTION_INIT,
-//
-//   /**
-//    * Ready to exchange frames.
-//    */
-//   MHD_CONNECTION_HTTP2_READY = 128,
-//
-//   /**
-//    * Client sent GOAWAY frame.
-//    */
-//   MHD_CONNECTION_HTTP2_CLOSED_REMOTE = 130,
-//
-//   /**
-//    * Server sent GOAWAY frame.
-//    */
-//   MHD_CONNECTION_HTTP2_CLOSED_LOCAL = 131,
-//
-//   /**
-//    * Connection closed.
-//    */
-//   MHD_CONNECTION_HTTP2_CLOSED = MHD_CONNECTION_CLOSED,
-//
-//   /**
-//    * This connection is finished (only to be freed)
-//    */
-//   MHD_CONNECTION_HTTP2_IN_CLEANUP = 132
-// };
-
 void print_flags(const nghttp2_frame_hd hd);
 
-#define warnx(format, args...) fprintf(stderr, format "\n", ##args)
-
-#define FRAME_TYPE(x) ( x == NGHTTP2_DATA ? "DATA" : \
-                      ( x == NGHTTP2_HEADERS ? "HEADERS" : \
-                      ( x == NGHTTP2_PRIORITY ? "PRIORITY" : \
-                      ( x == NGHTTP2_RST_STREAM ? "RST_STREAM" : \
-                      ( x == NGHTTP2_SETTINGS ? "SETTINGS" : \
-                      ( x == NGHTTP2_PUSH_PROMISE ? "PUSH_PROMISE" : \
-                      ( x == NGHTTP2_PING ? "PING" : \
-                      ( x == NGHTTP2_GOAWAY ? "GOAWAY" : \
-                      ( x == NGHTTP2_WINDOW_UPDATE ? "WINDOW_UPDATE" : \
-                      ( x == NGHTTP2_CONTINUATION ? "CONTINUATION" : \
-                      ( x == NGHTTP2_ALTSVC ? "ALTSVC" : \
-                        "???" )))))))))))
-
+#if HTTP2_DEBUG
+struct timeval h2_util_tm_start;
 #define ENTER_COLOR "31;1m"
 #define do_color(code) (color ? code : "")
-
-struct timeval h2_util_tm_start;
-
 #define h2_debug_vprintf(format, args...) {if (HTTP2_DEBUG) {\
     int color = isatty(fileno(stderr));\
     struct timeval now; gettimeofday(&now, NULL);\
@@ -99,6 +49,7 @@ struct timeval h2_util_tm_start;
     fprintf(stderr, "%s[%3ld.%03ld]%s ", do_color("\033[33m"), milli/1000000, (milli%1000000)/1000, do_color("\033[0m"));\
     fprintf(stderr, "%s[%s]%s " format "\n", do_color("\033["ENTER_COLOR), __FUNCTION__, do_color("\033[0m"), ##args);\
   }}
+#endif /* HTTP2_DEBUG */
 
 #endif /* HTTP2_SUPPORT */
 

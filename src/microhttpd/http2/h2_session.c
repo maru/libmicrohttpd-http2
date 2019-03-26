@@ -46,6 +46,19 @@
 #define H2_HEADER_CONTENT_LENGTH     "content-length"
 #define H2_HEADER_CONTENT_LENGTH_LEN 14
 
+#define FRAME_TYPE(x) ( x == NGHTTP2_DATA ? "DATA" : \
+                      ( x == NGHTTP2_HEADERS ? "HEADERS" : \
+                      ( x == NGHTTP2_PRIORITY ? "PRIORITY" : \
+                      ( x == NGHTTP2_RST_STREAM ? "RST_STREAM" : \
+                      ( x == NGHTTP2_SETTINGS ? "SETTINGS" : \
+                      ( x == NGHTTP2_PUSH_PROMISE ? "PUSH_PROMISE" : \
+                      ( x == NGHTTP2_PING ? "PING" : \
+                      ( x == NGHTTP2_GOAWAY ? "GOAWAY" : \
+                      ( x == NGHTTP2_WINDOW_UPDATE ? "WINDOW_UPDATE" : \
+                      ( x == NGHTTP2_CONTINUATION ? "CONTINUATION" : \
+                      ( x == NGHTTP2_ALTSVC ? "ALTSVC" : \
+                        "???" )))))))))))
+
 /* Number of sessions, for debugging purposes */
 size_t num_sessions = 0;
 
@@ -1247,7 +1260,7 @@ h2_session_send_preface (struct h2_session_t *h2)
                                 h2->settings, h2->settings_len);
   if (rv != 0)
     {
-      warnx("Fatal error: %s", nghttp2_strerror (rv));
+      h2_debug_vprintf("Fatal error: %s", nghttp2_strerror (rv));
       return MHD_NO;
     }
   return MHD_YES;

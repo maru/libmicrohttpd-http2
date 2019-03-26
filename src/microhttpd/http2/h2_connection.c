@@ -221,7 +221,7 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
     {
       if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
         {
-          warnx("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
+          h2_debug_vprintf("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
         }
       /* Should send a GOAWAY frame with last stream_id successfully received */
       nghttp2_submit_goaway(h2->session, NGHTTP2_FLAG_NONE, h2->accepted_max,

@@ -2381,7 +2381,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
   connection->last_activity = MHD_monotonic_sec_counter();
 #ifdef HTTP2_SUPPORT
   /* Default protocol */
-  MHD_set_h1_callbacks (connection);
+  h2_set_h1_callbacks (connection);
 #endif /* HTTP2_SUPPORT */
 
   if (0 == (daemon->options & MHD_USE_TLS))
@@ -2634,7 +2634,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
 #ifdef HTTP2_SUPPORT
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      MHD_http2_suspend_stream (connection);
+      h2_stream_suspend (connection);
     }
 #endif /* HTTP2_SUPPORT */
 
@@ -5047,14 +5047,17 @@ parse_options_va (struct MHD_Daemon *daemon,
 	  break;
 #ifdef HTTP2_SUPPORT
   case MHD_OPTION_HTTP2_SETTINGS:
-    daemon->h2_settings_len = va_arg (ap, size_t);
-    daemon->h2_settings = va_arg (ap, h2_settings_entry *);
+    {
+      size_t nmemb = va_arg (ap, size_t);
+      h2_config_set_settings (daemon->h2_config,
+                              nmemb, va_arg (ap, h2_settings_entry *));
+    }
     break;
   case MHD_OPTION_HTTP2_DIRECT:
-    daemon->h2_direct = va_arg (ap, int) ? 1 : 0;
+    h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
     break;
   case MHD_OPTION_HTTP2_UPGRADE:
-    daemon->h2_upgrade = va_arg (ap, int) ? 1 : 0;
+    h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
     break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
@@ -5444,15 +5447,15 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+
 #ifdef HTTP2_SUPPORT
   if (0 != (*pflags & MHD_USE_HTTP2))
     {
-      gettimeofday(&tm_start, NULL);
       int is_tls = (0 != (*pflags & MHD_USE_TLS)) ? 1 : 0;
-      daemon->h2_direct = is_tls ? 0 : 1;
-      daemon->h2_upgrade = is_tls ? 0 : 1;
+      daemon->h2_config = h2_config_init (is_tls);
     }
 #endif /* HTTP2_SUPPORT */
+
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;
@@ -6511,6 +6514,13 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
             gnutls_certificate_free_credentials (daemon->x509_cred);
         }
 #endif /* HTTPS_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+      if (0 != (daemon->options & MHD_USE_HTTP2))
+        {
+          h2_config_destroy (daemon->h2_config);
+        }
+#endif /* HTTP2_SUPPORT */
 
 #ifdef DAUTH_SUPPORT
       free (daemon->nnc);

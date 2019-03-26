@@ -201,5 +201,20 @@ get_date_string (char *date, size_t date_len, char *header, char *end_of_line);
 int
 need_100_continue (struct MHD_Connection *connection);
 
+void
+cleanup_connection (struct MHD_Connection *connection);
+
+int
+try_grow_read_buffer (struct MHD_Connection *connection);
+
+int
+build_header_response (struct MHD_Connection *connection);
+
+int
+connection_add_header (struct MHD_Connection *connection,
+                       const char *key, const char *value,
+                       enum MHD_ValueKind kind);
+
+
 #endif /* ! HTTP2_SUPPORT */
 #endif

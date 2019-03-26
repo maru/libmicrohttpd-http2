@@ -1048,12 +1048,15 @@ struct MHD_Connection
   /**
    * HTTP/2 connection details
    */
-  struct http2_conn *h2;
+  struct h2_session_t *h2;
+
+  /**
+   * Offset where we are start reading from @e read_buffer.
+   */
+  size_t read_buffer_start_offset;
 
 #endif /* HTTP2_SUPPORT */
 };
-
-#define HTTP_VERSION(major, minor) (1000*(major) + (minor))
 
 #ifdef UPGRADE_SUPPORT
 /**
@@ -1756,27 +1759,9 @@ struct MHD_Daemon
 
 #ifdef HTTP2_SUPPORT
   /**
-   * HTTP/2 settings array.
-   * https://nghttp2.org/documentation/enums.html?#c.nghttp2_settings_id
+   * Configuration for HTTP/2 module.
    */
-  h2_settings_entry *h2_settings;
-
-  /**
-   * Number of entries in h2_settings.
-   */
-  size_t h2_settings_len;
-
-  /**
-   * Inspect first bytes to detect HTTP/2 connection.
-   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
-   */
-  int h2_direct;
-
-  /**
-   * Allow HTTP/1 upgrade to HTTP/2.
-   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
-   */
-  int h2_upgrade;
+  struct h2_config_t *h2_config;
 #endif /* HTTP2_SUPPORT */
 
 };

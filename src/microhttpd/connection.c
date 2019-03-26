@@ -944,7 +944,7 @@ MHD_connection_close_ (struct MHD_Connection *connection,
 #ifdef HTTP2_SUPPORT
   if (connection->http_version == HTTP_VERSION(2, 0))
     {
-      MHD_http2_session_delete (connection);
+      h2_connection_close (connection);
     }
 #endif /* HTTP2_SUPPORT */
 
@@ -1275,16 +1275,13 @@ keepalive_possible (struct MHD_Connection *connection)
 {
   if (MHD_CONN_MUST_CLOSE == connection->keepalive)
     return MHD_NO;
+  if (MHD_CONN_USE_KEEPALIVE == connection->keepalive)
+    return MHD_YES;
   if (NULL == connection->version)
     return MHD_NO;
   if ( (NULL != connection->response) &&
        (0 != (connection->response->flags & MHD_RF_HTTP_VERSION_1_0_ONLY) ) )
     return MHD_NO;
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    return MHD_YES;
-#endif /* HTTP2_SUPPORT */
 
   if (MHD_str_equal_caseless_(connection->version,
                               MHD_HTTP_VERSION_1_1))
@@ -1387,7 +1384,7 @@ get_date_string (char *date,
  * @param connection the connection
  * @return #MHD_YES on success, #MHD_NO on failure
  */
-static int
+int
 try_grow_read_buffer (struct MHD_Connection *connection)
 {
   void *buf;
@@ -1419,7 +1416,7 @@ try_grow_read_buffer (struct MHD_Connection *connection)
  * @param connection the connection
  * @return #MHD_YES on success, #MHD_NO on failure (out of memory)
  */
-static int
+int
 build_header_response (struct MHD_Connection *connection)
 {
   size_t size;
@@ -1972,20 +1969,6 @@ MHD_connection_update_event_loop_info (struct MHD_Connection *connection)
           mhd_assert (0);
           break;
 #endif /* UPGRADE_SUPPORT */
-#ifdef HTTP2_SUPPORT
-        case MHD_CONNECTION_HTTP2_INIT:
-        case MHD_CONNECTION_HTTP2_IDLE:
-        case MHD_CONNECTION_HTTP2_BUSY:
-        case MHD_CONNECTION_HTTP2_CLOSED_REMOTE:
-        case MHD_CONNECTION_HTTP2_CLOSED_LOCAL:
-          break;
-        case MHD_CONNECTION_HTTP2_CLOSED:
-    connection->event_loop_info = MHD_EVENT_LOOP_INFO_CLEANUP;
-          return;       /* do nothing, not even reading */
-        case MHD_CONNECTION_HTTP2_IN_CLEANUP:
-          mhd_assert (0);
-          break;
-#endif /* HTTP2_SUPPORT */
         default:
           mhd_assert (0);
         }
@@ -2066,7 +2049,7 @@ get_next_header_line (struct MHD_Connection *connection,
  * @param value the value itself
  * @return #MHD_NO on failure (out of memory), #MHD_YES for success
  */
-static int
+int
 connection_add_header (struct MHD_Connection *connection,
                        const char *key,
 		       const char *value,
@@ -2876,22 +2859,12 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
     { /* HTTPS connection. */
       if (MHD_TLS_CONN_CONNECTED > connection->tls_state)
         {
-          if (!MHD_run_tls_handshake_ (connection))
+          if ( (!MHD_run_tls_handshake_ (connection)) ||
+               (MHD_HTTP_VERSION_1_1 != connection->version) )
             return;
         }
     }
 #endif /* HTTPS_SUPPORT */
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      if (MHD_CONNECTION_INIT ==connection->state)
-        connection->state = MHD_CONNECTION_HTTP2_INIT;
-
-      h2_connection_handle_read (connection);
-      return;
-    }
-#endif /* HTTP2_SUPPORT */
 
   /* make sure "read" has a reasonable number of bytes
      in buffer to use per system call (if possible) */
@@ -2940,6 +2913,19 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
             __FUNCTION__,
             MHD_state_to_string (connection->state));
 #endif
+
+#ifdef HTTP2_SUPPORT
+  /* Peek first bytes and check if it's an h2 preface */
+  if ((0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+      (MHD_CONNECTION_INIT == connection->state) &&
+      (0 != h2_config_is_direct (connection->daemon->h2_config)) &&
+      (MHD_YES == h2_is_h2_preface (connection)))
+    {
+      h2_set_h2_callbacks (connection);
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
+
   switch (connection->state)
     {
     case MHD_CONNECTION_INIT:
@@ -3008,14 +2994,6 @@ MHD_connection_handle_write (struct MHD_Connection *connection)
             __FUNCTION__,
             MHD_state_to_string (connection->state));
 #endif
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      h2_connection_handle_write (connection);
-      return;
-    }
-#endif /* HTTP2_SUPPORT */
 
   switch (connection->state)
     {
@@ -3326,20 +3304,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
                 MHD_state_to_string (connection->state));
 #endif
 
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      if (connection->state == MHD_CONNECTION_CLOSED)
-        {
-          cleanup_connection (connection);
-          connection->in_idle = false;
-          return MHD_NO;
-        }
-      h2_connection_handle_idle (connection);
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    {
       switch (connection->state)
         {
         case MHD_CONNECTION_INIT:
@@ -3562,6 +3526,16 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
             }
           continue;
         case MHD_CONNECTION_FOOTERS_RECEIVED:
+#ifdef HTTP2_SUPPORT
+          /* Check if the connection wants an h2 upgrade */
+          if ((0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+              (0 != h2_config_is_upgrade (connection->daemon->h2_config)) &&
+              (MHD_YES == h2_is_h2_upgrade (connection)))
+            {
+              h2_do_h2_upgrade (connection);
+              break;
+            }
+#endif /* HTTP2_SUPPORT */
           call_connection_handler (connection); /* "final" call */
           if (connection->state == MHD_CONNECTION_CLOSED)
             continue;
@@ -3783,7 +3757,6 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           mhd_assert (0);
           break;
         }
-    }
       break;
     } /* while (! connection->suspended) */
 
@@ -4036,6 +4009,14 @@ MHD_queue_response (struct MHD_Connection *connection,
 #endif
       return MHD_NO;
     }
+
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION(2, 0))
+    {
+      return h2_queue_response (connection, status_code, response);
+    }
+#endif /* HTTP2_SUPPORT */
+
 #ifdef UPGRADE_SUPPORT
   if ( (NULL != response->upgrade_handler) &&
        (0 == (daemon->options & MHD_ALLOW_UPGRADE)) )
@@ -4056,13 +4037,6 @@ MHD_queue_response (struct MHD_Connection *connection,
       return MHD_NO;
     }
 #endif /* UPGRADE_SUPPORT */
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      return MHD_http2_queue_response (connection, status_code, response);
-    }
-#endif /* HTTP2_SUPPORT */
 
   MHD_increment_response_rc (response);
   connection->response = response;

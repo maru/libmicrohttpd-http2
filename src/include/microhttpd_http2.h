@@ -28,14 +28,9 @@
 #ifndef MICROHTTPD_HTTP2_H
 #define MICROHTTPD_HTTP2_H
 
-#define MHD_HTTP_VERSION_2_0 "HTTP/2"
-
 #include <nghttp2/nghttp2.h>
 
 typedef nghttp2_settings_entry h2_settings_entry;
-
-#define ALPN_HTTP_2_0_LENGTH  NGHTTP2_PROTO_VERSION_ID_LEN
-#define ALPN_HTTP_2_0         NGHTTP2_PROTO_VERSION_ID
 
 /**
  * @brief Flags for the `struct MHD_Daemon`.

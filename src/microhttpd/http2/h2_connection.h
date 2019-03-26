@@ -20,31 +20,35 @@
 */
 
 /**
- * @file microhttpd/http2/h2.h
- * @brief Methods for managing HTTP/2 connections
+ * @file microhttpd/http2/h2_connection.h
+ * @brief HTTP/2 API for MHD
  * @author Maru Berezin
  */
 
-#ifndef H2_H
-#define H2_H
+#ifndef H2_CONNECTION_H
+#define H2_CONNECTION_H
 
-#include "microhttpd_http2.h"
-#include "internal.h"
-#include "http2/h2_config.h"
-#include "http2/h2_connection.h"
-#include "http2/h2_upgrade.h"
+int
+h2_is_h2_preface (struct MHD_Connection *connection);
 
-#ifdef HTTP2_SUPPORT
+int
+h2_queue_response (struct MHD_Connection *connection,
+                   unsigned int status_code,
+                   struct MHD_Response *response);
 
-#define HTTP2_DEBUG 1
+void
+h2_stream_suspend (struct MHD_Connection *connection);
 
-#define MHD_HTTP_VERSION_2_0 "HTTP/2"
+void
+h2_stream_resume (struct MHD_Connection *connection);
 
-#define ALPN_HTTP_2_0_LENGTH  NGHTTP2_PROTO_VERSION_ID_LEN
-#define ALPN_HTTP_2_0         NGHTTP2_PROTO_VERSION_ID
+void
+h2_connection_close (struct MHD_Connection *connection);
 
-struct h2_session_t;
+void
+h2_set_h1_callbacks (struct MHD_Connection *connection);
 
-#endif /* HTTP2_SUPPORT */
+void
+h2_set_h2_callbacks (struct MHD_Connection *connection);
 
 #endif

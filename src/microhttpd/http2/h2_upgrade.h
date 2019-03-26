@@ -20,31 +20,18 @@
 */
 
 /**
- * @file microhttpd/http2/h2.h
- * @brief Methods for managing HTTP/2 connections
+ * @file microhttpd/http2/h2_upgrade.h
+ * @brief HTTP/2 upgrade API for MHD
  * @author Maru Berezin
  */
 
-#ifndef H2_H
-#define H2_H
+#ifndef H2_UPGRADE_H
+#define H2_UPGRADE_H
 
-#include "microhttpd_http2.h"
-#include "internal.h"
-#include "http2/h2_config.h"
-#include "http2/h2_connection.h"
-#include "http2/h2_upgrade.h"
+int
+h2_is_h2_upgrade (struct MHD_Connection *connection);
 
-#ifdef HTTP2_SUPPORT
-
-#define HTTP2_DEBUG 1
-
-#define MHD_HTTP_VERSION_2_0 "HTTP/2"
-
-#define ALPN_HTTP_2_0_LENGTH  NGHTTP2_PROTO_VERSION_ID_LEN
-#define ALPN_HTTP_2_0         NGHTTP2_PROTO_VERSION_ID
-
-struct h2_session_t;
-
-#endif /* HTTP2_SUPPORT */
+int
+h2_do_h2_upgrade (struct MHD_Connection *connection);
 
 #endif

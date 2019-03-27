@@ -33,6 +33,7 @@
  */
 struct h2_stream_t
 {
+  struct MHD_Connection *connection;
 
   /**
    * Next stream in the streams list.
@@ -48,42 +49,6 @@ struct h2_stream_t
    * Identifier.
    */
   size_t stream_id;
-
-  /**
-   * Linked list of parsed headers.
-   */
-  struct MHD_HTTP_Header *headers_received;
-
-  /**
-   * Tail of linked list of parsed headers.
-   */
-  struct MHD_HTTP_Header *headers_received_tail;
-
-  /**
-   * Response to transmit (initially NULL).
-   */
-  struct MHD_Response *response;
-
-  /**
-   * The memory pool is created when a stream is created and destroyed
-   * at the end of each stream.
-   * The pool is used for all stream-related data (except for the
-   * response).
-   */
-  struct MemoryPool *pool;
-
-  /**
-   * We allow the main application to associate some pointer with the
-   * HTTP request, which is passed to each #MHD_AccessHandlerCallback
-   * and some other API calls.  Here is where we store it.  (MHD does
-   * not know or care what it is).
-   */
-  void *client_context;
-
-  /**
-   * Request method.  Should be GET/POST/etc.
-   */
-  char *method;
 
   /**
    * Requested absolute path.
@@ -113,36 +78,10 @@ struct h2_stream_t
   char *authority;
 
   /**
-   * Number of bytes we had in the HTTP header, set once we
-   * pass #MHD_CONNECTION_HEADERS_RECEIVED.
-   */
-  size_t header_size;
-
-  /**
-   * Did we ever call the "default_handler" on this stream?  (this
-   * flag will determine if we call the #MHD_OPTION_NOTIFY_COMPLETED
-   * handler when the connection closes down).
-   */
-  bool client_aware;
-
-  /**
    * HTTP response code.  Only valid if response object
    * is already set.
    */
   unsigned int response_code;
-
-  /**
-   * How many more bytes of the body do we expect
-   * to read? #MHD_SIZE_UNKNOWN for unknown.
-   */
-  uint64_t remaining_upload_size;
-
-  /**
-   * Current write position in the actual response
-   * (excluding headers, content only; should be 0
-   * while sending headers).
-   */
-  uint64_t response_write_position;
 };
 
 struct h2_stream_t*

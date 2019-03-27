@@ -32,19 +32,30 @@ char * FRAME_TYPE(int type)
 {
   switch (type)
   {
-    case NGHTTP2_DATA: return "DATA";
-    case NGHTTP2_HEADERS: return "HEADERS";
-    case NGHTTP2_PRIORITY: return "PRIORITY";
-    case NGHTTP2_RST_STREAM: return "RST_STREAM";
-    case NGHTTP2_SETTINGS: return "SETTINGS";
-    case NGHTTP2_PUSH_PROMISE: return "PUSH_PROMISE";
-    case NGHTTP2_PING: return "PING";
-    case NGHTTP2_GOAWAY: return "GOAWAY";
-    case NGHTTP2_WINDOW_UPDATE: return "WINDOW_UPDATE";
-    case NGHTTP2_CONTINUATION: return "CONTINUATION";
-    case NGHTTP2_ALTSVC: return "ALTSVC";
+    case NGHTTP2_DATA:
+      return "DATA";
+    case NGHTTP2_HEADERS:
+      return "HEADERS";
+    case NGHTTP2_PRIORITY:
+      return "PRIORITY";
+    case NGHTTP2_RST_STREAM:
+      return "RST_STREAM";
+    case NGHTTP2_SETTINGS:
+      return "SETTINGS";
+    case NGHTTP2_PUSH_PROMISE:
+      return "PUSH_PROMISE";
+    case NGHTTP2_PING:
+      return "PING";
+    case NGHTTP2_GOAWAY:
+      return "GOAWAY";
+    case NGHTTP2_WINDOW_UPDATE:
+      return "WINDOW_UPDATE";
+    case NGHTTP2_CONTINUATION:
+      return "CONTINUATION";
+    case NGHTTP2_ALTSVC:
+      return "ALTSVC";
   }
-  return "???";
+  return "<UNKNOWN>";
 }
 
 #define bufsize 1024

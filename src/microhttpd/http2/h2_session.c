@@ -1369,26 +1369,32 @@ h2_session_create (struct MHD_Connection *connection)
   return h2;
 }
 
+/**
+ * Performs post-process of HTTP Upgrade request.
+ * @param h2 h2 session
+ * @param
+ * @return #MHD_YES if no error
+ *         #MHD_NO otherwise.
+ */
 int
 h2_session_upgrade (struct h2_session_t *h2, const char *settings, const char *method)
 {
   char *settings_payload;
-  int head_request = 0, ret;
   size_t len;
 
   settings_payload = BASE64Decode (settings);
   len = strlen (settings_payload);
 
   /* Is it a HEAD request? */
-  if (MHD_str_equal_caseless_ (method, MHD_HTTP_METHOD_HEAD))
-    {
-      head_request = 1;
-    }
+  int head_request;
+  head_request = MHD_str_equal_caseless_ (method, MHD_HTTP_METHOD_HEAD) ? 1 : 0;
 
+  int ret;
   ret = nghttp2_session_upgrade2 (h2->session, settings_payload, len,
                                   head_request, NULL);
   free (settings_payload);
-  return ret;
+
+  return ret ? MHD_NO : MHD_YES;
 }
 
 /* end of h2_session.c */

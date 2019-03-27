@@ -130,13 +130,7 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
 
   /* Upgrade to HTTP/2 connection */
   ret = h2_session_upgrade (connection->h2, settings, connection->method);
-  if (ret)
-    {
-      /* Cannot perform upgrade */
-      return MHD_NO;
-    }
-
-  return MHD_YES;
+  return ret;
 }
 
 /* end of h2_upgrade.c */

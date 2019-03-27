@@ -78,14 +78,15 @@ h2_stream_destroy (struct h2_stream_t *stream)
       MHD_destroy_response (stream->response);
       stream->response = NULL;
 
-      // struct MHD_Connection *connection = h2->connection;
-      // if ((NULL != connection->daemon->notify_completed) && (stream->client_aware))
-      //   {
-      //     stream->client_aware = false;
-      //     connection->daemon->notify_completed (connection->daemon->notify_completed_cls,
-      //       connection, &stream->client_context,
-      //       MHD_REQUEST_TERMINATED_COMPLETED_OK);
-      //   }
+      struct MHD_Connection *connection = stream->connection;
+      struct MHD_Daemon *daemon = connection->daemon;
+      if ((NULL != daemon->notify_completed) && (connection->client_aware))
+        {
+          connection->client_aware = false;
+          daemon->notify_completed (daemon->notify_completed_cls,
+            connection, &connection->client_context,
+            MHD_REQUEST_TERMINATED_COMPLETED_OK);
+        }
     }
   MHD_pool_destroy (stream->pool);
   stream->pool = NULL;

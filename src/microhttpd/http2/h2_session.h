@@ -107,4 +107,7 @@ h2_session_create (struct MHD_Connection *connection);
 void
 h2_session_destroy (struct h2_session_t *h2);
 
+int
+h2_session_upgrade (struct h2_session_t *h2, const char *settings, const char *method);
+
 #endif

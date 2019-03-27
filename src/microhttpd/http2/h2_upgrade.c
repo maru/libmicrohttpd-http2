@@ -28,7 +28,6 @@
 #include "http2/h2.h"
 #include "http2/h2_internal.h"
 #include "connection.h"
-#include "base64.h"
 #include "mhd_str.h"
 
 /**
@@ -90,21 +89,11 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   bool is_tls = (connection->tls_state == MHD_TLS_CONN_CONNECTED);
   const char *protocol = is_tls ? "h2" : "h2c";
   const char *settings;
-  char *settings_payload;
-  int head_request = 0, ret;
-  size_t len;
+  int ret;
 
   /* Get base64 decoded settings from client */
   settings = MHD_lookup_connection_value (connection,
                 MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS);
-  settings_payload = BASE64Decode (settings);
-  len = strlen (settings_payload);
-
-  /* Is it a HEAD request? */
-  if (MHD_str_equal_caseless_ (connection->method, MHD_HTTP_METHOD_HEAD))
-    {
-      head_request = 1;
-    }
 
   /* Create HTTP/1 response */
   response = MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT);
@@ -140,19 +129,12 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
     }
 
   /* Upgrade to HTTP/2 connection */
-  ret = nghttp2_session_upgrade2 (connection->h2->session,
-                                  settings_payload, len, head_request, NULL);
-  free (settings_payload);
+  ret = h2_session_upgrade (connection->h2, settings, connection->method);
   if (ret)
     {
       /* Cannot perform upgrade */
       return MHD_NO;
     }
-
-  connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-  MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
 
   return MHD_YES;
 }

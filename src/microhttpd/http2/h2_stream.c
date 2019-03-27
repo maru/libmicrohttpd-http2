@@ -25,13 +25,9 @@
  * @author Maru Berezin
  */
 
-#include "mhd_mono_clock.h"
-#include "connection.h"
-#include "memorypool.h"
-#include "response.h"
-#include "mhd_str.h"
 #include "http2/h2.h"
 #include "http2/h2_internal.h"
+#include "memorypool.h"
 
 /* ================================================================ */
 /*                        Stream operations                         */

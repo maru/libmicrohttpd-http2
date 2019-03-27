@@ -28,27 +28,35 @@
 #ifndef H2_INTERNAL_H
 #define H2_INTERNAL_H
 
-#include "microhttpd_http2.h"
-#include "internal.h"
-#include "http2/h2.h"
 #include "http2/h2_session.h"
 #include "http2/h2_stream.h"
 
 #ifdef HTTP2_SUPPORT
 
-void print_flags(const nghttp2_frame_hd hd);
+char * FRAME_TYPE (int type);
+void print_flags (const nghttp2_frame_hd hd);
 
 #if HTTP2_DEBUG
+
 struct timeval h2_util_tm_start;
-#define ENTER_COLOR "31;1m"
+
+#define COLOR_RED    "\033[31;1m"
+#define COLOR_WHITE  "\033[0m"
+#define COLOR_YELLOW "\033[33m"
 #define do_color(code) (color ? code : "")
-#define h2_debug_vprintf(format, args...) {if (HTTP2_DEBUG) {\
-    int color = isatty(fileno(stderr));\
-    struct timeval now; gettimeofday(&now, NULL);\
-    long int milli = (now.tv_sec-h2_util_tm_start.tv_sec)*1000000+(now.tv_usec-h2_util_tm_start.tv_usec);\
-    fprintf(stderr, "%s[%3ld.%03ld]%s ", do_color("\033[33m"), milli/1000000, (milli%1000000)/1000, do_color("\033[0m"));\
-    fprintf(stderr, "%s[%s]%s " format "\n", do_color("\033["ENTER_COLOR), __FUNCTION__, do_color("\033[0m"), ##args);\
-  }}
+#define h2_debug_vprintf(format, args...) { \
+  int color = isatty(fileno(stderr)); \
+  struct timeval now; \
+  gettimeofday(&now, NULL); \
+  time_t usec = (now.tv_sec - h2_util_tm_start.tv_sec)*1000000 + (now.tv_usec - h2_util_tm_start.tv_usec); \
+  time_t sec = usec/1000000; \
+  time_t msec = (usec % 1000000)/1000; \
+  fprintf(stderr, "%s[%3ld.%03ld]", do_color(COLOR_YELLOW), sec, msec); \
+  fprintf(stderr, "%s ", do_color(COLOR_WHITE)); \
+  fprintf(stderr, "%s[%s]", do_color(COLOR_RED), __FUNCTION__); \
+  fprintf(stderr, "%s ", do_color(COLOR_WHITE)); \
+  fprintf(stderr, format "\n", ##args); \
+}
 #endif /* HTTP2_DEBUG */
 
 #endif /* HTTP2_SUPPORT */

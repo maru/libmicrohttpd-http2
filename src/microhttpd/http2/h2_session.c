@@ -25,13 +25,12 @@
  * @author Maru Berezin
  */
 
-#include "mhd_mono_clock.h"
-#include "connection.h"
-#include "memorypool.h"
-#include "response.h"
-#include "mhd_str.h"
 #include "http2/h2.h"
 #include "http2/h2_internal.h"
+#include "base64.h"
+#include "connection.h"
+#include "memorypool.h"
+#include "mhd_str.h"
 
 #define H2_HEADER_METHOD     ":method"
 #define H2_HEADER_METHOD_LEN 7
@@ -45,19 +44,6 @@
 #define H2_HEADER_COOKIE_LEN 6
 #define H2_HEADER_CONTENT_LENGTH     "content-length"
 #define H2_HEADER_CONTENT_LENGTH_LEN 14
-
-#define FRAME_TYPE(x) ( x == NGHTTP2_DATA ? "DATA" : \
-                      ( x == NGHTTP2_HEADERS ? "HEADERS" : \
-                      ( x == NGHTTP2_PRIORITY ? "PRIORITY" : \
-                      ( x == NGHTTP2_RST_STREAM ? "RST_STREAM" : \
-                      ( x == NGHTTP2_SETTINGS ? "SETTINGS" : \
-                      ( x == NGHTTP2_PUSH_PROMISE ? "PUSH_PROMISE" : \
-                      ( x == NGHTTP2_PING ? "PING" : \
-                      ( x == NGHTTP2_GOAWAY ? "GOAWAY" : \
-                      ( x == NGHTTP2_WINDOW_UPDATE ? "WINDOW_UPDATE" : \
-                      ( x == NGHTTP2_CONTINUATION ? "CONTINUATION" : \
-                      ( x == NGHTTP2_ALTSVC ? "ALTSVC" : \
-                        "???" )))))))))))
 
 /* Number of sessions, for debugging purposes */
 size_t num_sessions = 0;
@@ -107,7 +93,7 @@ char status_string[600][4] = {
  void
  h2_session_destroy (struct h2_session_t *h2)
  {
-   if (NULL == h2) return; // MHD_NO;
+   mhd_assert (NULL != h2);
    // h2_debug_vprintf ("[id=%zu]", h2->session_id);
 
    struct h2_stream_t *stream;
@@ -1381,6 +1367,28 @@ h2_session_create (struct MHD_Connection *connection)
     }
 
   return h2;
+}
+
+int
+h2_session_upgrade (struct h2_session_t *h2, const char *settings, const char *method)
+{
+  char *settings_payload;
+  int head_request = 0, ret;
+  size_t len;
+
+  settings_payload = BASE64Decode (settings);
+  len = strlen (settings_payload);
+
+  /* Is it a HEAD request? */
+  if (MHD_str_equal_caseless_ (method, MHD_HTTP_METHOD_HEAD))
+    {
+      head_request = 1;
+    }
+
+  ret = nghttp2_session_upgrade2 (h2->session, settings_payload, len,
+                                  head_request, NULL);
+  free (settings_payload);
+  return ret;
 }
 
 /* end of h2_session.c */

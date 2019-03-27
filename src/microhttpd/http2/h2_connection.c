@@ -25,20 +25,17 @@
  * @author Maru Berezin
  */
 
-#include "connection.h"
-#include "memorypool.h"
-#include "response.h"
-#include "mhd_str.h"
 #include "http2/h2.h"
 #include "http2/h2_internal.h"
+#include "connection.h"
+#include "memorypool.h"
+#include "mhd_mono_clock.h"
+#include "mhd_str.h"
+#include "response.h"
 
 #define H2_MAGIC_TOKEN "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define H2_MAGIC_TOKEN_LEN_MIN 16
 #define H2_MAGIC_TOKEN_LEN 24
-
-/* ================================================================ */
-/*                          HTTP2 MHD API                           */
-/* ================================================================ */
 
 /**
  * Read data from the connection.
@@ -50,15 +47,11 @@ h2_connection_handle_read (struct MHD_Connection *connection)
 {
   ssize_t bytes_read;
 
-  if ( (MHD_CONNECTION_CLOSED == connection->state) ||
-       (connection->suspended) )
+  if (MHD_CONNECTION_CLOSED == connection->state)
     return;
 
 #ifdef HTTPS_SUPPORT
-  if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
-    { /* HTTPS connection. */
-      mhd_assert (MHD_TLS_CONN_CONNECTED <= connection->tls_state);
-    }
+  mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
 #endif /* HTTPS_SUPPORT */
 
   /* make sure "read" has a reasonable number of bytes
@@ -71,7 +64,8 @@ h2_connection_handle_read (struct MHD_Connection *connection)
     return; /* No space for receiving data. */
 
   struct h2_session_t *h2 = connection->h2;
-  if (NULL == h2) return; // MHD_NO;
+
+  mhd_assert (NULL != h2);
   h2_debug_vprintf ("[id=%zu]", h2->session_id);
 
   bytes_read = connection->recv_cls (connection,
@@ -80,7 +74,7 @@ h2_connection_handle_read (struct MHD_Connection *connection)
                                      connection->read_buffer_size -
                                      connection->read_buffer_offset);
 
-  h2_debug_vprintf ("read %zd / %zu", bytes_read, connection->read_buffer_size);
+  h2_debug_vprintf ("read=%zd", bytes_read);
 
   if (bytes_read < 0)
     {
@@ -120,75 +114,48 @@ void
 h2_connection_handle_write (struct MHD_Connection *connection)
 {
   struct h2_session_t *h2 = connection->h2;
-  if (NULL == h2) return; // MHD_NO;
+  mhd_assert (NULL != h2);
   h2_debug_vprintf ("[id=%zu]", h2->session_id);
 
-  h2_debug_vprintf ("write_buffer send=%d append=%d = %d", connection->write_buffer_send_offset, connection->write_buffer_append_offset, connection->write_buffer_append_offset - connection->write_buffer_send_offset);
-  if (connection->write_buffer_append_offset - connection->write_buffer_send_offset > 0)
+  if (MHD_CONNECTION_CLOSED == connection->state)
+    return;
+
+#ifdef HTTPS_SUPPORT
+  mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+#endif /* HTTPS_SUPPORT */
+
+  size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
+  h2_debug_vprintf ("bytes_to_send = %zd", bytes_to_send);
+
+  if (bytes_to_send > 0)
     {
-      ssize_t ret;
-      ret = connection->send_cls (connection,
-                                  &connection->write_buffer
-                                  [connection->write_buffer_send_offset],
-                                  connection->write_buffer_append_offset -
-                                  connection->write_buffer_send_offset);
-      h2_debug_vprintf ("send_cls ret=%ld", ret);
-      if (ret < 0)
+      ssize_t bytes_sent;
+      const char *write_buffer = &connection->write_buffer[connection->write_buffer_send_offset];
+
+      bytes_sent = connection->send_cls (connection, write_buffer, bytes_to_send);
+      h2_debug_vprintf ("send_cls = %zd / %zd", bytes_sent, bytes_to_send);
+
+      if (bytes_sent < 0)
         {
-          if (MHD_ERR_AGAIN_ == ret)
+          if (MHD_ERR_AGAIN_ == bytes_sent)
             {
-              /* TODO: Transmission could not be accomplished. Try again. */
-              h2_debug_vprintf (" =================== ADD WRITE EVENT ================== ret=%zd", ret);
-              return; // MHD_YES;
+              /* Transmission could not be accomplished. Try again. */
+              return;
             }
           MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-          return; // MHD_NO;
+          return;
         }
-      connection->write_buffer_send_offset += ret;
 
-      if (connection->write_buffer_append_offset - connection->write_buffer_send_offset == 0)
+      connection->write_buffer_send_offset += bytes_sent;
+      MHD_update_last_activity_ (connection);
+
+      if (bytes_sent == bytes_to_send)
         {
           /* Reset offsets */
           connection->write_buffer_append_offset = 0;
           connection->write_buffer_send_offset = 0;
         }
     }
-
-  /* Fill write buffer */
-  if (h2_fill_write_buffer (h2->session, h2) != 0)
-    {
-      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-      return;
-    }
-
-  h2_debug_vprintf ("h2_fill_write_buffer: send=%d append=%d = %d", connection->write_buffer_send_offset, connection->write_buffer_append_offset, connection->write_buffer_append_offset - connection->write_buffer_send_offset);
-
-  /* More to write */
-  if (connection->write_buffer_append_offset - connection->write_buffer_send_offset != 0)
-    {
-      /* TODO: Add new write event */
-      h2_debug_vprintf (" =================== ADD WRITE EVENT2 ==================");
-    }
-
-  h2_debug_vprintf ("want_read %d want_write %d append-send %d", nghttp2_session_want_read (h2->session),
-                        nghttp2_session_want_write (h2->session),
-                        connection->write_buffer_append_offset - connection->write_buffer_send_offset);
-  if ( (nghttp2_session_want_read (h2->session) == 0) &&
-       (nghttp2_session_want_write (h2->session) == 0) &&
-       (connection->write_buffer_append_offset - connection->write_buffer_send_offset == 0) )
-    {
-      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
-      return;
-    }
-  else
-    {
-      // MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-    }
-  MHD_update_last_activity_ (connection);
-  connection->event_loop_info = MHD_EVENT_LOOP_INFO_READ;
-#ifdef EPOLL_SUPPORT
-  MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
 }
 
 
@@ -212,52 +179,80 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
       return MHD_NO;
     }
 
-  h2_debug_vprintf ("[id=%zu]", h2->session_id, connection->read_buffer_start_offset);
+  h2_debug_vprintf ("[id=%zu]", h2->session_id);
+  sleep(1);
 
-  ssize_t bytes_read = connection->read_buffer_offset - connection->read_buffer_start_offset;
-  ssize_t rv;
-  rv = nghttp2_session_mem_recv (h2->session, &connection->read_buffer[connection->read_buffer_start_offset], bytes_read);
-  if (rv < 0)
+  ssize_t bytes_to_read = connection->read_buffer_offset - connection->read_buffer_start_offset;
+  if (bytes_to_read > 0)
     {
-      if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
-        {
-          h2_debug_vprintf("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
-        }
-      /* Should send a GOAWAY frame with last stream_id successfully received */
-      nghttp2_submit_goaway(h2->session, NGHTTP2_FLAG_NONE, h2->accepted_max,
-                            NGHTTP2_PROTOCOL_ERROR, NULL, 0);
-      nghttp2_session_send(h2->session);
-      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-      return MHD_NO;
+
     }
-  else
-  {
-    h2_debug_vprintf ("nghttp2_session_mem_recv: %d/%d", rv, bytes_read);
-    MHD_update_last_activity_ (connection);
+  // ssize_t rv;
+  // rv = nghttp2_session_mem_recv (h2->session, &connection->read_buffer[connection->read_buffer_start_offset], bytes_read);
+  // if (rv < 0)
+  //   {
+  //     if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
+  //       {
+  //         h2_debug_vprintf("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
+  //       }
+  //     /* Should send a GOAWAY frame with last stream_id successfully received */
+  //     nghttp2_submit_goaway(h2->session, NGHTTP2_FLAG_NONE, h2->accepted_max,
+  //                           NGHTTP2_PROTOCOL_ERROR, NULL, 0);
+  //     nghttp2_session_send(h2->session);
+  //     MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+  //     return MHD_NO;
+  //   }
+  // else
+  // {
+  //   h2_debug_vprintf ("nghttp2_session_mem_recv: %d/%d", rv, bytes_read);
+  //   MHD_update_last_activity_ (connection);
+  //
+  //   /* Update read_buffer offsets */
+  //   connection->read_buffer_start_offset += rv;
+  //   if (connection->read_buffer_offset == connection->read_buffer_start_offset)
+  //     {
+  //       connection->read_buffer_offset = 0;
+  //       connection->read_buffer_start_offset = 0;
+  //     }
+  // }
 
-    /* Update read_buffer offsets */
-    connection->read_buffer_start_offset += rv;
-    if (connection->read_buffer_offset == connection->read_buffer_start_offset)
-      {
-        connection->read_buffer_offset = 0;
-        connection->read_buffer_start_offset = 0;
-      }
-
-    connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-    MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
-  }
-
-  if (connection->write_buffer_append_offset - connection->write_buffer_send_offset != 0)
+  /* Fill write buffer */
+  size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
+  if (bytes_to_send > 0)
     {
-      connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-      MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
+
+    }
+  // if (h2_fill_write_buffer (h2->session, h2) != 0)
+  // if (connection->write_buffer_append_offset - connection->write_buffer_send_offset != 0)
+//     {
+//  MHD_connection_update_event_loop_info (connection) =
+//       connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+//     }
+//
+//     if ( (nghttp2_session_want_read (h2->session) == 0) &&
+//          (nghttp2_session_want_write (h2->session) == 0) )
+//       {
+//         MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+//       }
+//
+//
+
+  time_t timeout = connection->connection_timeout;
+  if ( (0 != timeout) &&
+       (timeout < (MHD_monotonic_sec_counter() - connection->last_activity)) )
+    {
+      MHD_connection_close_ (connection,
+                             MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
+      connection->in_idle = false;
+      return MHD_YES;
     }
 
-  return MHD_YES;
+  int ret = MHD_YES;
+#ifdef EPOLL_SUPPORT
+  ret = MHD_connection_epoll_update_ (connection);
+#endif /* EPOLL_SUPPORT */
+  connection->in_idle = false;
+  return ret;
 
 //   /* TODO: resume all deferred streams */
 //   if (h2 && h2->deferred_stream > 0)
@@ -339,10 +334,11 @@ h2_queue_response (struct MHD_Connection *connection,
       return MHD_NO;
     }
 
-  connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-  MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
+//   connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+// #ifdef EPOLL_SUPPORT
+//   MHD_connection_epoll_update_ (connection);
+// #endif /* EPOLL_SUPPORT */
+// h2_connection_handle_idle (connection);
   return MHD_YES;
 }
 
@@ -407,12 +403,7 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
       MHD_connection_close_ (connection,
                              MHD_REQUEST_TERMINATED_WITH_ERROR);
     }
-
-  /* Send preface */
-  connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-  MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
+  // connection->handle_idle_cls (connection);
 }
 
 

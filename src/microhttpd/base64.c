@@ -22,7 +22,9 @@ static const char base64_digits[] =
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-
+/**
+ * @warning Returned value must be freed.
+ */
 char *
 BASE64Decode(const char* src)
 {

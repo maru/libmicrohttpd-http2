@@ -156,7 +156,7 @@ void print_flags(const nghttp2_frame_hd hd)
       break;
   }
   mhd_assert(s[bufsize - len] == '\0');
-  h2_debug_vprintf ("; %s", s);
+  ENTER ("; %s", s);
 }
 
 /* end of h2_helper.c */

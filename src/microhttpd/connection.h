@@ -215,6 +215,9 @@ connection_add_header (struct MHD_Connection *connection,
                        const char *key, const char *value,
                        enum MHD_ValueKind kind);
 
+int
+parse_cookie_header (struct MHD_Connection *connection);
+
 
 #endif /* ! HTTP2_SUPPORT */
 #endif

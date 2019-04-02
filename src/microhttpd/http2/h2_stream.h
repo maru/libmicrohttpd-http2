@@ -33,7 +33,10 @@
  */
 struct h2_stream_t
 {
-  struct MHD_Connection *connection;
+  /**
+   * Due to current design of MHD, each stream needs a MHD_Connection for itself.
+   */
+  struct MHD_Connection c;
 
   /**
    * Next stream in the streams list.
@@ -56,11 +59,6 @@ struct h2_stream_t
   char *path;
 
   /**
-   * Requested URL.
-   */
-  char *url;
-
-  /**
    * Requested query in URL.
    */
   char *query;
@@ -76,12 +74,6 @@ struct h2_stream_t
    * https://tools.ietf.org/html/rfc3986#section-3.2
    */
   char *authority;
-
-  /**
-   * HTTP response code.  Only valid if response object
-   * is already set.
-   */
-  unsigned int response_code;
 };
 
 struct h2_stream_t*
@@ -91,8 +83,8 @@ void
 h2_stream_destroy (struct h2_stream_t *stream);
 
 int
-h2_stream_parse_cookie_header (struct MHD_Connection *connection,
-                               struct h2_stream_t *stream,
-                               const char *value, size_t valuelen);
+h2_stream_add_header (struct h2_stream_t *stream,
+                      const uint8_t *name, const size_t namelen,
+                      const uint8_t *value, const size_t valuelen);
 
 #endif

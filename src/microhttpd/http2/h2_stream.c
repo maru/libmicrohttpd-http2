@@ -27,11 +27,15 @@
 
 #include "http2/h2.h"
 #include "http2/h2_internal.h"
+#include "connection.h"
 #include "memorypool.h"
 
-/* ================================================================ */
-/*                        Stream operations                         */
-/* ================================================================ */
+extern struct MHD_Daemon *daemon_;
+
+#define H2_HEADER_COOKIE     "cookie"
+#define H2_HEADER_COOKIE_LEN  6
+#define H2_HEADER_CONTENT_LENGTH     "content-length"
+#define H2_HEADER_CONTENT_LENGTH_LEN 14
 
 /**
  * Create a new stream structure and add it to the session.
@@ -52,8 +56,8 @@ h2_stream_create (int32_t stream_id, size_t pool_size)
 
   stream->stream_id = stream_id;
 
-  stream->pool = MHD_pool_create (pool_size);
-  if (NULL == stream->pool)
+  stream->c.pool = MHD_pool_create (pool_size);
+  if (NULL == stream->c.pool)
     {
       free (stream);
       return NULL;
@@ -72,129 +76,85 @@ h2_stream_create (int32_t stream_id, size_t pool_size)
 void
 h2_stream_destroy (struct h2_stream_t *stream)
 {
-  // h2_debug_vprintf ("id=%zu stream_id=%zu", h2->session_id, stream->stream_id);
-  if (stream->response)
+  ENTER ("stream_id=%zu", stream->stream_id);
+  if (stream->c.response)
     {
-      MHD_destroy_response (stream->response);
-      stream->response = NULL;
+      MHD_destroy_response (stream->c.response);
+      stream->c.response = NULL;
 
-      struct MHD_Connection *connection = stream->connection;
-      struct MHD_Daemon *daemon = connection->daemon;
-      if ((NULL != daemon->notify_completed) && (connection->client_aware))
+      if ((NULL != daemon_->notify_completed) && (stream->c.client_aware))
         {
-          connection->client_aware = false;
-          daemon->notify_completed (daemon->notify_completed_cls,
-            connection, &connection->client_context,
+          stream->c.client_aware = false;
+          daemon_->notify_completed (daemon_->notify_completed_cls,
+            &stream->c, &stream->c.client_context,
             MHD_REQUEST_TERMINATED_COMPLETED_OK);
         }
     }
-  MHD_pool_destroy (stream->pool);
-  stream->pool = NULL;
+  MHD_pool_destroy (stream->c.pool);
   free (stream);
 }
 
 
 /**
- * Parse the cookie header (see RFC 2109).
+ * Add an entry to the HTTP headers of a stream.
  *
- * @param connection connection to parse header of
- * @param stream     stream we are processing
- * @param value      cookie header value
- * @param valuelen   length of cookie header value
- * @return #MHD_YES for success, #MHD_NO for failure (malformed, out of memory)
+ * @param connection connection to handle
+ * @param h2       HTTP/2 session
+ * @param stream     current stream
+ * @param name       header name
+ * @param namelen    length of header name
+ * @param value      header value
+ * @param valuelen   length of header value
+ * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 int
-h2_stream_parse_cookie_header (struct MHD_Connection *connection,
-                               struct h2_stream_t *stream,
-                               const char *value, size_t valuelen)
+h2_stream_add_header (struct h2_stream_t *stream,
+                      const uint8_t *name, const size_t namelen,
+                      const uint8_t *value, const size_t valuelen)
 {
-  char *pos;
-  char *sce;
-  char *ekill;
-  char *equals;
-  char *semicolon;
-  char old;
-  int quotes;
-
-  pos = MHD_pool_allocate (stream->pool, valuelen + 1, MHD_YES);
-  if (NULL == pos)
+  if ( (namelen == H2_HEADER_CONTENT_LENGTH_LEN) &&
+            (0 == strcmp (H2_HEADER_CONTENT_LENGTH, name)) )
     {
-  #ifdef HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-                _("Not enough memory in pool to parse cookies!\n"));
-  #endif
-        return MHD_NO;
+      stream->c.remaining_upload_size = atol(value);
+      return 0;
     }
-  memcpy (pos, value, valuelen + 1);
 
-  while (NULL != pos)
+  char *key = MHD_pool_allocate (stream->c.pool, namelen + 1, MHD_YES);
+  char *val = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
+
+  if ((NULL == key) || (NULL == val))
     {
-      while (' ' == *pos)
-        pos++;                  /* skip spaces */
-
-      sce = pos;
-      while ( ((*sce) != '\0') &&
-              ((*sce) != ',') &&
-              ((*sce) != ';') &&
-              ((*sce) != '=') )
-        sce++;
-      /* remove tailing whitespace (if any) from key */
-      ekill = sce - 1;
-      while ((*ekill == ' ') && (ekill >= pos))
-        *(ekill--) = '\0';
-      old = *sce;
-      *sce = '\0';
-      if (old != '=')
-      {
-        /* value part omitted, use empty string... */
-        if (MHD_NO == MHD_set_connection_value (connection, MHD_COOKIE_KIND, pos, ""))
-          {
-          #ifdef HAVE_MESSAGES
-            MHD_DLOG (connection->daemon,
-                        _("Not enough memory in pool to allocate header record!\n"));
-          #endif
-            return MHD_NO;
-          }
-        if (old == '\0')
-          break;
-        pos = sce + 1;
-        continue;
-      }
-      equals = sce + 1;
-      quotes = 0;
-      semicolon = equals;
-      while (('\0' != semicolon[0]) &&
-             ((0 != quotes) || ((';' != semicolon[0]) &&
-             (',' != semicolon[0]))))
-        {
-          if ('"' == semicolon[0])
-            quotes = (quotes + 1) & 1;
-          semicolon++;
-        }
-      if ('\0' == semicolon[0])
-        semicolon = NULL;
-      if (NULL != semicolon)
-        {
-          semicolon[0] = '\0';
-          semicolon++;
-        }
-      /* remove quotes */
-      if (('"' == equals[0]) && ('"' == equals[strlen (equals) - 1]))
-        {
-          equals[strlen (equals) - 1] = '\0';
-          equals++;
-        }
-      if (MHD_NO == MHD_set_connection_value (connection, MHD_COOKIE_KIND, pos, equals))
-        {
-          #ifdef HAVE_MESSAGES
-            MHD_DLOG (connection->daemon,
-                        _("Not enough memory in pool to allocate header record!\n"));
-          #endif
-          return MHD_NO;
-        }
-      pos = semicolon;
+      stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-  return MHD_YES;
+
+  strncpy (key, name, namelen + 1);
+  strncpy (val, value, valuelen + 1);
+
+  int r;
+  if ( (namelen == H2_HEADER_COOKIE_LEN) &&
+       (0 == strcmp (H2_HEADER_COOKIE, name)) )
+    {
+      r = MHD_set_connection_value (&stream->c, MHD_COOKIE_KIND, key, val);
+      r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : MHD_NO;
+    }
+  else
+  {
+    /* Other headers */
+    r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
+  }
+
+  if (MHD_NO == r)
+    {
+#ifdef HAVE_MESSAGES
+      MHD_DLOG (daemon_,
+                  _("Not enough memory in pool to allocate header record!\n"));
+#endif
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+
+  return 0;
 }
+
 
 /* end of h2_stream.c */

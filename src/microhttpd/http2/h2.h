@@ -36,7 +36,7 @@
 
 #ifdef HTTP2_SUPPORT
 
-#define HTTP2_DEBUG 1
+#define HTTP2_DEBUG DEBUG_STATES
 
 #define MHD_HTTP_VERSION_2_0 "HTTP/2"
 

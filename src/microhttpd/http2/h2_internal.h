@@ -30,21 +30,23 @@
 
 #include "http2/h2_session.h"
 #include "http2/h2_stream.h"
+#include "http2/h2_callbacks.h"
 
-#ifdef HTTP2_SUPPORT
-
-char * FRAME_TYPE (int type);
+char* FRAME_TYPE (int type);
 void print_flags (const nghttp2_frame_hd hd);
 
 #if HTTP2_DEBUG
 
 struct timeval h2_util_tm_start;
 
+struct MHD_Daemon *daemon_;
+
 #define COLOR_RED    "\033[31;1m"
 #define COLOR_WHITE  "\033[0m"
 #define COLOR_YELLOW "\033[33m"
+#define PRINT_RECV "\033[1;36m"
 #define do_color(code) (color ? code : "")
-#define h2_debug_vprintf(format, args...) { \
+#define ENTER(format, args...) { \
   int color = isatty(fileno(stderr)); \
   struct timeval now; \
   gettimeofday(&now, NULL); \
@@ -58,7 +60,5 @@ struct timeval h2_util_tm_start;
   fprintf(stderr, format "\n", ##args); \
 }
 #endif /* HTTP2_DEBUG */
-
-#endif /* HTTP2_SUPPORT */
 
 #endif

@@ -2080,7 +2080,7 @@ connection_add_header (struct MHD_Connection *connection,
  * @param connection connection to parse header of
  * @return #MHD_YES for success, #MHD_NO for failure (malformed, out of memory)
  */
-static int
+int
 parse_cookie_header (struct MHD_Connection *connection)
 {
   const char *hdr;

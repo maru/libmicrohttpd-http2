@@ -71,7 +71,7 @@ h2_is_h2_upgrade (struct MHD_Connection *connection)
     {
       return MHD_NO;
     }
-  h2_debug_vprintf ("yes");
+  ENTER ("yes");
   return MHD_YES;
 }
 

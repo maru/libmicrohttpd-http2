@@ -44,11 +44,6 @@ struct h2_session_t
   size_t session_id;
 
   /**
-   * Pointer to connection.
-   */
-  struct MHD_Connection *connection;
-
-  /**
    * Session settings.
    */
   h2_settings_entry *settings;
@@ -59,7 +54,7 @@ struct h2_session_t
   size_t settings_len;
 
   /**
-   * Head of doubly linked list of current streams.
+   * Dummy head of doubly linked list of current streams.
    */
   struct h2_stream_t *streams;
 
@@ -94,20 +89,26 @@ struct h2_session_t
   size_t data_pending_len; //?
 };
 
-int
-h2_fill_write_buffer (nghttp2_session *session, void *user_data);
+void
+h2_session_add_stream (struct h2_session_t *h2, struct h2_stream_t *stream);
 
-int
-h2_session_build_stream_headers (struct h2_session_t *h2,
-                    struct h2_stream_t *stream, struct MHD_Response *response);
+void
+h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream);
+
+ssize_t
+h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen);
+
+ssize_t
+h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen);
 
 struct h2_session_t *
-h2_session_create (struct MHD_Connection *connection);
+h2_session_create ();
 
 void
 h2_session_destroy (struct h2_session_t *h2);
 
 int
-h2_session_upgrade (struct h2_session_t *h2, const char *settings, const char *method);
+h2_session_upgrade (struct h2_session_t *h2,
+                    const char *settings, const char *method);
 
 #endif

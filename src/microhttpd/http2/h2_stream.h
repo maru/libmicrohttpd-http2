@@ -54,16 +54,6 @@ struct h2_stream_t
   size_t stream_id;
 
   /**
-   * Requested absolute path.
-   */
-  char *path;
-
-  /**
-   * Requested query in URL.
-   */
-  char *query;
-
-  /**
    * Scheme (e.g., http).
    * https://tools.ietf.org/html/rfc3986#section-3.1
    */

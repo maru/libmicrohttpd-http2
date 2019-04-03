@@ -76,17 +76,17 @@ struct h2_session_t
   /**
    * Highest remote stream identifier was handled.
    */
-  size_t accepted_max;
+  size_t last_stream_id;
 
   /**
    * Data pending to write in the write_buffer.
    */
-  const uint8_t *data_pending; //?
+  const uint8_t *pending_write_data; //?
 
   /**
    * Length of data pending.
    */
-  size_t data_pending_len; //?
+  size_t pending_write_data_len; //?
 };
 
 void

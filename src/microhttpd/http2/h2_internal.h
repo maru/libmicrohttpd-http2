@@ -44,6 +44,7 @@ struct MHD_Daemon *daemon_;
 #define COLOR_RED    "\033[31;1m"
 #define COLOR_WHITE  "\033[0m"
 #define COLOR_YELLOW "\033[33m"
+#define PRINT_SEND "\033[1;35m"
 #define PRINT_RECV "\033[1;36m"
 #define do_color(code) (color ? code : "")
 #define ENTER(format, args...) { \

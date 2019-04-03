@@ -64,6 +64,8 @@ char status_string[600][4] = {
  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "" };
 
+const size_t MHD_HTTP_HEADER_HOST_LEN = strlen(MHD_HTTP_HEADER_HOST);
+
 typedef struct {
   const char *name;
   size_t len;
@@ -86,6 +88,187 @@ static ssize_t
 response_read_cb (nghttp2_session*, int32_t, uint8_t*, size_t, uint32_t*,
                   nghttp2_data_source*, void*);
 
+static int
+h2_transmit_error_response (struct h2_session_t *h2, struct h2_stream_t *stream);
+
+/**
+ * The reception of a header block in HEADERS or PUSH_PROMISE is started.
+ * Create a stream.
+ *
+ * @param session    current http2 session
+ * @param frame      frame received
+ * @param user_data  HTTP2 connection of type h2_session_t
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+static int
+on_begin_headers_cb (nghttp2_session *session,
+                     const nghttp2_frame *frame, void *user_data)
+{
+  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_stream_t *stream;
+  // ENTER ("XXXX [id=%zu]", h2->session_id);
+
+  if ( !((frame->hd.type == NGHTTP2_HEADERS) &&
+         (frame->headers.cat == NGHTTP2_HCAT_REQUEST)) )
+    {
+      /* Frame is not beginning of a new stream */
+      return 0;
+    }
+
+  int32_t stream_id = frame->hd.stream_id;
+  stream = h2_stream_create (stream_id, daemon_->pool_size);
+  if (NULL == stream)
+    {
+      /* Out of memory */
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+  int rv;
+  rv = nghttp2_session_set_stream_user_data (session, stream_id, stream);
+  if (rv != 0)
+    {
+      h2_stream_destroy (stream);
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+  h2_session_add_stream (h2, stream);
+  h2->num_streams++;
+  h2->last_stream_id = stream_id;
+
+  return 0;
+}
+
+
+static int
+header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuelen)
+{
+  /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
+  if (NULL != daemon_->uri_log_callback)
+    {
+      stream->c.client_aware = true;
+      stream->c.client_context
+          = daemon_->uri_log_callback (daemon_->uri_log_callback_cls,
+                                       stream->c.url, &stream->c);
+    }
+  char *args;
+  args = memchr (value, '?', valuelen);
+
+  if (NULL != args)
+    {
+      args[0] = '\0';
+      size_t argslen = valuelen - 1;
+      valuelen = (size_t)(args - (char *) value);
+      argslen -= valuelen;
+      args++;
+
+      char *fragment = memchr (args, '#', argslen);
+      if (NULL != fragment)
+        {
+          fragment[0] = '\0';
+          argslen = (size_t)(fragment - (char *) args);
+        }
+
+      /* note that this call clobbers 'query' */
+      unsigned int unused_num_headers;
+
+      MHD_parse_arguments_ (&stream->c, MHD_GET_ARGUMENT_KIND, args,
+        &connection_add_header, &unused_num_headers);
+
+    }
+  return 0;
+}
+/**
+ * A header name/value pair is received for the frame.
+ *
+ * @param session  current http2 session
+ * @param frame    frame received
+ * @param name     header name
+ * @param namelen  length of header name
+ * @param value    header value
+ * @param valuelen length of header value
+ * @param flags    flags for header field name/value pair
+ * @param user_data  HTTP2 connection of type h2_session_t
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+static int
+on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
+              const uint8_t *name,  size_t namelen,
+              const uint8_t *value, size_t valuelen,
+              uint8_t flags, void *user_data)
+{
+  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_stream_t *stream;
+
+  ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
+
+  /* Get stream */
+  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  if (NULL == stream)
+    {
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+  /* Not a pseudo header :hhhhhh */
+  if ( (namelen > 0) && (name[0] != ':') )
+    {
+      return h2_stream_add_header (stream, name, namelen, value, valuelen);
+    }
+
+  int header;
+  for (header = 0; header < sizeof (h2_pseudo_headers); header++)
+    {
+      if ( (namelen == h2_pseudo_headers[header].len) &&
+           (0 == strcmp (h2_pseudo_headers[header].name, name)) )
+        break;
+    }
+
+  if (H2_HEADER_AUTH == header)
+    {
+      /* Add header Host: */
+      return h2_stream_add_header (stream,
+                                   MHD_HTTP_HEADER_HOST, MHD_HTTP_HEADER_HOST_LEN,
+                                   value, valuelen);
+    }
+
+  char *buf = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
+  if (NULL == buf)
+    {
+      stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
+      return h2_transmit_error_response (h2, stream);
+    }
+  strcpy (buf, value);
+
+  switch (header)
+    {
+      /* :method */
+      case H2_HEADER_METHOD:
+        stream->c.method = buf;
+        break;
+
+      /* :scheme */
+      case H2_HEADER_SCHEME:
+        stream->scheme = buf;
+        break;
+
+      /* :path */
+      case H2_HEADER_PATH:
+        daemon_->unescape_callback (daemon_->unescape_callback_cls,
+                                    &stream->c, buf);
+        stream->c.url = buf;
+        return header_parse_path (stream, value, valuelen);
+        break;
+
+      /* :authority */
+      case H2_HEADER_AUTH:
+        break;
+
+      default:
+        mhd_assert (header >= sizeof (h2_pseudo_headers));
+        break;
+    }
+  return 0;
+}
+
 
 /**
  * Fill header name/value pair.
@@ -94,7 +277,7 @@ response_read_cb (nghttp2_session*, int32_t, uint8_t*, size_t, uint32_t*,
  * @param key   name of header
  * @param value value of header
  */
-void
+static void
 add_header (nghttp2_nv *nv, const char *key, const char *value)
 {
   nv->name = (uint8_t*)key;
@@ -114,13 +297,13 @@ add_header (nghttp2_nv *nv, const char *key, const char *value)
  * @param upload_data_size  the size of the upload_data provided
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
-int
+static int
 h2_call_connection_handler (struct h2_stream_t *stream, nghttp2_session *session,
                             char *upload_data, size_t *upload_data_size)
 {
   if ((NULL != stream->c.response) || (stream->c.responseCode != 0))
     return 0;                     /* already queued a response */
-  // ENTER ("[id=%zu] method %s url %s", connection->h2->session_id, stream->c.method, stream->c.url);
+  ENTER ("XXXX method %s url %s", stream->c.method, stream->c.url);
   stream->c.client_aware = true;
   if (MHD_NO ==
       daemon_->default_handler (daemon_->default_handler_cls,
@@ -131,7 +314,8 @@ h2_call_connection_handler (struct h2_stream_t *stream, nghttp2_session *session
       /* serious internal error, close stream */
       nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
                                 stream->stream_id, NGHTTP2_INTERNAL_ERROR);
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+      ENTER ("XXXX fail!");
+      return 0; //NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
   return 0;
 }
@@ -147,13 +331,14 @@ h2_call_connection_handler (struct h2_stream_t *stream, nghttp2_session *session
  * @param response response to transmit
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
+// static
 int
 h2_build_stream_headers (struct h2_session_t *h2, struct h2_stream_t *stream,
                   struct MHD_Response *response)
 {
   nghttp2_nv *nva;
   size_t nvlen = 2;
-  ENTER ("[id=%zu]", h2->session_id);
+  ENTER ("XXXX [id=%zu]", h2->session_id);
 
   /* Count the number of headers to send */
   struct MHD_HTTP_Header *pos;
@@ -235,9 +420,10 @@ h2_build_stream_headers (struct h2_session_t *h2, struct h2_stream_t *stream,
  * @param stream   current stream
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
-int
+static int
 h2_transmit_error_response (struct h2_session_t *h2, struct h2_stream_t *stream)
 {
+  ENTER("XXXX");
   return h2_build_stream_headers (h2, stream, NULL);
 }
 
@@ -271,7 +457,7 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
   struct MHD_Response *response;
   ssize_t nread;
 
-  // ENTER ("[id=%zu]", h2->session_id);
+  ENTER ("XXXX [id=%zu]", h2->session_id);
   /* Get current stream */
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
@@ -420,7 +606,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
   size_t pos;
   mhd_assert (h2 != NULL);
 
-  // ENTER ("[id=%zu]", h2->session_id);
+  ENTER ("XXXX [id=%zu]", h2->session_id);
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (NULL == stream)
     {
@@ -459,7 +645,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       /* Buffer response */
       pos = (size_t) stream->c.response_write_position - response->data_start;
       memcpy (buffer, &response->data[pos], length);
-      // ENTER ("pos %d len %d", pos, length);
+      ENTER ("XXXX pos %d len %d", pos, length);
     }
   else if ((response->crc != NULL) && (length > 0))
     {
@@ -480,7 +666,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
     }
 
   *(buffer + length) = 0;
-  ENTER ("%s", buffer);
+  ENTER ("XXXX %s", buffer);
 
   /* Set padding */
   if (padlen > 0)
@@ -489,7 +675,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       memset (buffer, 0, padlen - 1);
     }
 
-  // ENTER ("size:%d pos %d len %d", stream->c.write_buffer_size, stream->c.response_write_position, length);
+  ENTER ("XXXX size:%d pos %d len %d", stream->c.write_buffer_size, stream->c.response_write_position, length);
   stream->c.response_write_position += length;
 
   /* Reset data buffer */
@@ -526,7 +712,7 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
   mhd_assert (h2 != NULL);
-  // ENTER ("[id=%zu] len: %zu", h2->session_id, len);
+  ENTER ("XXXX [id=%zu] len: %zu", h2->session_id, len);
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
@@ -606,14 +792,13 @@ on_frame_recv_cb (nghttp2_session *session,
   struct h2_stream_t *stream;
 
   /* FIXME h2_debug_print_frame */
-  ENTER ("[id=%zu] recv %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>",
+  ENTER ("XXXX [id=%zu] recv %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>",
       h2->session_id, do_color(PRINT_RECV), FRAME_TYPE (frame->hd.type), do_color(COLOR_WHITE),
       frame->hd.length, frame->hd.flags, frame->hd.stream_id);
   if (frame->hd.flags) print_flags(frame->hd);
   /*  */
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-
   /* Stream not found: frame is not HEADERS, PUSH_PROMISE or DATA */
   if (NULL == stream)
     {
@@ -625,6 +810,7 @@ on_frame_recv_cb (nghttp2_session *session,
     case NGHTTP2_HEADERS:
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
         {
+          /* FIXME */
           if (need_100_continue (&stream->c))
             {
               nghttp2_nv nva;
@@ -671,66 +857,22 @@ on_frame_recv_cb (nghttp2_session *session,
  * @param user_data  HTTP2 connection of type h2_session_t
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
-int
+static int
 on_frame_send_cb (nghttp2_session *session,
                         const nghttp2_frame *frame, void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  ENTER ("[id=%zu] send %s frame <length=%zu, flags=0x%02X, stream_id=%u>", h2->session_id, FRAME_TYPE (frame->hd.type), frame->hd.length, frame->hd.flags, frame->hd.stream_id);
+  ENTER ("XXXX [id=%zu] send %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>",
+    h2->session_id, do_color(PRINT_SEND), FRAME_TYPE (frame->hd.type), do_color(COLOR_WHITE),
+    frame->hd.length, frame->hd.flags, frame->hd.stream_id);
   if (frame->hd.type == NGHTTP2_HEADERS)
     {
       nghttp2_nv *nva = frame->headers.nva;
       nghttp2_nv *end = frame->headers.nva + frame->headers.nvlen;
       for (; nva != end; ++nva)
         {
-          ENTER ("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), nva->name, do_color("\033[0m"), nva->value);
+          ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), nva->name, do_color("\033[0m"), nva->value);
         }
-    }
-  return 0;
-}
-
-
-/**
- * The reception of a header block in HEADERS or PUSH_PROMISE is started.
- * Create a stream.
- *
- * @param session    current http2 session
- * @param frame      frame received
- * @param user_data  HTTP2 connection of type h2_session_t
- * @return If succeeds, returns 0. Otherwise, returns an error.
- */
-static int
-on_begin_headers_cb (nghttp2_session *session,
-                     const nghttp2_frame *frame, void *user_data)
-{
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  struct h2_stream_t *stream;
-  ENTER ("[id=%zu]", h2->session_id);
-
-  if ((frame->hd.type != NGHTTP2_HEADERS) ||
-      (frame->headers.cat != NGHTTP2_HCAT_REQUEST))
-    {
-      return 0;
-    }
-
-  int32_t stream_id = frame->hd.stream_id;
-  stream = h2_stream_create (stream_id, daemon_->pool_size);
-  if (NULL == stream)
-    {
-      // Out of memory.
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-  h2->num_streams++;
-  h2->accepted_max = stream_id;
-
-  h2_session_add_stream (h2, stream);
-
-  int rv;
-  rv = nghttp2_session_set_stream_user_data (session, stream_id, stream);
-  if (rv != 0)
-    {
-      h2_session_remove_stream (h2, stream);
-      return rv;
     }
   return 0;
 }
@@ -752,7 +894,7 @@ error_cb (nghttp2_session *session,
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   mhd_assert (h2 != NULL);
-  ENTER ("[id=%zu] %s", h2->session_id, msg);
+  ENTER ("XXXX [id=%zu] %s", h2->session_id, msg);
   return 0;
 }
 
@@ -774,7 +916,7 @@ on_invalid_frame_recv_cb (nghttp2_session *session,
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   mhd_assert (h2 != NULL);
-  ENTER ("[id=%zu] INVALID: %s", h2->session_id, nghttp2_strerror(error_code));
+  ENTER ("XXXX [id=%zu] INVALID: %s", h2->session_id, nghttp2_strerror(error_code));
   return 0;
 }
 
@@ -802,167 +944,7 @@ on_invalid_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
 {
   (void)flags;
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  ENTER ("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
-  return 0;
-}
-
-
-/**
- * A header name/value pair is received for the frame.
- *
- * @param session  current http2 session
- * @param frame    frame received
- * @param name     header name
- * @param namelen  length of header name
- * @param value    header value
- * @param valuelen length of header value
- * @param flags    flags for header field name/value pair
- * @param user_data  HTTP2 connection of type h2_session_t
- * @return If succeeds, returns 0. Otherwise, returns an error.
- */
-static int
-on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
-                    const uint8_t *name,  size_t namelen,
-                    const uint8_t *value, size_t valuelen,
-                    uint8_t flags, void *user_data)
-{
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  struct h2_stream_t *stream;
-
-  ENTER ("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
-
-  /* Get stream */
-  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-  if (NULL == stream)
-    {
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-  /* Not a pseudo header :aabbcc */
-  if ( (namelen > 0) && (name[0] != ':') )
-    {
-      return h2_stream_add_header (stream,
-                                              name, namelen, value, valuelen);
-    }
-
-  int header;
-  for (header = 0; header < sizeof (h2_pseudo_headers); header++)
-    {
-      if ( (namelen == h2_pseudo_headers[header].len) &&
-           (0 == strcmp (h2_pseudo_headers[header].name, name)) )
-        break;
-    }
-
-  switch (header)
-    {
-      /* :method */
-      case H2_HEADER_METHOD:
-        stream->c.method = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
-        if (NULL == stream->c.method)
-          {
-            stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
-            return h2_transmit_error_response (h2, stream);
-          }
-        strcpy (stream->c.method, value);
-        break;
-
-      /* :scheme */
-      case H2_HEADER_SCHEME:
-        stream->scheme = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
-        if (NULL == stream->scheme)
-          {
-            stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
-            return h2_transmit_error_response (h2, stream);
-          }
-        strcpy (stream->scheme, value);
-        break;
-
-      /* :path */
-      case H2_HEADER_PATH:
-        stream->path = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
-        if (NULL == stream->path)
-          {
-            stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
-            return h2_transmit_error_response (h2, stream);
-          }
-        strcpy(stream->path, value);
-
-        /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
-        if (NULL != daemon_->uri_log_callback)
-          {
-            stream->c.client_aware = true;
-            stream->c.client_context
-                = daemon_->uri_log_callback (daemon_->uri_log_callback_cls,
-                                             stream->path, &stream->c);
-          }
-        char *args;
-        args = memchr (value, '?', valuelen);
-
-        if (NULL != args)
-          {
-            args[0] = '\0';
-            size_t argslen = valuelen - 1;
-            valuelen = (size_t)(args - (char *) value);
-            argslen -= valuelen;
-            args++;
-
-            // TODO
-            // char *fragment = memchr (args, '#', argslen);
-            // if (NULL != fragment)
-            // {
-            //   fragment[0] = '\0';
-            //   argslen = (size_t)(fragment - (char *) args);
-            // }
-
-            stream->query = MHD_pool_allocate (stream->c.pool, argslen + 1, MHD_YES);
-            if (NULL == stream->query)
-              {
-                stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
-                return h2_transmit_error_response (h2, stream);
-              }
-            strcpy (stream->query, args);
-
-            /* note that this call clobbers 'query' */
-            unsigned int unused_num_headers;
-
-            MHD_parse_arguments_ (&stream->c, MHD_GET_ARGUMENT_KIND, stream->query,
-              &connection_add_header, &unused_num_headers);
-
-          }
-
-        /* Absolute path */
-        stream->c.url = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
-        if (NULL == stream->c.url)
-          {
-            stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
-            return h2_transmit_error_response (h2, stream);
-          }
-        strcpy (stream->c.url, value);
-
-        /* Decode %HH */
-        if (NULL != stream->c.url)
-          {
-            daemon_->unescape_callback (daemon_->unescape_callback_cls,
-                                        &stream->c, stream->c.url);
-          }
-        break;
-
-      /* :authority */
-      case H2_HEADER_AUTH:
-        stream->authority = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
-        if (NULL == stream->authority)
-          {
-            stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
-            return h2_transmit_error_response (h2, stream);
-          }
-        strcpy (stream->authority, value);
-        return h2_stream_add_header (stream,
-                                 MHD_HTTP_HEADER_HOST, strlen(MHD_HTTP_HEADER_HOST),
-                                 value, valuelen);
-        break;
-      default:
-        mhd_assert (header >= sizeof (h2_pseudo_headers));
-        break;
-    }
+  ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
   return 0;
 }
 
@@ -983,14 +965,14 @@ on_stream_close_cb (nghttp2_session *session, int32_t stream_id,
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
   (void)error_code;
-  ENTER ("[id=%zu] stream_id=%zu", h2->session_id, stream_id);
+  ENTER ("XXXX [id=%zu] stream_id=%zu", h2->session_id, stream_id);
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (stream != NULL)
     {
       if (error_code)
         {
-          ENTER ("[stream_id=%d] Closing with err=%s", stream_id, nghttp2_strerror(error_code));
+          ENTER ("XXXX [stream_id=%d] Closing with err=%s", stream_id, nghttp2_strerror(error_code));
           nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
                                     stream_id, error_code);
         }
@@ -1025,32 +1007,32 @@ h2_session_set_callbacks (struct h2_session_t *h2)
   nghttp2_session_callbacks_set_on_frame_recv_callback (callbacks,
     on_frame_recv_cb);
 
-  // nghttp2_session_callbacks_set_on_frame_send_callback (callbacks,
-  //   on_frame_send_cb);
-  //
-  // nghttp2_session_callbacks_set_on_stream_close_callback (callbacks,
-  //   on_stream_close_cb);
-  //
-  // nghttp2_session_callbacks_set_on_header_callback (callbacks,
-  //   on_header_cb);
-  //
-  // nghttp2_session_callbacks_set_on_data_chunk_recv_callback (callbacks,
-  //   on_data_chunk_recv_cb);
-  //
-  // nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (callbacks,
-  //   on_invalid_frame_recv_cb);
-  //
-  // nghttp2_session_callbacks_set_error_callback (callbacks,
-  //   error_cb);
-  //
-  // nghttp2_session_callbacks_set_on_begin_headers_callback (callbacks,
-  //   on_begin_headers_cb);
-  //
-  // nghttp2_session_callbacks_set_send_data_callback (callbacks,
-  //   send_data_cb);
-  //
-  // nghttp2_session_callbacks_set_on_invalid_header_callback (callbacks,
-  //   on_invalid_header_cb);
+  nghttp2_session_callbacks_set_on_frame_send_callback (callbacks,
+    on_frame_send_cb);
+
+  nghttp2_session_callbacks_set_on_stream_close_callback (callbacks,
+    on_stream_close_cb);
+
+  nghttp2_session_callbacks_set_on_header_callback (callbacks,
+    on_header_cb);
+
+  nghttp2_session_callbacks_set_on_data_chunk_recv_callback (callbacks,
+    on_data_chunk_recv_cb);
+
+  nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (callbacks,
+    on_invalid_frame_recv_cb);
+
+  nghttp2_session_callbacks_set_error_callback (callbacks,
+    error_cb);
+
+  nghttp2_session_callbacks_set_on_begin_headers_callback (callbacks,
+    on_begin_headers_cb);
+
+  nghttp2_session_callbacks_set_send_data_callback (callbacks,
+    send_data_cb);
+
+  nghttp2_session_callbacks_set_on_invalid_header_callback (callbacks,
+    on_invalid_header_cb);
 
   rv = nghttp2_session_server_new (&h2->session, callbacks, h2);
   if (rv != 0)

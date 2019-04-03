@@ -33,6 +33,9 @@
 #include "mhd_str.h"
 #include "response.h"
 
+#undef COLOR_RED
+#define COLOR_RED    "\033[32;1m"
+
 #define H2_MAGIC_TOKEN "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define H2_MAGIC_TOKEN_LEN_MIN 16
 #define H2_MAGIC_TOKEN_LEN 24
@@ -47,7 +50,7 @@ extern struct MHD_Daemon *daemon_;
 void
 h2_connection_handle_read (struct MHD_Connection *connection)
 {
-  ENTER();
+  // ENTER();
   ssize_t bytes_read;
   if (MHD_CONNECTION_CLOSED == connection->state)
     return;
@@ -68,7 +71,7 @@ h2_connection_handle_read (struct MHD_Connection *connection)
   struct h2_session_t *h2 = connection->h2;
 
   mhd_assert (NULL != h2);
-  ENTER ("[id=%zu]", h2->session_id);
+  // ENTER ("[id=%zu]", h2->session_id);
 
   bytes_read = connection->recv_cls (connection,
                                      &connection->read_buffer
@@ -76,7 +79,7 @@ h2_connection_handle_read (struct MHD_Connection *connection)
                                      connection->read_buffer_size -
                                      connection->read_buffer_offset);
 
-  ENTER ("read=%zd", bytes_read);
+  // ENTER ("recv(): %zd", bytes_read);
 
   if (bytes_read < 0)
     {
@@ -115,10 +118,9 @@ h2_connection_handle_read (struct MHD_Connection *connection)
 void
 h2_connection_handle_write (struct MHD_Connection *connection)
 {
-  ENTER();
   struct h2_session_t *h2 = connection->h2;
   mhd_assert (NULL != h2);
-  ENTER ("[id=%zu]", h2->session_id);
+  // ENTER ("[id=%zu]", h2->session_id);
 
   if (MHD_CONNECTION_CLOSED == connection->state)
     return;
@@ -128,7 +130,7 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
 
   size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
-  ENTER ("bytes_to_send = %zd", bytes_to_send);
+  // ENTER ("bytes_to_send = %zd", bytes_to_send);
 
   if (bytes_to_send > 0)
     {
@@ -136,7 +138,7 @@ h2_connection_handle_write (struct MHD_Connection *connection)
       const char *write_buffer = &connection->write_buffer[connection->write_buffer_send_offset];
 
       bytes_sent = connection->send_cls (connection, write_buffer, bytes_to_send);
-      ENTER ("send_cls = %zd / %zd", bytes_sent, bytes_to_send);
+      // ENTER ("send(): %zd / %zd", bytes_sent, bytes_to_send);
 
       if (bytes_sent < 0)
         {
@@ -172,7 +174,6 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 int
 h2_connection_handle_idle (struct MHD_Connection *connection)
 {
-  ENTER();
   struct h2_session_t *h2 = connection->h2;
 
   connection->in_idle = true;
@@ -184,7 +185,7 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
       return MHD_NO;
     }
 
-  ENTER ("[id=%zu]", h2->session_id);
+  // ENTER ("[id=%zu]", h2->session_id);
 
   size_t bytes_to_read = connection->read_buffer_offset - connection->read_buffer_start_offset;
   if (bytes_to_read > 0)
@@ -201,7 +202,7 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
           return MHD_NO;
         }
 
-      ENTER ("bytes_to_read: %d/%d", rv, bytes_to_read);
+      // ENTER ("bytes read: %d/%d", rv, bytes_to_read);
 
       /* Update read_buffer offsets */
       connection->read_buffer_start_offset += rv;
@@ -214,9 +215,9 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
 
   /* Fill write buffer */
   size_t left = connection->write_buffer_size - connection->write_buffer_append_offset;
-  ENTER("%d / %d / %d", connection->write_buffer_size, connection->write_buffer_send_offset, connection->write_buffer_append_offset);
+  // ENTER("%d / %d / %d", connection->write_buffer_size, connection->write_buffer_send_offset, connection->write_buffer_append_offset);
   size_t bytes_to_send = h2_session_write_data (h2, connection->write_buffer, left);
-  ENTER("Now fill write buffer = %d/%d", bytes_to_send, left);
+  // ENTER("bytes to write = %d/%d", bytes_to_send, left);
   if (bytes_to_send < 0)
     {
       MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
@@ -254,10 +255,9 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
     }
 
   time_t timeout = connection->connection_timeout;
-  if ( (0 != timeout) &&
-       (timeout < (MHD_monotonic_sec_counter() - connection->last_activity)) )
+  if ( (bytes_to_send <= 0) && (0 != timeout) &&
+       (timeout <= (MHD_monotonic_sec_counter() - connection->last_activity)) )
     {
-      ENTER("timeout");
       MHD_connection_close_ (connection,
                              MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
     }
@@ -314,50 +314,47 @@ h2_queue_response (struct MHD_Connection *connection,
                    unsigned int status_code,
                    struct MHD_Response *response)
 {
-  ENTER();
-  return MHD_YES;
+  struct h2_session_t *h2 = connection->h2;
+  struct h2_stream_t *stream;
 
-//   struct h2_session_t *h2 = connection->h2;
-//   struct h2_stream_t *stream;
-//
-//   mhd_assert (h2 != NULL);
-//   ENTER ("[id=%zu]", connection->h2->session_id);
-//
-//   stream = nghttp2_session_get_stream_user_data (h2->session, h2->current_stream_id);
-//   if (NULL == stream)
-//     {
-//       return MHD_NO;
-//     }
-//
-//   MHD_increment_response_rc (response);
-//   stream->c.response = response;
-//   stream->c.responseCode = status_code;
-//
-//   if ( ( (NULL != stream->c.method) &&
-//          (MHD_str_equal_caseless_ (stream->c.method,
-//                                    MHD_HTTP_METHOD_HEAD)) ) ||
-//        (MHD_HTTP_OK > status_code) ||
-//        (MHD_HTTP_NO_CONTENT == status_code) ||
-//        (MHD_HTTP_NOT_MODIFIED == status_code) )
-//     {
-//       /* if this is a "HEAD" request, or a status code for
-//          which a body is not allowed, pretend that we
-//          have already sent the full message body. */
-//       stream->c.response_write_position = response->total_size;
-//     }
-//
-//   int r = h2_build_stream_headers (h2, stream, response);
-//   if (r != 0)
-//     {
-//       return MHD_NO;
-//     }
-//
-//   connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-// #ifdef EPOLL_SUPPORT
-//   MHD_connection_epoll_update_ (connection);
-// #endif /* EPOLL_SUPPORT */
-//   h2_connection_handle_idle (connection);
-//   return MHD_YES;
+  mhd_assert (h2 != NULL);
+  ENTER ("[id=%zu]", connection->h2->session_id);
+
+  stream = nghttp2_session_get_stream_user_data (h2->session, h2->current_stream_id);
+  if (NULL == stream)
+    {
+      return MHD_NO;
+    }
+
+  MHD_increment_response_rc (response);
+  stream->c.response = response;
+  stream->c.responseCode = status_code;
+
+  if ( ( (NULL != stream->c.method) &&
+         (MHD_str_equal_caseless_ (stream->c.method,
+                                   MHD_HTTP_METHOD_HEAD)) ) ||
+       (MHD_HTTP_OK > status_code) ||
+       (MHD_HTTP_NO_CONTENT == status_code) ||
+       (MHD_HTTP_NOT_MODIFIED == status_code) )
+    {
+      /* if this is a "HEAD" request, or a status code for
+         which a body is not allowed, pretend that we
+         have already sent the full message body. */
+      stream->c.response_write_position = response->total_size;
+    }
+
+  int r = h2_build_stream_headers (h2, stream, response);
+  if (r != 0)
+    {
+      return MHD_NO;
+    }
+
+  connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+#ifdef EPOLL_SUPPORT
+  MHD_connection_epoll_update_ (connection);
+#endif /* EPOLL_SUPPORT */
+  h2_connection_handle_idle (connection);
+  return MHD_YES;
 }
 
 /**
@@ -367,6 +364,8 @@ h2_queue_response (struct MHD_Connection *connection,
 void
 h2_connection_close (struct MHD_Connection *connection)
 {
+  ENTER("h2_session_destroy!");
+  if (NULL == connection->h2) return;
   h2_session_destroy (connection->h2);
   connection->h2 = NULL;
 
@@ -475,7 +474,6 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
 int
 h2_is_h2_preface (struct MHD_Connection *connection)
 {
-  ENTER("len: %zu", connection->read_buffer_offset);
   int ret = MHD_NO;
   if (connection->read_buffer_offset >= H2_MAGIC_TOKEN_LEN)
     {

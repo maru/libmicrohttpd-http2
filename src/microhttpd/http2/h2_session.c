@@ -80,7 +80,7 @@ h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream)
 ssize_t
 h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
 {
-  ENTER();
+  // ENTER("read-------------------------------------------------------------------------------");
   ssize_t rv;
   rv = nghttp2_session_mem_recv (h2->session, in, inlen);
   if (rv < 0)
@@ -90,11 +90,12 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
           ENTER("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
         }
       /* Should send a GOAWAY frame with last stream_id successfully received */
-      nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE, h2->accepted_max,
-                             NGHTTP2_PROTOCOL_ERROR, NULL, 0);
-      nghttp2_session_send (h2->session);
+      rv = nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE, h2->last_stream_id,
+                                  NGHTTP2_PROTOCOL_ERROR, NULL, 0);
+      rv = rv ?: nghttp2_session_send (h2->session);
       return -1;
     }
+  // ENTER("read///////////////////////////////////////////////////////////////////////////////");
   return rv;
 }
 
@@ -110,33 +111,36 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
 ssize_t
 h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen)
 {
-  mhd_assert (h2 != NULL);
-  ENTER ("[id=%zu] outlen=%d", h2->session_id, outlen);
+  // ENTER("write------------------------------------------------------------------------------");
 
-  // struct MHD_Connection *connection = h2->connection;
-  //
-  // /* If there is pending data from previous nghttp2_session_mem_send call */
-  // if (h2->data_pending)
-  //   {
-  //     ENTER ("h2->data_pending=%zu", h2->data_pending_len);
-  //     size_t left = connection->write_buffer_size - connection->write_buffer_append_offset;
-  //     size_t n = MHD_MIN(left, h2->data_pending_len);
-  //
-  //     memcpy (&connection->write_buffer[connection->write_buffer_append_offset], h2->data_pending, n);
-  //     connection->write_buffer_append_offset += n;
-  //
-  //     if (n < h2->data_pending_len)
-  //       {
-  //         h2->data_pending += n;
-  //         h2->data_pending_len -= n;
-  //         return 0;
-  //       }
-  //     h2->data_pending = NULL;
-  //     h2->data_pending_len = 0;
-  //   }
-  //
-  // for (;;)
-  //   {
+  /* If there is pending data from previous nghttp2_session_mem_send call */
+  if (h2->pending_write_data)
+    {
+      ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
+      size_t n = MHD_MIN (outlen, h2->pending_write_data_len);
+
+      memcpy (out, h2->pending_write_data, n);
+
+      /* Update buffer offset */
+      outlen -= n;
+      out += n;
+
+      /* Not enough space for all pending data */
+      if (n < h2->pending_write_data_len)
+        {
+          h2->pending_write_data += n;
+          h2->pending_write_data_len -= n;
+          return n;
+        }
+
+      /* Reset */
+      h2->pending_write_data = NULL;
+      h2->pending_write_data_len = 0;
+    }
+
+  ssize_t total_bytes = 0;
+  for (;;)
+    {
       const uint8_t *data;
       ssize_t data_len;
       data_len = nghttp2_session_mem_send (h2->session, &data);
@@ -145,27 +149,31 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen)
         return -1;
 
       if (data_len == 0)
-        return 0;
-  //       break;
-  //     // for (int i = 0; i < data_len; i++) {
-  //     //   fprintf(stderr, "%02X ", data[i]);
-  //     // }
-  //     // fprintf(stderr, "\n");
+        break;
+      //     // for (int i = 0; i < data_len; i++) {
+      //     //   fprintf(stderr, "%02X ", data[i]);
+      //     // }
+      //     // fprintf(stderr, "\n");
 
-      size_t n = MHD_MIN(outlen, data_len);
-  //     // ENTER ("size=%d append=%d n=%d left=%d data_len=%d", connection->write_buffer_size, connection->write_buffer_append_offset, n, left, data_len);
+      size_t n = MHD_MIN (outlen, data_len);
       memcpy (out, data, n);
+      total_bytes += n;
+
+      /* Update buffer offset */
+      outlen -= n;
+      out += n;
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)
         {
           ENTER("pending data! %d", data_len - n);
-  //       h2->data_pending = data + n;
-  //       h2->data_pending_len = data_len - n;
-  //       break;
+          h2->pending_write_data = data + n;
+          h2->pending_write_data_len = data_len - n;
+          break;
         }
-  //   }
-  return n;
+    }
+  // ENTER("write//////////////////////////////////////////////////////////////////////////////");
+  return total_bytes;
 }
 
 /**
@@ -239,7 +247,7 @@ h2_session_create ()
     }
 
   h2->session_id = num_sessions++;
-  ENTER ("[id=%zu]", h2->session_id);
+  // ENTER ("[id=%zu]", h2->session_id);
 
   /* Set initial local session settings */
   h2->settings = h2_config_get_settings (daemon_->h2_config);
@@ -249,6 +257,7 @@ h2_session_create ()
   if ( (MHD_YES != h2_session_set_callbacks (h2)) ||
        (MHD_YES != h2_session_send_preface (h2)) )
     {
+      ENTER("h2_session_destroy!");
       h2_session_destroy (h2);
       return NULL;
     }

@@ -56,13 +56,20 @@ h2_stream_create (int32_t stream_id, size_t pool_size)
 
   stream->stream_id = stream_id;
 
+  char *data;
+  size_t size = pool_size/2;
   stream->c.pool = MHD_pool_create (pool_size);
-  if (NULL == stream->c.pool)
+  if ( (NULL == stream->c.pool) ||
+       (NULL == (data = MHD_pool_allocate (stream->c.pool, size, MHD_YES))) )
     {
       free (stream);
       return NULL;
     }
 
+  stream->c.write_buffer = data;
+  stream->c.write_buffer_append_offset = 0;
+  stream->c.write_buffer_send_offset = 0;
+  stream->c.write_buffer_size = size;
   return stream;
 }
 
@@ -105,7 +112,8 @@ h2_stream_destroy (struct h2_stream_t *stream)
  * @param namelen    length of header name
  * @param value      header value
  * @param valuelen   length of header value
- * @return If succeeds, returns 0. Otherwise, returns an error.
+ * @return If succeeds, returns 0.
+ *         Otherwise, returns an error (NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE).
  */
 int
 h2_stream_add_header (struct h2_stream_t *stream,
@@ -124,7 +132,6 @@ h2_stream_add_header (struct h2_stream_t *stream,
 
   if ((NULL == key) || (NULL == val))
     {
-      stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
 
@@ -136,7 +143,7 @@ h2_stream_add_header (struct h2_stream_t *stream,
        (0 == strcmp (H2_HEADER_COOKIE, name)) )
     {
       r = MHD_set_connection_value (&stream->c, MHD_COOKIE_KIND, key, val);
-      r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : MHD_NO;
+      r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : r;
     }
   else
   {

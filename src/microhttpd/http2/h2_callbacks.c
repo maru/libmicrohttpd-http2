@@ -139,6 +139,14 @@ on_begin_headers_cb (nghttp2_session *session,
 }
 
 
+/**
+ * Parse path header: obtain uri and query string.
+ *
+ * @param stream  current http2 stream
+ * @param value    header value
+ * @param valuelen length of header value
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
 static int
 header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuelen)
 {
@@ -177,6 +185,8 @@ header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuele
     }
   return 0;
 }
+
+
 /**
  * A header name/value pair is received for the frame.
  *
@@ -199,7 +209,7 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
 
-  ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
+  ENTER ("[id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
 
   /* Get stream */
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
@@ -222,6 +232,11 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
         break;
     }
 
+  if (header >= sizeof (h2_pseudo_headers))
+    {
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+
   if (H2_HEADER_AUTH == header)
     {
       /* Add header Host: */
@@ -233,8 +248,7 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
   char *buf = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
   if (NULL == buf)
     {
-      stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
-      return h2_transmit_error_response (h2, stream);
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
   strcpy (buf, value);
 
@@ -255,16 +269,89 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
         daemon_->unescape_callback (daemon_->unescape_callback_cls,
                                     &stream->c, buf);
         stream->c.url = buf;
-        return header_parse_path (stream, value, valuelen);
+        if (0 != header_parse_path (stream, value, valuelen))
+          {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+          }
         break;
 
       /* :authority */
       case H2_HEADER_AUTH:
         break;
+    }
+  return 0;
+}
 
-      default:
-        mhd_assert (header >= sizeof (h2_pseudo_headers));
-        break;
+
+/**
+ * A frame was received. If it is a DATA or HEADERS frame,
+ * we pass the request to the MHD application.
+ *
+ * @param session    current http2 session
+ * @param frame      frame received
+ * @param user_data  HTTP2 connection of type h2_session_t
+ * @return If succeeds, returns 0. Otherwise, returns an error.
+ */
+static int
+on_frame_recv_cb (nghttp2_session *session,
+                  const nghttp2_frame *frame, void *user_data)
+{
+  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_stream_t *stream;
+
+  /* FIXME h2_debug_print_frame */
+  ENTER ("XXXX [id=%zu] recv %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>",
+      h2->session_id, do_color(PRINT_RECV), FRAME_TYPE (frame->hd.type), do_color(COLOR_WHITE),
+      frame->hd.length, frame->hd.flags, frame->hd.stream_id);
+  if (frame->hd.flags) print_flags(frame->hd);
+  /*  */
+
+  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  /* Stream not found: frame is not HEADERS, PUSH_PROMISE or DATA */
+  if (NULL == stream)
+    {
+      return 0;
+    }
+
+  switch (frame->hd.type)
+    {
+    case NGHTTP2_HEADERS:
+      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
+        {
+          /* FIXME */
+          if (need_100_continue (&stream->c))
+            {
+              nghttp2_nv nva;
+              stream->c.responseCode = 100;
+              add_header (&nva, ":status", status_string[100]);
+              nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE, stream->stream_id,
+                                      NULL, &nva, 1, NULL);
+              stream->c.responseCode = 0;
+            }
+          /* First call */
+          size_t unused = 0;
+          int ret = h2_call_connection_handler (stream, session, NULL, &unused);
+          if (ret != 0)
+            return ret;
+        }
+      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
+        {
+          /* Final call to application handler: GET, HEAD requests */
+          size_t unused = 0;
+          return h2_call_connection_handler (stream, session, NULL, &unused);
+        }
+      break;
+    case NGHTTP2_PUSH_PROMISE:
+      break;
+    case NGHTTP2_DATA:
+      /* Check that the client request has finished */
+      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
+        {
+          /* Final call to application handler: POST, PUT requests */
+          size_t unused = 0;
+          return h2_call_connection_handler (stream, session, NULL, &unused);
+        }
+      break;
     }
   return 0;
 }
@@ -771,80 +858,6 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
   available -= processed_size;
   if (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size)
     stream->c.remaining_upload_size -= processed_size;
-  return 0;
-}
-
-
-/**
- * A frame was received. If it is a DATA or HEADERS frame,
- * we pass the request to the MHD application.
- *
- * @param session    current http2 session
- * @param frame      frame received
- * @param user_data  HTTP2 connection of type h2_session_t
- * @return If succeeds, returns 0. Otherwise, returns an error.
- */
-static int
-on_frame_recv_cb (nghttp2_session *session,
-                  const nghttp2_frame *frame, void *user_data)
-{
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  struct h2_stream_t *stream;
-
-  /* FIXME h2_debug_print_frame */
-  ENTER ("XXXX [id=%zu] recv %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>",
-      h2->session_id, do_color(PRINT_RECV), FRAME_TYPE (frame->hd.type), do_color(COLOR_WHITE),
-      frame->hd.length, frame->hd.flags, frame->hd.stream_id);
-  if (frame->hd.flags) print_flags(frame->hd);
-  /*  */
-
-  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
-  /* Stream not found: frame is not HEADERS, PUSH_PROMISE or DATA */
-  if (NULL == stream)
-    {
-      return 0;
-    }
-
-  switch (frame->hd.type)
-    {
-    case NGHTTP2_HEADERS:
-      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
-        {
-          /* FIXME */
-          if (need_100_continue (&stream->c))
-            {
-              nghttp2_nv nva;
-              stream->c.responseCode = 100;
-              add_header (&nva, ":status", status_string[100]);
-              nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE, stream->stream_id,
-                                      NULL, &nva, 1, NULL);
-              stream->c.responseCode = 0;
-            }
-          /* First call */
-          size_t unused = 0;
-          int ret = h2_call_connection_handler (stream, session, NULL, &unused);
-          if (ret != 0)
-            return ret;
-        }
-      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
-        {
-          /* Final call to application handler: GET, HEAD requests */
-          size_t unused = 0;
-          return h2_call_connection_handler (stream, session, NULL, &unused);
-        }
-      break;
-    case NGHTTP2_PUSH_PROMISE:
-      break;
-    case NGHTTP2_DATA:
-      /* Check that the client request has finished */
-      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
-        {
-          /* Final call to application handler: POST, PUT requests */
-          size_t unused = 0;
-          return h2_call_connection_handler (stream, session, NULL, &unused);
-        }
-      break;
-    }
   return 0;
 }
 

@@ -81,12 +81,12 @@ struct h2_session_t
   /**
    * Data pending to write in the write_buffer.
    */
-  const uint8_t *pending_write_data; //?
+  const uint8_t *pending_write_data;
 
   /**
    * Length of data pending.
    */
-  size_t pending_write_data_len; //?
+  size_t pending_write_data_len;
 };
 
 void

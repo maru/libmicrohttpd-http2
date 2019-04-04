@@ -257,7 +257,6 @@ h2_session_create ()
   if ( (MHD_YES != h2_session_set_callbacks (h2)) ||
        (MHD_YES != h2_session_send_preface (h2)) )
     {
-      ENTER("h2_session_destroy!");
       h2_session_destroy (h2);
       return NULL;
     }
@@ -277,7 +276,7 @@ int
 h2_session_upgrade (struct h2_session_t *h2,
                     const char *settings, const char *method)
 {
-  ENTER ("[id=%zu]", h2->session_id);
+  // ENTER ("[id=%zu]", h2->session_id);
   char *settings_payload;
   size_t len;
 

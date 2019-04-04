@@ -364,7 +364,7 @@ h2_queue_response (struct MHD_Connection *connection,
 void
 h2_connection_close (struct MHD_Connection *connection)
 {
-  ENTER("h2_session_destroy!");
+  ENTER("");
   if (NULL == connection->h2) return;
   h2_session_destroy (connection->h2);
   connection->h2 = NULL;

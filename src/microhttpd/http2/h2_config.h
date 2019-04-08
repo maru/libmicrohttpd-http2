@@ -28,31 +28,7 @@
 #ifndef H2_CONFIG_H
 #define H2_CONFIG_H
 
-struct h2_config_t
-{
-  /**
-   * HTTP/2 settings array.
-   * https://nghttp2.org/documentation/enums.html?#c.nghttp2_settings_id
-   */
-  h2_settings_entry *h2_settings;
-
-  /**
-   * Number of entries in h2_settings.
-   */
-  size_t h2_settings_size;
-
-  /**
-   * Inspect first bytes to detect HTTP/2 connection.
-   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
-   */
-  int h2_direct;
-
-  /**
-   * Allow HTTP/1 upgrade to HTTP/2.
-   * Default value: enabled in HTTP connections, disabled in HTTPS connections.
-   */
-  int h2_upgrade;
-};
+struct h2_config_t;
 
 struct h2_config_t *
 h2_config_init (int is_tls);

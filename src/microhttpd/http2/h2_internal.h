@@ -32,32 +32,41 @@
 #include "http2/h2_stream.h"
 #include "http2/h2_callbacks.h"
 
-char* FRAME_TYPE (int type);
-void print_flags (const nghttp2_frame_hd hd);
+struct MHD_Daemon *daemon_;
 
 #if HTTP2_DEBUG
 
-struct timeval h2_util_tm_start;
+enum {PRINT_SEND, PRINT_RECV};
 
-struct MHD_Daemon *daemon_;
-
-#define COLOR_RED    "\033[31;1m"
+#define COLOR_RED    "\033[1;31m"
+#define COLOR_GREEN  "\033[0;32m"
+#define COLOR_LGREEN "\033[1;32m"
+#define COLOR_LBLUE  "\033[1;34m"
+#define COLOR_MGNT   "\033[0;35m"
 #define COLOR_WHITE  "\033[0m"
 #define COLOR_YELLOW "\033[33m"
-#define PRINT_SEND "\033[1;35m"
-#define PRINT_RECV "\033[1;36m"
-#define do_color(code) (color ? code : "")
+#define COLOR_SEND   "\033[1;35m"
+#define COLOR_RECV   "\033[1;36m"
+
+void set_timer ();
+
+void set_color_output (bool f);
+
+const char *
+do_color(const char *code);
+
+void
+h2_debug_print_time ();
+
+void
+h2_debug_print_header (size_t session_id, size_t stream_id, const uint8_t *name, const uint8_t *value);
+
+void
+h2_debug_print_frame (size_t session_id, int action, const nghttp2_frame *frame);
+
 #define ENTER(format, args...) { \
-  int color = isatty(fileno(stderr)); \
-  struct timeval now; \
-  gettimeofday(&now, NULL); \
-  time_t usec = (now.tv_sec - h2_util_tm_start.tv_sec)*1000000 + (now.tv_usec - h2_util_tm_start.tv_usec); \
-  time_t sec = usec/1000000; \
-  time_t msec = (usec % 1000000)/1000; \
-  fprintf(stderr, "%s[%3ld.%03ld]", do_color(COLOR_YELLOW), sec, msec); \
-  fprintf(stderr, "%s ", do_color(COLOR_WHITE)); \
-  fprintf(stderr, "%s[%s]", do_color(COLOR_RED), __FUNCTION__); \
-  fprintf(stderr, "%s ", do_color(COLOR_WHITE)); \
+  h2_debug_print_time (); \
+  fprintf(stderr, "%s[%s]%s ", do_color (COLOR_RED), __FUNCTION__, do_color (COLOR_WHITE)); \
   fprintf(stderr, format "\n", ##args); \
 }
 #endif /* HTTP2_DEBUG */

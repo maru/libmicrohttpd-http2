@@ -67,14 +67,18 @@ struct h2_stream_t
 };
 
 struct h2_stream_t*
-h2_stream_create (int32_t stream_id, size_t pool_size);
+h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid);
 
 void
 h2_stream_destroy (struct h2_stream_t *stream);
 
 int
-h2_stream_add_header (struct h2_stream_t *stream,
-                      const uint8_t *name, const size_t namelen,
-                      const uint8_t *value, const size_t valuelen);
+h2_stream_add_recv_header (struct h2_stream_t *stream,
+                           const uint8_t *name, const size_t namelen,
+                           const uint8_t *value, const size_t valuelen);
+
+int
+h2_stream_call_connection_handler (struct h2_stream_t *stream,
+                                   char *upload_data, size_t *upload_data_size);
 
 #endif

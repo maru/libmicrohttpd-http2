@@ -32,6 +32,9 @@
 #include "memorypool.h"
 #include "mhd_str.h"
 
+#undef COLOR_RED
+#define COLOR_RED    "\033[33;1m"
+
 extern struct MHD_Daemon *daemon_;
 
 /* Number of sessions, for debugging purposes */
@@ -80,14 +83,15 @@ h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream)
 ssize_t
 h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
 {
-  // ENTER("read-------------------------------------------------------------------------------");
   ssize_t rv;
   rv = nghttp2_session_mem_recv (h2->session, in, inlen);
   if (rv < 0)
     {
       if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
         {
-          ENTER("nghttp2_session_mem_recv () returned error: %s %zd", nghttp2_strerror (rv), rv);
+          MHD_DLOG (daemon_,
+              _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
+              nghttp2_strerror (rv), rv);
         }
       /* Should send a GOAWAY frame with last stream_id successfully received */
       rv = nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE, h2->last_stream_id,
@@ -95,28 +99,29 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
       rv = rv ?: nghttp2_session_send (h2->session);
       return -1;
     }
-  // ENTER("read///////////////////////////////////////////////////////////////////////////////");
   return rv;
 }
 
 /**
  * Sends at most length bytes of data stored in data.
  *
- * @param h2 HTTP/2 session to handle
- * @param out data to process
- * @param outlen length of data to process
- * @return If succeeds, returns the number of written bytes.
+ * @param h2      HTTP/2 session to handle
+ * @param out     data to process
+ * @param outlen  length of data to process
+ * @append_offset Last valid location in write_buffer (need to update because DATA
+ *                frames are written directly in the buffer, not in this function).
+ *                See send_data_cb in h2_callbacks.c
+ * @return If succeeds, returns the number of written bytes >= 0.
  *         Otherwise, returns -1.
  */
 ssize_t
-h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen)
+h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
+                       size_t *append_offset)
 {
-  // ENTER("write------------------------------------------------------------------------------");
-
   /* If there is pending data from previous nghttp2_session_mem_send call */
   if (h2->pending_write_data)
     {
-      ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
+      // ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
       size_t n = MHD_MIN (outlen, h2->pending_write_data_len);
 
       memcpy (out, h2->pending_write_data, n);
@@ -150,29 +155,26 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen)
 
       if (data_len == 0)
         break;
-      //     // for (int i = 0; i < data_len; i++) {
-      //     //   fprintf(stderr, "%02X ", data[i]);
-      //     // }
-      //     // fprintf(stderr, "\n");
 
       size_t n = MHD_MIN (outlen, data_len);
       memcpy (out, data, n);
       total_bytes += n;
+      // ENTER("n=%d", n);
 
       /* Update buffer offset */
       outlen -= n;
       out += n;
+      *append_offset += n;
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)
         {
-          ENTER("pending data! %d", data_len - n);
+          // ENTER("pending data! %d", data_len - n);
           h2->pending_write_data = data + n;
           h2->pending_write_data_len = data_len - n;
           break;
         }
     }
-  // ENTER("write//////////////////////////////////////////////////////////////////////////////");
   return total_bytes;
 }
 
@@ -193,7 +195,7 @@ h2_session_send_preface (struct h2_session_t *h2)
                                 h2->settings, h2->settings_len);
   if (rv != 0)
     {
-      ENTER("Fatal error: %s", nghttp2_strerror (rv));
+      MHD_DLOG (daemon_, _("Fatal error: %s\n"), nghttp2_strerror (rv));
       return MHD_NO;
     }
   return MHD_YES;
@@ -209,7 +211,6 @@ void
 h2_session_destroy (struct h2_session_t *h2)
 {
   mhd_assert (NULL != h2);
-  ENTER ("[id=%zu]", h2->session_id);
 
   struct h2_stream_t *stream;
   for (stream = h2->streams; h2->num_streams > 0 && stream != NULL; )
@@ -232,11 +233,12 @@ h2_session_destroy (struct h2_session_t *h2)
  * Initialize HTTP2 structures, set the initial local settings for the session,
  * and send server preface.
  *
+ * @param pid Thread handle for this connection.
  * @return #MHD_YES if no error
  *         #MHD_NO otherwise, connection must be closed.
  */
 struct h2_session_t *
-h2_session_create ()
+h2_session_create (struct MHD_Connection *connection)
 {
   int rv;
 
@@ -246,8 +248,8 @@ h2_session_create ()
       return NULL;
     }
 
-  h2->session_id = num_sessions++;
-  // ENTER ("[id=%zu]", h2->session_id);
+  h2->session_id = ++num_sessions;
+  h2->c = connection;
 
   /* Set initial local session settings */
   h2->settings = h2_config_get_settings (daemon_->h2_config);
@@ -276,7 +278,6 @@ int
 h2_session_upgrade (struct h2_session_t *h2,
                     const char *settings, const char *method)
 {
-  // ENTER ("[id=%zu]", h2->session_id);
   char *settings_payload;
   size_t len;
 

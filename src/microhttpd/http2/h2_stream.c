@@ -45,7 +45,7 @@ extern struct MHD_Daemon *daemon_;
  * @return new stream, NULL if error.
  */
 struct h2_stream_t*
-h2_stream_create (int32_t stream_id, size_t pool_size)
+h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid)
 {
   struct h2_stream_t *stream;
   stream = calloc (1, sizeof (struct h2_stream_t));
@@ -65,7 +65,9 @@ h2_stream_create (int32_t stream_id, size_t pool_size)
       free (stream);
       return NULL;
     }
-
+  stream->c.daemon = daemon_;
+  stream->c.pid = pid;
+  stream->c.version = MHD_HTTP_VERSION_2_0;
   stream->c.write_buffer = data;
   stream->c.write_buffer_append_offset = 0;
   stream->c.write_buffer_send_offset = 0;
@@ -116,12 +118,12 @@ h2_stream_destroy (struct h2_stream_t *stream)
  *         Otherwise, returns an error (NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE).
  */
 int
-h2_stream_add_header (struct h2_stream_t *stream,
-                      const uint8_t *name, const size_t namelen,
-                      const uint8_t *value, const size_t valuelen)
+h2_stream_add_recv_header (struct h2_stream_t *stream,
+                           const uint8_t *name, const size_t namelen,
+                           const uint8_t *value, const size_t valuelen)
 {
   if ( (namelen == H2_HEADER_CONTENT_LENGTH_LEN) &&
-            (0 == strcmp (H2_HEADER_CONTENT_LENGTH, name)) )
+       (0 == memcmp (H2_HEADER_CONTENT_LENGTH, name, H2_HEADER_CONTENT_LENGTH_LEN)) )
     {
       stream->c.remaining_upload_size = atol(value);
       return 0;
@@ -135,12 +137,12 @@ h2_stream_add_header (struct h2_stream_t *stream,
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
 
-  strncpy (key, name, namelen + 1);
-  strncpy (val, value, valuelen + 1);
+  memcpy (key, name, namelen + 1);
+  memcpy (val, value, valuelen + 1);
 
   int r;
   if ( (namelen == H2_HEADER_COOKIE_LEN) &&
-       (0 == strcmp (H2_HEADER_COOKIE, name)) )
+       (0 == memcmp (H2_HEADER_COOKIE, name, H2_HEADER_COOKIE_LEN)) )
     {
       r = MHD_set_connection_value (&stream->c, MHD_COOKIE_KIND, key, val);
       r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : r;
@@ -151,7 +153,7 @@ h2_stream_add_header (struct h2_stream_t *stream,
     r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
   }
 
-  if (MHD_NO == r)
+  if (MHD_YES != r)
     {
 #ifdef HAVE_MESSAGES
       MHD_DLOG (daemon_,
@@ -161,6 +163,34 @@ h2_stream_add_header (struct h2_stream_t *stream,
     }
 
   return 0;
+}
+
+
+/**
+ * Call the handler of the application for this connection.
+ * Handles chunking of the upload as well as normal uploads.
+ *
+ * @param stream            stream we are processing
+ * @param upload_data       the data being uploaded
+ * @param upload_data_size  the size of the upload_data provided
+ * @return If succeeds, returns MHD_YES.
+ *         Otherwise, resets the stream and returns MHD_NO.
+ */
+int
+h2_stream_call_connection_handler (struct h2_stream_t *stream,
+                                   char *upload_data, size_t *upload_data_size)
+{
+  if ((NULL != stream->c.response) || (0 != stream->c.responseCode))
+    return 0;                     /* already queued a response */
+
+  stream->c.in_idle = true;
+  stream->c.client_aware = true;
+  int ret = daemon_->default_handler (daemon_->default_handler_cls,
+              &stream->c, stream->c.url, stream->c.method, MHD_HTTP_VERSION_2_0,
+ 					    upload_data, upload_data_size, &stream->c.client_context);
+  stream->c.in_idle = false;
+  ENTER("ret=%d MHD_YES %d", ret, MHD_YES);
+  return ret;
 }
 
 

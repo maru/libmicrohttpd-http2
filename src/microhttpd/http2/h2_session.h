@@ -34,6 +34,11 @@
 struct h2_session_t
 {
   /**
+   * Pointer to the MHD_Connection.
+   */
+  struct MHD_Connection *c;
+
+  /**
    * HTTP/2 session.
    */
   nghttp2_session *session;
@@ -87,6 +92,12 @@ struct h2_session_t
    * Length of data pending.
    */
   size_t pending_write_data_len;
+
+  /**
+   * Thread handle for this connection (if we are using
+   * one thread per connection).
+   */
+  MHD_thread_handle_ID_ pid;
 };
 
 void
@@ -99,10 +110,11 @@ ssize_t
 h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen);
 
 ssize_t
-h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen);
+h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
+                       size_t *append_offset);
 
 struct h2_session_t *
-h2_session_create ();
+h2_session_create (struct MHD_Connection *connection);
 
 void
 h2_session_destroy (struct h2_session_t *h2);

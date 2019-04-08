@@ -31,8 +31,4 @@
 int
 h2_session_set_callbacks (struct h2_session_t *h2);
 
-int
-h2_build_stream_headers (struct h2_session_t *h2, struct h2_stream_t *stream,
-                         struct MHD_Response *response);
-
 #endif

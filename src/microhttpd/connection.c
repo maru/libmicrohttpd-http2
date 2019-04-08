@@ -3984,14 +3984,17 @@ MHD_queue_response (struct MHD_Connection *connection,
                     unsigned int status_code,
                     struct MHD_Response *response)
 {
+// #ifdef HTTP2_SUPPORT
+//   if (connection->http_version == HTTP_VERSION(2, 0))
+// #endif /* HTTP2_SUPPORT */
+
   struct MHD_Daemon *daemon;
 
   if ( (NULL == connection) ||
        (NULL == response) ||
        (NULL != connection->response) ||
-       ( (connection->http_version < HTTP_VERSION(2, 0)) &&
-         (MHD_CONNECTION_HEADERS_PROCESSED != connection->state) &&
-	 (MHD_CONNECTION_FOOTERS_RECEIVED != connection->state) ) )
+       ( (MHD_CONNECTION_HEADERS_PROCESSED != connection->state) &&
+         (MHD_CONNECTION_FOOTERS_RECEIVED != connection->state) ) )
     return MHD_NO;
   daemon = connection->daemon;
 
@@ -4009,13 +4012,6 @@ MHD_queue_response (struct MHD_Connection *connection,
 #endif
       return MHD_NO;
     }
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
-    {
-      return h2_queue_response (connection, status_code, response);
-    }
-#endif /* HTTP2_SUPPORT */
 
 #ifdef UPGRADE_SUPPORT
   if ( (NULL != response->upgrade_handler) &&
@@ -4075,6 +4071,7 @@ MHD_queue_response (struct MHD_Connection *connection,
     }
   if (! connection->in_idle)
     (void) MHD_connection_handle_idle (connection);
+  MHD_update_last_activity_ (connection);
   return MHD_YES;
 }
 

@@ -67,7 +67,7 @@ h2_is_h2_upgrade (struct MHD_Connection *connection)
     }
 
   /* Is protocol proposed? (h2/h2c) */
-  if (strcmp (upgrade, protocol) != 0)
+  if (0 != strcmp (upgrade, protocol))
     {
       return MHD_NO;
     }
@@ -107,14 +107,14 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   ret = MHD_queue_response (connection,
                             MHD_HTTP_SWITCHING_PROTOCOLS,
                             response);
-  if (MHD_NO == ret)
+  if (MHD_YES != ret)
     {
       return MHD_NO;
     }
 
   MHD_destroy_response (response);
 
-  if (MHD_NO == build_header_response (connection))
+  if (MHD_YES != build_header_response (connection))
     {
       connection_close_error (connection,
             _("Closing connection (failed to create response header)\n"));

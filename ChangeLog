@@ -1,3 +1,6 @@
+Mon 08 Apr 2019 03:06:05 PM CEST
+	Fix close() checks as suggested by MK on the mailinglist
+        (#3926). -MK/CG
 Wed 20 Mar 2019 10:20:24 AM CET
 	Adding additional "value_length" argument to MHD_KeyValueIterator
 	callback to support binary zeros in values.  This is done in a

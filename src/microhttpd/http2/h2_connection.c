@@ -55,7 +55,10 @@ h2_connection_handle_read (struct MHD_Connection *connection)
     return;
 
 #ifdef HTTPS_SUPPORT
-  mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+  if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
+    { /* HTTPS connection. */
+      mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+    }
 #endif /* HTTPS_SUPPORT */
 
   /* make sure "read" has a reasonable number of bytes
@@ -123,7 +126,10 @@ h2_connection_handle_write (struct MHD_Connection *connection)
     return;
 
 #ifdef HTTPS_SUPPORT
-  mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+  if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
+    { /* HTTPS connection. */
+      mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+    }
 #endif /* HTTPS_SUPPORT */
 
   size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
@@ -381,7 +387,12 @@ h2_set_h1_callbacks (struct MHD_Connection *connection)
 void
 h2_set_h2_callbacks (struct MHD_Connection *connection)
 {
-  mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+#ifdef HTTPS_SUPPORT
+  if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
+    { /* HTTPS connection. */
+      mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
+    }
+#endif /* HTTPS_SUPPORT */
 
   h2_daemon_init (connection->daemon);
 

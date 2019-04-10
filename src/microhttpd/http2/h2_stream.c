@@ -59,8 +59,7 @@ h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid
   char *data;
   size_t size = pool_size/2;
   stream->c.pool = MHD_pool_create (pool_size);
-  if ( (NULL == stream->c.pool) ||
-       (NULL == (data = MHD_pool_allocate (stream->c.pool, size, MHD_YES))) )
+  if (NULL == stream->c.pool)
     {
       free (stream);
       return NULL;
@@ -68,10 +67,6 @@ h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid
   stream->c.daemon = daemon_;
   stream->c.pid = pid;
   stream->c.version = MHD_HTTP_VERSION_2_0;
-  stream->c.write_buffer = data;
-  stream->c.write_buffer_append_offset = 0;
-  stream->c.write_buffer_send_offset = 0;
-  stream->c.write_buffer_size = size;
   return stream;
 }
 
@@ -185,6 +180,8 @@ h2_stream_call_connection_handler (struct h2_stream_t *stream,
 
   stream->c.in_idle = true;
   stream->c.client_aware = true;
+  ENTER("daemon_ %p", daemon_);
+  ENTER("daemon_->default_handler %p", daemon_->default_handler);
   int ret = daemon_->default_handler (daemon_->default_handler_cls,
               &stream->c, stream->c.url, stream->c.method, MHD_HTTP_VERSION_2_0,
  					    upload_data, upload_data_size, &stream->c.client_context);

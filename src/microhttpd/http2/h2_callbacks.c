@@ -319,7 +319,7 @@ add_header (nghttp2_nv *nv, const char *key, const char *value)
  */
 static ssize_t
 response_read_cb (nghttp2_session *session, int32_t stream_id,
-                  uint8_t *buf, size_t length, uint32_t *data_flags,
+                  uint8_t *buf, size_t buf_size, uint32_t *data_flags,
                   nghttp2_data_source *source, void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
@@ -339,17 +339,17 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
   connection = h2->c;
   response = stream->c.response;
 
-  /* Check: the DATA frame has to enter in the write_buffer - 10 bytes
+  /* Check: the DATA frame has to enter in the write_buffer = 10 bytes
      (frame header + padding) */
-  const size_t min_length = 10;
+  const size_t header_size = 10;
   size_t left = connection->write_buffer_size - connection->write_buffer_append_offset;
-  if (left < min_length)
+  if (left <= header_size) /* At least 1 data byte */
     {
       nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
                                  stream->stream_id, NGHTTP2_ERR_NOMEM);
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
-  length = MHD_MIN (length, left - min_length);
+  size_t max_bytes = MHD_MIN (buf_size, left - header_size);
 
   /* Determine number of bytes to read */
   if (response->data_size > 0)
@@ -357,7 +357,7 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
       /* Response in data buffer */
       size_t data_write_offset;
       data_write_offset = (size_t) stream->c.response_write_position - response->data_start;
-      nread = MHD_MIN (length, (ssize_t) (response->data_size - data_write_offset));
+      nread = MHD_MIN (max_bytes, (ssize_t) (response->data_size - data_write_offset));
     }
   else if (response->total_size == MHD_SIZE_UNKNOWN)
     {
@@ -386,17 +386,18 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
       else
         {
           response->data_size = ret;
-          nread = MHD_MIN (length, ret);
+          nread = MHD_MIN (max_bytes, ret);
         }
     }
   else
     {
-      nread = MHD_MIN (length, (ssize_t) (response->total_size - stream->c.response_write_position));
+      nread = MHD_MIN (max_bytes, (ssize_t) (response->total_size - stream->c.response_write_position));
     }
 
   /* We will write the complete DATA frame into the write_buffer in function send_data_cb. */
   *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
 
+  /* Last DATA frame */
   if ((nread == 0) || (response->total_size == stream->c.response_write_position + nread))
     {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
@@ -447,7 +448,7 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
                                      stream_id, NGHTTP2_NO_ERROR);
         }
     }
-  ENTER("nread=%d", nread);
+  // ENTER("nread=%d", nread);
   return nread;
 }
 
@@ -680,7 +681,6 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
 
   padlen = frame->data.padlen;
 
-  // left = stream->c.write_buffer_size - stream->c.write_buffer_append_offset;
   left = connection->write_buffer_size - connection->write_buffer_append_offset;
 
   if ((stream->c.suspended) || (left < 9 + length + padlen)  /* 9 = frame header */)
@@ -777,16 +777,18 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
-    return 0;
+    {
+      return 0;
+    }
 
   size_t available = len;
   size_t to_be_processed;
   size_t left_unprocessed;
   size_t processed_size;
 
-  if ((0 != stream->c.remaining_upload_size) &&
-      (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size) &&
-      (stream->c.remaining_upload_size < available) )
+  if ( (0 != stream->c.remaining_upload_size) &&
+       (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size) &&
+       (stream->c.remaining_upload_size < available) )
     {
       to_be_processed = (size_t)stream->c.remaining_upload_size;
     }
@@ -823,8 +825,8 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
        * in the input bytes.
        */
       /* client did not process everything */
-      if ((0 != (daemon_->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
-          (! stream->c.suspended) )
+      if ( (0 != (daemon_->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
+           (!stream->c.suspended) )
         MHD_DLOG (daemon_,
             _("WARNING: incomplete upload processing and connection not suspended may result in hung connection.\n"));
       // mhd_assert(left_unprocessed == 0);
@@ -835,7 +837,9 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
   data += processed_size;
   available -= processed_size;
   if (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size)
-    stream->c.remaining_upload_size -= processed_size;
+    {
+      stream->c.remaining_upload_size -= processed_size;
+    }
   return 0;
 }
 
@@ -947,16 +951,17 @@ on_stream_close_cb (nghttp2_session *session, int32_t stream_id,
   ENTER ("XXXX [id=%zu] stream_id=%zu", h2->session_id, stream_id);
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
-  if (stream != NULL)
+  if (NULL == stream)
     {
-      if (error_code)
-        {
-          ENTER ("XXXX [stream_id=%d] Closing with err=%s", stream_id, nghttp2_strerror(error_code));
-          nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE,
-                                    stream_id, error_code);
-        }
-      h2_session_remove_stream (h2, stream);
+      return 0;
     }
+
+  if (error_code)
+    {
+      ENTER ("XXXX [stream_id=%d] Closing with err=%s", stream_id, nghttp2_strerror(error_code));
+      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, error_code);
+    }
+  h2_session_remove_stream (h2, stream);
   return 0;
 }
 

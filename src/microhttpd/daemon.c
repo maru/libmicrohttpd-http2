@@ -5047,17 +5047,45 @@ parse_options_va (struct MHD_Daemon *daemon,
 	  break;
 #ifdef HTTP2_SUPPORT
   case MHD_OPTION_HTTP2_SETTINGS:
-    {
-      size_t nmemb = va_arg (ap, size_t);
-      h2_config_set_settings (daemon->h2_config,
-                              nmemb, va_arg (ap, h2_settings_entry *));
-    }
+    if (0 != (daemon->options & MHD_USE_HTTP2))
+      {
+        size_t nmemb = va_arg (ap, size_t);
+        h2_config_set_settings (daemon->h2_config,
+                                nmemb, va_arg (ap, h2_settings_entry *));
+      }
+    else
+      {
+        MHD_DLOG (daemon,
+                  _("MHD_OPTION_HTTP2_SETTINGS specified for daemon "
+                    "without MHD_USE_HTTP2 flag set.\n"));
+        return MHD_NO;
+      }
     break;
   case MHD_OPTION_HTTP2_DIRECT:
-    h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
+    if (0 != (daemon->options & MHD_USE_HTTP2))
+      {
+        h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
+      }
+    else
+      {
+        MHD_DLOG (daemon,
+                  _("MHD_OPTION_HTTP2_DIRECT specified for daemon "
+                    "without MHD_USE_HTTP2 flag set.\n"));
+        return MHD_NO;
+      }
     break;
   case MHD_OPTION_HTTP2_UPGRADE:
-    h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
+    if (0 != (daemon->options & MHD_USE_HTTP2))
+      {
+        h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
+      }
+    else
+      {
+        MHD_DLOG (daemon,
+                  _("MHD_OPTION_HTTP2_UPGRADE specified for daemon "
+                    "without MHD_USE_HTTP2 flag set.\n"));
+        return MHD_NO;
+      }
     break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:

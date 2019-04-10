@@ -727,27 +727,44 @@ main (int argc, char *const *argv)
     return 2;
   global_port = 0;
   errorCount += testInternalGet (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testMultithreadedGet (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testMultithreadedPoolGet (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testUnknownPortGet (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testStopRace (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testExternalGet ();
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   errorCount += testEmptyGet (0);
+  fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
   if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_POLL))
     {
       errorCount += testInternalGet(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testMultithreadedGet(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testMultithreadedPoolGet(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testUnknownPortGet(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testStopRace(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testEmptyGet(MHD_USE_POLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
     }
   if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_EPOLL))
     {
       errorCount += testInternalGet(MHD_USE_EPOLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testMultithreadedPoolGet(MHD_USE_EPOLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testUnknownPortGet(MHD_USE_EPOLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
       errorCount += testEmptyGet(MHD_USE_EPOLL);
+      fprintf(stderr, "(%d) errorCount %d\n", __LINE__, errorCount);
     }
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);

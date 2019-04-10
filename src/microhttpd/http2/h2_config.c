@@ -72,6 +72,7 @@ h2_config_init (int is_tls)
 void
 h2_config_destroy (struct h2_config_t *conf)
 {
+  daemon_ = NULL;
   free (conf);
 }
 

@@ -263,7 +263,7 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
         daemon_->unescape_callback (daemon_->unescape_callback_cls,
                                     &stream->c, buf);
         stream->c.url = buf;
-        if (0 != header_parse_path (stream, value, valuelen))
+        if (0 != header_parse_path (stream, stream->c.url, valuelen))
           {
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
           }

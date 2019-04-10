@@ -139,7 +139,7 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
   if ( (namelen == H2_HEADER_COOKIE_LEN) &&
        (0 == memcmp (H2_HEADER_COOKIE, name, H2_HEADER_COOKIE_LEN)) )
     {
-      r = MHD_set_connection_value (&stream->c, MHD_COOKIE_KIND, key, val);
+      r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
       r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : r;
     }
   else
@@ -180,13 +180,10 @@ h2_stream_call_connection_handler (struct h2_stream_t *stream,
 
   stream->c.in_idle = true;
   stream->c.client_aware = true;
-  ENTER("daemon_ %p", daemon_);
-  ENTER("daemon_->default_handler %p", daemon_->default_handler);
   int ret = daemon_->default_handler (daemon_->default_handler_cls,
               &stream->c, stream->c.url, stream->c.method, MHD_HTTP_VERSION_2_0,
  					    upload_data, upload_data_size, &stream->c.client_context);
   stream->c.in_idle = false;
-  ENTER("ret=%d MHD_YES %d", ret, MHD_YES);
   return ret;
 }
 

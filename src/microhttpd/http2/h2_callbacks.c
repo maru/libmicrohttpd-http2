@@ -260,13 +260,13 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
 
       /* :path */
       case H2_HEADER_PATH:
-        daemon_->unescape_callback (daemon_->unescape_callback_cls,
-                                    &stream->c, buf);
-        stream->c.url = buf;
-        if (0 != header_parse_path (stream, stream->c.url, valuelen))
+        if (0 != header_parse_path (stream, buf, valuelen))
           {
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
           }
+        daemon_->unescape_callback (daemon_->unescape_callback_cls,
+                                    &stream->c, buf);
+        stream->c.url = buf;
         break;
 
       /* :authority */

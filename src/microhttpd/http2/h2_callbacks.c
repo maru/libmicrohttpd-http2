@@ -126,7 +126,7 @@ on_begin_headers_cb (nghttp2_session *session,
   h2_session_add_stream (h2, stream);
   h2->num_streams++;
   h2->last_stream_id = stream_id;
-
+  stream->c.state = MHD_CONNECTION_HEADER_PART_RECEIVED;
   return 0;
 }
 
@@ -581,6 +581,7 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
        * the request. */
       if (0 != stream->c.responseCode)
         {
+          stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
           if (0 != (error_code = submit_response_headers (session, stream)))
             {
               /* Serious internal error, close stream */
@@ -608,21 +609,17 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
             }
           /* First call */
           size_t unused = 0;
-          if (MHD_YES != h2_stream_call_connection_handler (stream, NULL, &unused))
-            {
-              /* Serious internal error, close stream */
-              nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                         stream->stream_id, NGHTTP2_INTERNAL_ERROR);
-              return 0;
-            }
+          stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
+          h2_stream_call_connection_handler (stream, NULL, &unused);
         }
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
         {
           /* Final call to application handler: GET, HEAD requests */
           size_t unused = 0;
           stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-          if ( (MHD_YES != h2_stream_call_connection_handler (stream, NULL, &unused)) ||
-               (0 != (error_code = submit_response_headers (session, stream))) )
+          h2_stream_call_connection_handler (stream, NULL, &unused);
+          error_code = submit_response_headers (session, stream);
+          if (0 != error_code)
             {
               /* Serious internal error, close stream */
               nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
@@ -639,8 +636,9 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
             int error_code;
             size_t unused = 0;
             stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-            if ( (MHD_YES != h2_stream_call_connection_handler (stream, NULL, &unused)) ||
-                 (0 != (error_code = submit_response_headers (session, stream))) )
+            h2_stream_call_connection_handler (stream, NULL, &unused);
+            error_code = submit_response_headers (session, stream);
+            if (0 != error_code)
               {
                 /* Serious internal error, close stream */
                 nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
@@ -819,6 +817,7 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
       to_be_processed = available;
     }
   left_unprocessed = to_be_processed;
+  stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
   if (MHD_YES != h2_stream_call_connection_handler (stream, (char *)data, &left_unprocessed))
     {
       /* Serious internal error, close stream */

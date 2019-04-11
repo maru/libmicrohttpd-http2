@@ -82,8 +82,6 @@ enum h2_pseudo_headers_idx {
   H2_HEADER_METHOD, H2_HEADER_SCHEME, H2_HEADER_AUTH, H2_HEADER_PATH
 };
 
-extern struct MHD_Daemon *daemon_;
-
 /**
  * The reception of a header block in HEADERS or PUSH_PROMISE is started.
  * Create a stream.
@@ -99,6 +97,7 @@ on_begin_headers_cb (nghttp2_session *session,
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
+  struct MHD_Daemon *daemon = h2->c->daemon;
   // ENTER ("XXXX [id=%zu]", h2->session_id);
 
   if ( !((frame->hd.type == NGHTTP2_HEADERS) &&
@@ -109,7 +108,7 @@ on_begin_headers_cb (nghttp2_session *session,
     }
 
   int32_t stream_id = frame->hd.stream_id;
-  stream = h2_stream_create (stream_id, daemon_->pool_size, h2->c->pid);
+  stream = h2_stream_create (stream_id, daemon, h2->c->pid);
   if (NULL == stream)
     {
       /* Out of memory */
@@ -143,13 +142,14 @@ on_begin_headers_cb (nghttp2_session *session,
 static int
 header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuelen)
 {
+  struct MHD_Daemon *daemon = stream->c.daemon;
   /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
-  if (NULL != daemon_->uri_log_callback)
+  if (NULL != daemon->uri_log_callback)
     {
       stream->c.client_aware = true;
       stream->c.client_context
-          = daemon_->uri_log_callback (daemon_->uri_log_callback_cls,
-                                       stream->c.url, &stream->c);
+          = daemon->uri_log_callback (daemon->uri_log_callback_cls,
+                                      stream->c.url, &stream->c);
     }
   char *args;
   args = memchr (value, '?', valuelen);
@@ -202,6 +202,7 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
 
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
+  struct MHD_Daemon *daemon = h2->c->daemon;
 
   /* Get stream */
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
@@ -242,6 +243,11 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
   char *buf = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
   if (NULL == buf)
     {
+      if (H2_HEADER_PATH == header)
+        {
+          stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
+          return 0;
+        }
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
   memcpy (buf, value, valuelen + 1);
@@ -264,8 +270,8 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
           {
             return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
           }
-        daemon_->unescape_callback (daemon_->unescape_callback_cls,
-                                    &stream->c, buf);
+        daemon->unescape_callback (daemon->unescape_callback_cls,
+                                   &stream->c, buf);
         stream->c.url = buf;
         break;
 
@@ -466,6 +472,7 @@ static int
 submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
 {
   struct MHD_Response *response = stream->c.response;
+  struct MHD_Daemon *daemon = stream->c.daemon;
   nghttp2_nv *nva;
   size_t nvlen = 2;
 
@@ -488,7 +495,7 @@ submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
   if (NULL == nva)
     {
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (daemon_,
+      MHD_DLOG (daemon,
                 _("Not enough memory in pool for headers!\n"));
 #endif
       return NGHTTP2_ERR_NOMEM;
@@ -555,6 +562,7 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
+  int error_code;
 
   h2_debug_print_frame (h2->session_id, PRINT_RECV, frame);
 
@@ -568,6 +576,19 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
   switch (frame->hd.type)
     {
     case NGHTTP2_HEADERS:
+      /* We encountered an error processing the request.
+       * Send HEADERS with the indicated response code and stop processing
+       * the request. */
+      if (0 != stream->c.responseCode)
+        {
+          if (0 != (error_code = submit_response_headers (session, stream)))
+            {
+              /* Serious internal error, close stream */
+              nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+                                         stream->stream_id, error_code);
+            }
+          return 0;
+        }
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
         {
           if (need_100_continue (&stream->c))
@@ -598,7 +619,6 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
         {
           /* Final call to application handler: GET, HEAD requests */
-          int error_code;
           size_t unused = 0;
           stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
           if ( (MHD_YES != h2_stream_call_connection_handler (stream, NULL, &unused)) ||
@@ -775,6 +795,8 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
   mhd_assert (h2 != NULL);
   ENTER ("XXXX [id=%zu] len: %zu", h2->session_id, len);
 
+  struct MHD_Daemon *daemon = h2->c->daemon;
+
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
     {
@@ -813,7 +835,7 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
       , NULL
     #endif
     );
-
+ENTER("left_unprocessed=%d", left_unprocessed);
   if (0 != left_unprocessed)
     {
       /*
@@ -825,9 +847,9 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
        * in the input bytes.
        */
       /* client did not process everything */
-      if ( (0 != (daemon_->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
+      if ( (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
            (!stream->c.suspended) )
-        MHD_DLOG (daemon_,
+        MHD_DLOG (daemon,
             _("WARNING: incomplete upload processing and connection not suspended may result in hung connection.\n"));
       // mhd_assert(left_unprocessed == 0);
     }

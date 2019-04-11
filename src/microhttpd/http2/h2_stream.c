@@ -30,8 +30,6 @@
 #include "connection.h"
 #include "memorypool.h"
 
-extern struct MHD_Daemon *daemon_;
-
 #define H2_HEADER_COOKIE     "cookie"
 #define H2_HEADER_COOKIE_LEN  6
 #define H2_HEADER_CONTENT_LENGTH     "content-length"
@@ -45,7 +43,8 @@ extern struct MHD_Daemon *daemon_;
  * @return new stream, NULL if error.
  */
 struct h2_stream_t*
-h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid)
+h2_stream_create (int32_t stream_id, struct MHD_Daemon *daemon,
+                  MHD_thread_handle_ID_ pid)
 {
   struct h2_stream_t *stream;
   stream = calloc (1, sizeof (struct h2_stream_t));
@@ -57,14 +56,13 @@ h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid
   stream->stream_id = stream_id;
 
   char *data;
-  size_t size = pool_size/2;
-  stream->c.pool = MHD_pool_create (pool_size);
+  stream->c.pool = MHD_pool_create (daemon->pool_size);
   if (NULL == stream->c.pool)
     {
       free (stream);
       return NULL;
     }
-  stream->c.daemon = daemon_;
+  stream->c.daemon = daemon;
   stream->c.pid = pid;
   stream->c.version = MHD_HTTP_VERSION_2_0;
   return stream;
@@ -80,16 +78,17 @@ h2_stream_create (int32_t stream_id, size_t pool_size, MHD_thread_handle_ID_ pid
 void
 h2_stream_destroy (struct h2_stream_t *stream)
 {
+  struct MHD_Daemon *daemon = stream->c.daemon;
   ENTER ("stream_id=%zu", stream->stream_id);
   if (stream->c.response)
     {
       MHD_destroy_response (stream->c.response);
       stream->c.response = NULL;
 
-      if ((NULL != daemon_->notify_completed) && (stream->c.client_aware))
+      if ((NULL != daemon->notify_completed) && (stream->c.client_aware))
         {
           stream->c.client_aware = false;
-          daemon_->notify_completed (daemon_->notify_completed_cls,
+          daemon->notify_completed (daemon->notify_completed_cls,
             &stream->c, &stream->c.client_context,
             MHD_REQUEST_TERMINATED_COMPLETED_OK);
         }
@@ -117,6 +116,8 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
                            const uint8_t *name, const size_t namelen,
                            const uint8_t *value, const size_t valuelen)
 {
+  struct MHD_Daemon *daemon = stream->c.daemon;
+
   if ( (namelen == H2_HEADER_CONTENT_LENGTH_LEN) &&
        (0 == memcmp (H2_HEADER_CONTENT_LENGTH, name, H2_HEADER_CONTENT_LENGTH_LEN)) )
     {
@@ -129,7 +130,8 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
 
   if ((NULL == key) || (NULL == val))
     {
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+      stream->c.responseCode = MHD_HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE;
+      return 0;
     }
 
   memcpy (key, name, namelen + 1);
@@ -151,7 +153,7 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
   if (MHD_YES != r)
     {
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (daemon_,
+      MHD_DLOG (daemon,
                   _("Not enough memory in pool to allocate header record!\n"));
 #endif
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -175,12 +177,14 @@ int
 h2_stream_call_connection_handler (struct h2_stream_t *stream,
                                    char *upload_data, size_t *upload_data_size)
 {
+  struct MHD_Daemon *daemon = stream->c.daemon;
+
   if ((NULL != stream->c.response) || (0 != stream->c.responseCode))
     return 0;                     /* already queued a response */
 
   stream->c.in_idle = true;
   stream->c.client_aware = true;
-  int ret = daemon_->default_handler (daemon_->default_handler_cls,
+  int ret = daemon->default_handler (daemon->default_handler_cls,
               &stream->c, stream->c.url, stream->c.method, MHD_HTTP_VERSION_2_0,
  					    upload_data, upload_data_size, &stream->c.client_context);
   stream->c.in_idle = false;

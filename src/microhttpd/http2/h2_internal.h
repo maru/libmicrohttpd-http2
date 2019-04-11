@@ -32,8 +32,6 @@
 #include "http2/h2_stream.h"
 #include "http2/h2_callbacks.h"
 
-struct MHD_Daemon *daemon_;
-
 #if HTTP2_DEBUG
 
 enum {PRINT_SEND, PRINT_RECV};

@@ -40,8 +40,6 @@
 #define H2_MAGIC_TOKEN_LEN_MIN 16
 #define H2_MAGIC_TOKEN_LEN 24
 
-extern struct MHD_Daemon *daemon_;
-
 /**
  * Read data from the connection.
  *
@@ -51,6 +49,8 @@ void
 h2_connection_handle_read (struct MHD_Connection *connection)
 {
   ssize_t bytes_read;
+  struct MHD_Daemon *daemon = connection->daemon;
+
   if (MHD_CONNECTION_CLOSED == connection->state)
     return;
 
@@ -63,7 +63,7 @@ h2_connection_handle_read (struct MHD_Connection *connection)
 
   /* make sure "read" has a reasonable number of bytes
      in buffer to use per system call (if possible) */
-  if (connection->read_buffer_offset + daemon_->pool_increment >
+  if (connection->read_buffer_offset + daemon->pool_increment >
       connection->read_buffer_size)
     try_grow_read_buffer (connection);
 
@@ -264,20 +264,6 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
 }
 
 /**
- * Save pointer to the current instance of the MHD daemon.
- * @param daemon current daemon
- */
-void
-h2_daemon_init (struct MHD_Daemon *daemon)
-{
-  if (NULL == daemon_)
-    {
-      daemon_ = daemon;
-    }
-  mhd_assert (daemon_ == daemon);
-}
-
-/**
  *
  */
 void
@@ -387,14 +373,13 @@ h2_set_h1_callbacks (struct MHD_Connection *connection)
 void
 h2_set_h2_callbacks (struct MHD_Connection *connection)
 {
+  ENTER();
 #ifdef HTTPS_SUPPORT
   if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
     { /* HTTPS connection. */
       mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
     }
 #endif /* HTTPS_SUPPORT */
-
-  h2_daemon_init (connection->daemon);
 
   connection->version = MHD_HTTP_VERSION_2_0;
   connection->http_version = HTTP_VERSION(2, 0);
@@ -436,7 +421,7 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
   size_t wsz = 1024;
   while (size > wsz)
   {
-    // ENTER("Trying write_buffer size=%zu", size);
+    ENTER("Trying write_buffer size=%zu", size);
     data = MHD_pool_allocate (connection->pool, size, MHD_YES);
     if (NULL == data)
       {
@@ -483,6 +468,7 @@ h2_is_h2_preface (struct MHD_Connection *connection)
       ret = !memcmp(H2_MAGIC_TOKEN, connection->read_buffer, H2_MAGIC_TOKEN_LEN_MIN) ?
             MHD_YES : MHD_NO;
     }
+  ENTER("ret=%d", ret);
   return ret;
 }
 

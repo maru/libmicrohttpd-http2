@@ -35,8 +35,6 @@
 #undef COLOR_RED
 #define COLOR_RED    "\033[33;1m"
 
-extern struct MHD_Daemon *daemon_;
-
 /* Number of sessions, for debugging purposes */
 size_t num_sessions = 0;
 
@@ -83,13 +81,15 @@ h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream)
 ssize_t
 h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
 {
+  struct MHD_Daemon *daemon = h2->c->daemon;
+
   ssize_t rv;
   rv = nghttp2_session_mem_recv (h2->session, in, inlen);
   if (rv < 0)
     {
       if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
         {
-          MHD_DLOG (daemon_,
+          MHD_DLOG (daemon,
               _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
               nghttp2_strerror (rv), rv);
         }
@@ -188,6 +188,7 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
 int
 h2_session_send_preface (struct h2_session_t *h2)
 {
+  struct MHD_Daemon *daemon = h2->c->daemon;
   int rv;
 
   /* Flags currently ignored */
@@ -195,7 +196,7 @@ h2_session_send_preface (struct h2_session_t *h2)
                                 h2->settings, h2->settings_len);
   if (rv != 0)
     {
-      MHD_DLOG (daemon_, _("Fatal error: %s\n"), nghttp2_strerror (rv));
+      MHD_DLOG (daemon, _("Fatal error: %s\n"), nghttp2_strerror (rv));
       return MHD_NO;
     }
   return MHD_YES;
@@ -240,6 +241,7 @@ h2_session_destroy (struct h2_session_t *h2)
 struct h2_session_t *
 h2_session_create (struct MHD_Connection *connection)
 {
+  struct MHD_Daemon *daemon = connection->daemon;
   int rv;
 
   struct h2_session_t *h2 = calloc (1, sizeof (struct h2_session_t));
@@ -252,8 +254,8 @@ h2_session_create (struct MHD_Connection *connection)
   h2->c = connection;
 
   /* Set initial local session settings */
-  h2->settings = h2_config_get_settings (daemon_->h2_config);
-  h2->settings_len = h2_config_get_settings_len (daemon_->h2_config);
+  h2->settings = h2_config_get_settings (daemon->h2_config);
+  h2->settings_len = h2_config_get_settings_len (daemon->h2_config);
 
   /* Create session and send server preface */
   if ( (MHD_YES != h2_session_set_callbacks (h2)) ||

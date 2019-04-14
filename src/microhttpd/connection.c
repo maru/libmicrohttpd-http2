@@ -2287,7 +2287,6 @@ parse_initial_message_line (struct MHD_Connection *connection,
   char *http_version;
   char *args;
   unsigned int unused_num_headers;
-  size_t uri_len;
 
   if (NULL == (uri = memchr (line,
                              ' ',
@@ -2305,13 +2304,13 @@ parse_initial_message_line (struct MHD_Connection *connection,
     {
       /* No URI and no http version given */
       curi = "";
-      uri_len = 0;
       uri = NULL;
       connection->version = "";
       args = NULL;
     }
   else
     {
+      size_t uri_len;
       curi = uri;
       /* Search from back to accept misformed URI with space */
       http_version = line + line_len - 1;
@@ -2359,7 +2358,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
   				    uri,
                                     connection);
     }
-  
+
   if (NULL != args)
     {
       args[0] = '\0';
@@ -2371,7 +2370,7 @@ parse_initial_message_line (struct MHD_Connection *connection,
 			    &connection_add_header,
 			    &unused_num_headers);
     }
-  
+
   /* unescape URI *after* searching for arguments and log callback */
   if (NULL != uri)
     daemon->unescape_callback (daemon->unescape_callback_cls,

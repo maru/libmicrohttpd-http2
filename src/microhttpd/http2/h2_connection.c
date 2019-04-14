@@ -80,7 +80,7 @@ h2_connection_handle_read (struct MHD_Connection *connection)
                                      connection->read_buffer_size -
                                      connection->read_buffer_offset);
 
-  // ENTER ("recv(): %zd", bytes_read);
+  ENTER ("recv(): %zd", bytes_read);
 
   if (bytes_read < 0)
     {
@@ -176,6 +176,7 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 int
 h2_connection_handle_idle (struct MHD_Connection *connection)
 {
+  ENTER();
   struct h2_session_t *h2 = connection->h2;
 
   connection->in_idle = true;
@@ -214,15 +215,15 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
   /* Fill write buffer */
   size_t left = connection->write_buffer_size - connection->write_buffer_append_offset;
   // ENTER("%d / %d / %d", connection->write_buffer_size, connection->write_buffer_send_offset, connection->write_buffer_append_offset);
-  size_t bytes_to_send = h2_session_write_data (h2, connection->write_buffer, left, &connection->write_buffer_append_offset);
-  // ENTER("bytes to write = %d/%d", bytes_to_send, left);
-  if (bytes_to_send < 0)
+  ssize_t ret = h2_session_write_data (h2, connection->write_buffer, left, &connection->write_buffer_append_offset);
+  if (ret < 0)
     {
       MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
       connection->in_idle = false;
       return MHD_NO;
     }
-
+  size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
+  ENTER("bytes to write = %d/%d", bytes_to_send, left);
   if (bytes_to_send > 0)
     {
       /* Next event is write */
@@ -281,48 +282,6 @@ h2_stream_suspend (struct MHD_Connection *connection)
 {
 }
 
-/**
- * Queue a response to be transmitted to the client (as soon as
- * possible but after #MHD_AccessHandlerCallback returns).
- *
- * @param connection the connection identifying the client
- * @param status_code HTTP status code (i.e. #MHD_HTTP_OK)
- * @param response response to transmit
- * @return #MHD_NO on error (i.e. reply already sent),
- *         #MHD_YES on success or if message has been queued
- * @ingroup response
- */
-int
-h2_queue_response (struct MHD_Connection *connection,
-                   unsigned int status_code,
-                   struct MHD_Response *response)
-{
-  MHD_increment_response_rc (response);
-  connection->response = response;
-  connection->responseCode = status_code;
-
-  if ( ( (NULL != connection->method) &&
-         (MHD_str_equal_caseless_ (connection->method,
-                                   MHD_HTTP_METHOD_HEAD)) ) ||
-       (MHD_HTTP_OK > status_code) ||
-       (MHD_HTTP_NO_CONTENT == status_code) ||
-       (MHD_HTTP_NOT_MODIFIED == status_code) )
-    {
-      /* if this is a "HEAD" request, or a status code for
-         which a body is not allowed, pretend that we
-         have already sent the full message body. */
-      connection->response_write_position = response->total_size;
-    }
-
-  connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
-#ifdef EPOLL_SUPPORT
-  MHD_connection_epoll_update_ (connection);
-#endif /* EPOLL_SUPPORT */
-  if (! connection->in_idle)
-    h2_connection_handle_idle (connection);
-  MHD_update_last_activity_ (connection);
-  return MHD_YES;
-}
 
 /**
  * Close http2 connection and free variables.
@@ -331,7 +290,7 @@ h2_queue_response (struct MHD_Connection *connection,
 void
 h2_connection_close (struct MHD_Connection *connection)
 {
-  // ENTER("");
+  ENTER("");
   if (NULL == connection->h2) return;
   h2_session_destroy (connection->h2);
   connection->h2 = NULL;
@@ -373,7 +332,6 @@ h2_set_h1_callbacks (struct MHD_Connection *connection)
 void
 h2_set_h2_callbacks (struct MHD_Connection *connection)
 {
-  ENTER();
 #ifdef HTTPS_SUPPORT
   if (MHD_TLS_CONN_NO_TLS != connection->tls_state)
     { /* HTTPS connection. */
@@ -404,7 +362,7 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
   char *data;
   if (NULL == connection->read_buffer)
     {
-      // ENTER("Allocate read_buffer size=%zu", size);
+      ENTER("Allocate read_buffer size=%zu", size);
       data = MHD_pool_allocate (connection->pool, size, MHD_YES);
       if (NULL == data)
         {
@@ -468,7 +426,6 @@ h2_is_h2_preface (struct MHD_Connection *connection)
       ret = !memcmp(H2_MAGIC_TOKEN, connection->read_buffer, H2_MAGIC_TOKEN_LEN_MIN) ?
             MHD_YES : MHD_NO;
     }
-  ENTER("ret=%d", ret);
   return ret;
 }
 

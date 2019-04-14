@@ -31,11 +31,6 @@
 int
 h2_is_h2_preface (struct MHD_Connection *connection);
 
-int
-h2_queue_response (struct MHD_Connection *connection,
-                   unsigned int status_code,
-                   struct MHD_Response *response);
-
 void
 h2_stream_suspend (struct MHD_Connection *connection);
 

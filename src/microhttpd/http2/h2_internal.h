@@ -32,8 +32,6 @@
 #include "http2/h2_stream.h"
 #include "http2/h2_callbacks.h"
 
-#if HTTP2_DEBUG
-
 enum {PRINT_SEND, PRINT_RECV};
 
 #define COLOR_RED    "\033[1;31m"
@@ -46,6 +44,14 @@ enum {PRINT_SEND, PRINT_RECV};
 #define COLOR_SEND   "\033[1;35m"
 #define COLOR_RECV   "\033[1;36m"
 
+void
+h2_debug_print_header (size_t session_id, size_t stream_id, const uint8_t *name, const uint8_t *value);
+
+void
+h2_debug_print_frame (size_t session_id, int action, const nghttp2_frame *frame);
+
+#if HTTP2_DEBUG
+
 void set_timer ();
 
 void set_color_output (bool f);
@@ -56,17 +62,14 @@ do_color(const char *code);
 void
 h2_debug_print_time ();
 
-void
-h2_debug_print_header (size_t session_id, size_t stream_id, const uint8_t *name, const uint8_t *value);
-
-void
-h2_debug_print_frame (size_t session_id, int action, const nghttp2_frame *frame);
-
 #define ENTER(format, args...) { \
   h2_debug_print_time (); \
   fprintf(stderr, "%s[%s]%s ", do_color (COLOR_RED), __FUNCTION__, do_color (COLOR_WHITE)); \
   fprintf(stderr, format "\n", ##args); \
 }
+
+#else
+#define ENTER(a...) { }
 #endif /* HTTP2_DEBUG */
 
 #endif

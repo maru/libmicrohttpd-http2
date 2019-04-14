@@ -117,67 +117,66 @@ frame_type (uint8_t type)
 
 void h2_debug_print_indent () { fprintf (stderr, "%s", "          "); }
 
-#define bufsize 1024
-char s[bufsize];
-
 void h2_debug_print_flags(const nghttp2_frame_hd hd)
 {
-  memset (s, 0, sizeof(s));
-  size_t len = bufsize - 1;
+  const int bufsize = 1024;
+  char s[bufsize];
+  s[0] = 0;
+  size_t n = bufsize - 1;
   switch (hd.type)
     {
     case NGHTTP2_DATA:
       if (hd.flags & NGHTTP2_FLAG_END_STREAM)
         {
-          strncat(s, "END_STREAM", len);
-          len -= 10;
+          strncat(s, "END_STREAM", n);
+          n -= 10;
         }
       if (hd.flags & NGHTTP2_FLAG_PADDED)
         {
-          if (len < bufsize - 1)
+          if (n < bufsize - 1)
             {
-              strncat(s, " | ", len);
-              len -= 3;
+              strncat(s, " | ", n);
+              n -= 3;
             }
-          strncat(s, "PADDED", len);
-          len -= 6;
+          strncat(s, "PADDED", n);
+          n -= 6;
         }
       break;
     case NGHTTP2_HEADERS:
       if (hd.flags & NGHTTP2_FLAG_END_STREAM)
         {
-          strncat(s, "END_STREAM", len);
-          len -= 10;
+          strncat(s, "END_STREAM", n);
+          n -= 10;
         }
       if (hd.flags & NGHTTP2_FLAG_END_HEADERS)
         {
-          if (len < bufsize - 1)
+          if (n < bufsize - 1)
             {
-              strncat(s, " | ", len);
-              len -= 3;
+              strncat(s, " | ", n);
+              n -= 3;
             }
-          strncat(s, "END_HEADERS", len);
-          len -= 11;
+          strncat(s, "END_HEADERS", n);
+          n -= 11;
         }
       if (hd.flags & NGHTTP2_FLAG_PADDED)
         {
-          if (len < bufsize - 1)
+          if (n < bufsize - 1)
             {
-              strncat(s, " | ", len);
-              len -= 3;
+              strncat(s, " | ", n);
+              n -= 3;
             }
-          strncat(s, "PADDED", len);
-          len -= 6;
+          strncat(s, "PADDED", n);
+          n -= 6;
         }
       if (hd.flags & NGHTTP2_FLAG_PRIORITY)
         {
-          if (len < bufsize - 1)
+          if (n < bufsize - 1)
             {
-              strncat(s, " | ", len);
-              len -= 3;
+              strncat(s, " | ", n);
+              n -= 3;
             }
-          strncat(s, "PRIORITY", len);
-          len -= 8;
+          strncat(s, "PRIORITY", n);
+          n -= 8;
         }
       break;
     case NGHTTP2_PRIORITY:
@@ -185,38 +184,38 @@ void h2_debug_print_flags(const nghttp2_frame_hd hd)
     case NGHTTP2_SETTINGS:
       if (hd.flags & NGHTTP2_FLAG_ACK)
         {
-          strncat(s, "ACK", len);
-          len -= 3;
+          strncat(s, "ACK", n);
+          n -= 3;
         }
       break;
     case NGHTTP2_PUSH_PROMISE:
       if (hd.flags & NGHTTP2_FLAG_END_HEADERS)
         {
-          strncat(s, "END_HEADERS", len);
-          len -= 11;
+          strncat(s, "END_HEADERS", n);
+          n -= 11;
         }
       if (hd.flags & NGHTTP2_FLAG_PADDED)
         {
-          if (len < bufsize - 1)
+          if (n < bufsize - 1)
             {
-              strncat(s, " | ", len);
-              len -= 3;
+              strncat(s, " | ", n);
+              n -= 3;
             }
-          strncat(s, "PADDED", len);
-          len -= 6;
+          strncat(s, "PADDED", n);
+          n -= 6;
         }
       break;
     case NGHTTP2_PING:
       if (hd.flags & NGHTTP2_FLAG_ACK)
         {
-          strncat(s, "ACK", len);
-          len -= 3;
+          strncat(s, "ACK", n);
+          n -= 3;
         }
       break;
   }
-  mhd_assert(s[bufsize - len] == '\0');
   h2_debug_print_indent ();
   fprintf (stderr, "; %s\n", s);
+  mhd_assert(s[bufsize - n - 1] == '\0');
 }
 
 void
@@ -249,6 +248,9 @@ h2_debug_print_headers (nghttp2_nv *nva, size_t nvlen)
 void
 h2_debug_print_header (size_t session_id, size_t stream_id, const uint8_t *name, const uint8_t *value)
 {
+#if !HTTP2_DEBUG
+  return;
+#endif
   h2_debug_print_session_id (session_id);
   h2_debug_print_time ();
 
@@ -261,6 +263,9 @@ h2_debug_print_header (size_t session_id, size_t stream_id, const uint8_t *name,
 void
 h2_debug_print_frame (size_t session_id, int action, const nghttp2_frame *frame)
 {
+#if !HTTP2_DEBUG
+  return;
+#endif
   h2_debug_print_session_id (session_id);
   h2_debug_print_time ();
   fprintf (stderr, "%s %s%s%s frame <length=%zu, flags=0x%02X, stream_id=%u>\n",

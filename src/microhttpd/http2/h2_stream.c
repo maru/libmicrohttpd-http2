@@ -180,7 +180,7 @@ h2_stream_call_connection_handler (struct h2_stream_t *stream,
   struct MHD_Daemon *daemon = stream->c.daemon;
 
   if ((NULL != stream->c.response) || (0 != stream->c.responseCode))
-    return 0;                     /* already queued a response */
+    return MHD_YES;                  /* already queued a response */
 
   stream->c.in_idle = true;
   stream->c.client_aware = true;

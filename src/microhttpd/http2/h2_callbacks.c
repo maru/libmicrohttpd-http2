@@ -98,7 +98,7 @@ on_begin_headers_cb (nghttp2_session *session,
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
   struct h2_stream_t *stream;
   struct MHD_Daemon *daemon = h2->c->daemon;
-  // ENTER ("XXXX [id=%zu]", h2->session_id);
+  ENTER ("XXXX [id=%zu]", h2->session_id);
 
   if ( !((frame->hd.type == NGHTTP2_HEADERS) &&
          (frame->headers.cat == NGHTTP2_HCAT_REQUEST)) )
@@ -454,7 +454,7 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
                                      stream_id, NGHTTP2_NO_ERROR);
         }
     }
-  // ENTER("nread=%d", nread);
+  ENTER("nread=%d", nread);
   return nread;
 }
 
@@ -471,6 +471,11 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
 static int
 submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
 {
+  if (0 == stream->c.responseCode)
+    {
+      return NGHTTP2_REFUSED_STREAM;
+    }
+
   struct MHD_Response *response = stream->c.response;
   struct MHD_Daemon *daemon = stream->c.daemon;
   nghttp2_nv *nva;
@@ -564,6 +569,7 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
   struct h2_stream_t *stream;
   int error_code;
 
+  ENTER ("XXXX [id=%zu]", h2->session_id);
   h2_debug_print_frame (h2->session_id, PRINT_RECV, frame);
 
   stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
@@ -573,23 +579,25 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
       return 0;
     }
 
+  /* We encountered an error processing the request.
+   * Send HEADERS with the indicated response code and stop processing
+   * the request. */
+  if (0 != stream->c.responseCode)
+    {
+      stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
+      error_code = submit_response_headers (session, stream);
+      if (0 != error_code)
+        {
+          /* Serious internal error, close stream */
+          nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+                                     stream->stream_id, error_code);
+        }
+      return 0;
+    }
+
   switch (frame->hd.type)
     {
     case NGHTTP2_HEADERS:
-      /* We encountered an error processing the request.
-       * Send HEADERS with the indicated response code and stop processing
-       * the request. */
-      if (0 != stream->c.responseCode)
-        {
-          stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-          if (0 != (error_code = submit_response_headers (session, stream)))
-            {
-              /* Serious internal error, close stream */
-              nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                         stream->stream_id, error_code);
-            }
-          return 0;
-        }
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
         {
           if (need_100_continue (&stream->c))
@@ -607,6 +615,7 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
                   return 0;
                 }
             }
+            ENTER("HEADERS +END_HEADERS");
           /* First call */
           size_t unused = 0;
           stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
@@ -614,10 +623,13 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
         }
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
         {
+          // ENTER("HEADERS +END_STREAM");
           /* Final call to application handler: GET, HEAD requests */
           size_t unused = 0;
           stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
+          ENTER("[id=%d] HEADERS +END_STREAM response %p", h2->session_id, stream->c.response);
           h2_stream_call_connection_handler (stream, NULL, &unused);
+          ENTER("[id=%d] response %p responseCode=%d, connection %p", h2->session_id, stream->c.response, stream->c.responseCode, &stream->c);
           error_code = submit_response_headers (session, stream);
           if (0 != error_code)
             {
@@ -632,6 +644,7 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
       case NGHTTP2_DATA:
         if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
           {
+            ENTER("DATA +END_STREAM");
             /* Final call to application handler: POST, PUT requests */
             int error_code;
             size_t unused = 0;
@@ -666,9 +679,9 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
  * @param user_data  HTTP2 connection of type h2_session_t
  * @return If succeeds, returns 0. Otherwise, returns an error:
  *        - NGHTTP2_ERR_WOULDBLOCK: cannot send DATA frame now
- *          (write_buffer doesn't have enough space).
+ *            (write_buffer doesn't have enough space).
  *        - NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE: closes stream by issuing an
- *          RST_STREAM frame with NGHTTP2_INTERNAL_ERROR.
+ *            RST_STREAM frame with NGHTTP2_INTERNAL_ERROR.
  *        - NGHTTP2_ERR_CALLBACK_FAILURE: session failure.
  */
 static int
@@ -682,7 +695,6 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
   struct MHD_Response *response;
   char *buffer;
   size_t padlen;
-  size_t left;
   size_t pos;
   mhd_assert (h2 != NULL);
 
@@ -696,16 +708,18 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
   connection = h2->c;
   response = stream->c.response;
   mhd_assert (response != NULL);
-
   padlen = frame->data.padlen;
 
+  /* Space left in connection->write_buffer */
+  size_t left;
   left = connection->write_buffer_size - connection->write_buffer_append_offset;
 
+  /* Check if there is enough space to write the DATA frame */
   if ((stream->c.suspended) || (left < 9 + length + padlen)  /* 9 = frame header */)
     {
       return NGHTTP2_ERR_WOULDBLOCK;
     }
-  ENTER("connection->write_buffer_append_offset=%zu", connection->write_buffer_append_offset);
+  ENTER("append=%zu left=%zu", connection->write_buffer_append_offset, left);
   buffer = &connection->write_buffer[connection->write_buffer_append_offset];
 
   /* Copy header */
@@ -724,7 +738,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       /* Buffer response */
       pos = (size_t) stream->c.response_write_position - response->data_start;
       memcpy (buffer, &response->data[pos], length);
-      ENTER ("XXXX pos %d len %d", pos, length);
+      ENTER ("XXXX response->data: pos %d len %d", pos, length);
     }
   else if ((response->crc != NULL) && (length > 0))
     {
@@ -745,7 +759,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
     }
 
   *(buffer + length) = 0;
-  ENTER ("XXXX %s", buffer);
+  ENTER ("XXXX body: %s", buffer);
 
   /* Set padding */
   if (padlen > 0)
@@ -754,10 +768,11 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       memset (buffer, 0, padlen - 1);
     }
 
-  ENTER ("XXXX size:%d pos %d len %d", connection->write_buffer_size, stream->c.response_write_position, length);
+  /* Update offsets */
   stream->c.response_write_position += length;
+  connection->write_buffer_append_offset += 9 + (padlen > 0) + length;
 
-  /* Reset data buffer */
+  /* Reset data buffer for chunked responses */
   if ((response->total_size == MHD_SIZE_UNKNOWN) &&
       ((stream->c.response_write_position - response->data_start) == response->data_size))
     {
@@ -765,7 +780,7 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       response->data_start = stream->c.response_write_position;
     }
 
-  connection->write_buffer_append_offset += 9 + (padlen > 0) + length;
+  ENTER("XXX update append=%zu", connection->write_buffer_append_offset);
   return 0;
 }
 
@@ -789,78 +804,92 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
                        size_t len, void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct MHD_Daemon *daemon = h2->c->daemon;
   struct h2_stream_t *stream;
   mhd_assert (h2 != NULL);
   ENTER ("XXXX [id=%zu] len: %zu", h2->session_id, len);
 
-  struct MHD_Daemon *daemon = h2->c->daemon;
-
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
-  if (NULL == stream)
+  if ((NULL == stream) || (0 != stream->c.responseCode))
     {
       return 0;
     }
-
-  size_t available = len;
-  size_t to_be_processed;
-  size_t left_unprocessed;
-  size_t processed_size;
-
-  if ( (0 != stream->c.remaining_upload_size) &&
-       (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size) &&
-       (stream->c.remaining_upload_size < available) )
+  ENTER("read_buffer_offset=%d read_buffer_size=%d len=%d", stream->c.read_buffer_offset, stream->c.read_buffer_size, len);
+  if (0 != stream->c.read_buffer_offset)
     {
-      to_be_processed = (size_t)stream->c.remaining_upload_size;
+      /* Check if there is enough space in read_buffer */
+      while (len > stream->c.read_buffer_size - stream->c.read_buffer_offset)
+        {
+          if (MHD_YES != try_grow_read_buffer (&stream->c))
+            {
+              stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+              return 0;
+            }
+          ENTER("read_buffer_size=%d", stream->c.read_buffer_size);
+        }
+      /* Add data to read_buffer and pass it to call_handler */
+      memcpy (&stream->c.read_buffer[stream->c.read_buffer_offset],
+              data,
+              len);
+
+      stream->c.read_buffer_offset += len;
+      size_t left_unprocessed = stream->c.read_buffer_offset;
+      stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
+      h2_stream_call_connection_handler (stream, stream->c.read_buffer, &left_unprocessed);
+      ENTER("left_unprocessed=%d", left_unprocessed);
+      if (left_unprocessed <= stream->c.read_buffer_offset)
+        {
+          if (left_unprocessed < stream->c.read_buffer_offset)
+            {
+              memmove (&stream->c.read_buffer,
+                       &stream->c.read_buffer[stream->c.read_buffer_offset - left_unprocessed],
+                       left_unprocessed);
+            }
+          stream->c.read_buffer_offset = left_unprocessed;
+        }
+      else
+        {
+          stream->c.read_buffer_offset = 0;
+        }
     }
   else
     {
-      to_be_processed = available;
-    }
-  left_unprocessed = to_be_processed;
-  stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
-  if (MHD_YES != h2_stream_call_connection_handler (stream, (char *)data, &left_unprocessed))
-    {
-      /* Serious internal error, close stream */
-      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                 stream->stream_id, NGHTTP2_INTERNAL_ERROR);
-      return -1;
-    }
+      size_t left_unprocessed = len;
+      stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
+      h2_stream_call_connection_handler (stream, (char *)data, &left_unprocessed);
+      /* Save the unprocessed bytes for next call */
+      if (left_unprocessed > 0)
+        {
+          /* Client did not process everything, save unprocessed data */
+          if ( (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
+               (!stream->c.suspended) )
+            MHD_DLOG (daemon,
+                _("WARNING: incomplete upload processing and connection not suspended may result in hung connection.\n"));
 
-  if (left_unprocessed > to_be_processed)
-    mhd_panic (mhd_panic_cls, __FILE__, __LINE__
-    #ifdef HAVE_MESSAGES
-      , _("libmicrohttpd API violation")
-    #else
-      , NULL
-    #endif
-    );
-ENTER("left_unprocessed=%d", left_unprocessed);
-  if (0 != left_unprocessed)
-    {
-      /*
-       * Can return NGHTTP2_ERR_PAUSE to make nghttp2_session_mem_recv() return
-       * without processing further input bytes. The memory by pointed by
-       * the data is retained until nghttp2_session_mem_recv() is called.
-       * The application must retain the input bytes which was used to produce
-       * the data parameter, because it may refer to the memory region included
-       * in the input bytes.
-       */
-      /* client did not process everything */
-      if ( (0 != (daemon->options & MHD_USE_INTERNAL_POLLING_THREAD)) &&
-           (!stream->c.suspended) )
-        MHD_DLOG (daemon,
-            _("WARNING: incomplete upload processing and connection not suspended may result in hung connection.\n"));
-      // mhd_assert(left_unprocessed == 0);
+          /* Check if there is enough space in read_buffer */
+          while (left_unprocessed > stream->c.read_buffer_size - stream->c.read_buffer_offset)
+            {
+              if (MHD_YES != try_grow_read_buffer (&stream->c))
+                {
+                  stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+                  return 0;
+                }
+            }
+          memcpy (&stream->c.read_buffer[stream->c.read_buffer_offset],
+                  &data[len - left_unprocessed],
+                  left_unprocessed);
+          stream->c.read_buffer_offset += left_unprocessed;
+        }
+      else
+        {
+          return 0;
+        }
     }
-
-  processed_size = to_be_processed - left_unprocessed;
-  /* default_handler left "unprocessed" bytes in buffer for next time... */
-  data += processed_size;
-  available -= processed_size;
-  if (MHD_SIZE_UNKNOWN != stream->c.remaining_upload_size)
-    {
-      stream->c.remaining_upload_size -= processed_size;
-    }
+  // if (0 != left_unprocessed)
+  //   {
+  //   }
+  //
+  // processed_size = to_be_processed - left_unprocessed;
   return 0;
 }
 
@@ -878,6 +907,7 @@ on_frame_send_cb (nghttp2_session *session, const nghttp2_frame *frame,
                   void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  ENTER ("XXXX [id=%zu]", h2->session_id);
 
   h2_debug_print_frame (h2->session_id, PRINT_SEND, frame);
 

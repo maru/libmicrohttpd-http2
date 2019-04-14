@@ -121,7 +121,7 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
   /* If there is pending data from previous nghttp2_session_mem_send call */
   if (h2->pending_write_data)
     {
-      // ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
+      ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
       size_t n = MHD_MIN (outlen, h2->pending_write_data_len);
 
       memcpy (out, h2->pending_write_data, n);
@@ -159,17 +159,17 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
       size_t n = MHD_MIN (outlen, data_len);
       memcpy (out, data, n);
       total_bytes += n;
-      // ENTER("n=%d", n);
 
       /* Update buffer offset */
       outlen -= n;
       out += n;
       *append_offset += n;
+      ENTER("n=%d --> append=%d", n, *append_offset);
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)
         {
-          // ENTER("pending data! %d", data_len - n);
+          ENTER("pending data! %d", data_len - n);
           h2->pending_write_data = data + n;
           h2->pending_write_data_len = data_len - n;
           break;

@@ -3984,10 +3984,6 @@ MHD_queue_response (struct MHD_Connection *connection,
                     unsigned int status_code,
                     struct MHD_Response *response)
 {
-// #ifdef HTTP2_SUPPORT
-//   if (connection->http_version == HTTP_VERSION(2, 0))
-// #endif /* HTTP2_SUPPORT */
-
   struct MHD_Daemon *daemon;
 
   if ( (NULL == connection) ||

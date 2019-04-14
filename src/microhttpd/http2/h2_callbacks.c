@@ -108,7 +108,7 @@ on_begin_headers_cb (nghttp2_session *session,
     }
 
   int32_t stream_id = frame->hd.stream_id;
-  stream = h2_stream_create (stream_id, daemon, h2->c->pid);
+  stream = h2_stream_create (stream_id, h2->c);
   if (NULL == stream)
     {
       /* Out of memory */

@@ -67,8 +67,7 @@ struct h2_stream_t
 };
 
 struct h2_stream_t*
-h2_stream_create (int32_t stream_id, struct MHD_Daemon *daemon,
-                  MHD_thread_handle_ID_ pid);
+h2_stream_create (int32_t stream_id, struct MHD_Connection *connection);
 
 void
 h2_stream_destroy (struct h2_stream_t *stream);

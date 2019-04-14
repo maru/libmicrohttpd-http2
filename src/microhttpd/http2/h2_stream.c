@@ -43,8 +43,7 @@
  * @return new stream, NULL if error.
  */
 struct h2_stream_t*
-h2_stream_create (int32_t stream_id, struct MHD_Daemon *daemon,
-                  MHD_thread_handle_ID_ pid)
+h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
 {
   struct h2_stream_t *stream;
   stream = calloc (1, sizeof (struct h2_stream_t));
@@ -56,15 +55,16 @@ h2_stream_create (int32_t stream_id, struct MHD_Daemon *daemon,
   stream->stream_id = stream_id;
 
   char *data;
-  stream->c.pool = MHD_pool_create (daemon->pool_size);
+  stream->c.pool = MHD_pool_create (connection->daemon->pool_size);
   if (NULL == stream->c.pool)
     {
       free (stream);
       return NULL;
     }
-  stream->c.daemon = daemon;
-  stream->c.pid = pid;
+  stream->c.daemon = connection->daemon;
+  stream->c.pid = connection->pid;
   stream->c.version = MHD_HTTP_VERSION_2_0;
+  stream->c.tls_session = connection->tls_session;
   return stream;
 }
 

@@ -133,7 +133,6 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 #endif /* HTTPS_SUPPORT */
 
   size_t bytes_to_send = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
-
   if (bytes_to_send > 0)
     {
       ssize_t bytes_sent;
@@ -256,6 +255,7 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
   if ( (bytes_to_send <= 0) && (0 != timeout) &&
        (timeout <= (MHD_monotonic_sec_counter() - connection->last_activity)) )
     {
+      ENTER("timeout");
       MHD_connection_close_ (connection,
                              MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
     }
@@ -292,6 +292,7 @@ h2_connection_close (struct MHD_Connection *connection)
 {
   ENTER("");
   if (NULL == connection->h2) return;
+
   h2_session_destroy (connection->h2);
   connection->h2 = NULL;
 
@@ -377,22 +378,24 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
     }
 
   size_t wsz = 1024;
-  while (size > wsz)
-  {
-    ENTER("Trying write_buffer size=%zu", size);
-    data = MHD_pool_allocate (connection->pool, size, MHD_YES);
-    if (NULL == data)
-      {
-        size -= wsz;
-        wsz <<= 1;
-        continue;
-      }
-    connection->write_buffer = data;
-    connection->write_buffer_append_offset = 0;
-    connection->write_buffer_send_offset = 0;
-    connection->write_buffer_size = size;
-    break;
-  }
+  do
+    {
+      ENTER("Trying write_buffer size=%zu", size);
+      data = MHD_pool_allocate (connection->pool, size, MHD_YES);
+      if (NULL == data)
+        {
+          size -= wsz;
+          wsz <<= 1;
+          continue;
+        }
+      connection->write_buffer = data;
+      connection->write_buffer_append_offset = 0;
+      connection->write_buffer_send_offset = 0;
+      connection->write_buffer_size = size;
+      break;
+    }
+  while (size > wsz);
+
   if (NULL == data)
     {
       MHD_connection_close_ (connection,
@@ -415,18 +418,18 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
 int
 h2_is_h2_preface (struct MHD_Connection *connection)
 {
-  int ret = MHD_NO;
+  int ret = -1;
   if (connection->read_buffer_offset >= H2_MAGIC_TOKEN_LEN)
     {
-      ret = !memcmp(H2_MAGIC_TOKEN, connection->read_buffer, H2_MAGIC_TOKEN_LEN) ?
-            MHD_YES : MHD_NO;
+      ret = memcmp(H2_MAGIC_TOKEN, connection->read_buffer,
+                   H2_MAGIC_TOKEN_LEN);
     }
   else if (connection->read_buffer_offset >= H2_MAGIC_TOKEN_LEN_MIN)
     {
-      ret = !memcmp(H2_MAGIC_TOKEN, connection->read_buffer, H2_MAGIC_TOKEN_LEN_MIN) ?
-            MHD_YES : MHD_NO;
+      ret = memcmp(H2_MAGIC_TOKEN, connection->read_buffer,
+                   H2_MAGIC_TOKEN_LEN_MIN);
     }
-  return ret;
+  return (ret == 0) ? MHD_YES : MHD_NO;
 }
 
 /* end of h2_connection.c */

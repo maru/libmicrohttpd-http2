@@ -86,9 +86,6 @@ crc (void *cls,
 
   if (pos == 128 * 10)
   {
-    MHD_add_response_footer (*responseptr,
-                             "Footer",
-                             "working");
     return MHD_CONTENT_READER_END_OF_STREAM;
   }
   if (max < 128)
@@ -146,6 +143,9 @@ ahc_echo (void *cls,
     return MHD_NO;
   }
   *responseptr = response;
+  MHD_add_response_footer (*responseptr,
+                           "Footer",
+                           "working");
   ret = MHD_queue_response (connection,
                             MHD_HTTP_OK,
                             response);

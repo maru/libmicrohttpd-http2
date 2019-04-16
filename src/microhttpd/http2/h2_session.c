@@ -93,6 +93,7 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
               _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
               nghttp2_strerror (rv), rv);
         }
+      ENTER("Error mem_recv: %s", nghttp2_strerror (rv));
       /* Should send a GOAWAY frame with last stream_id successfully received */
       rv = nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE, h2->last_stream_id,
                                   NGHTTP2_PROTOCOL_ERROR, NULL, 0);
@@ -157,12 +158,11 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
         break;
 
       size_t n = MHD_MIN (outlen, data_len);
-      memcpy (out, data, n);
+      memcpy (out + *append_offset, data, n);
       total_bytes += n;
 
       /* Update buffer offset */
       outlen -= n;
-      out += n;
       *append_offset += n;
       ENTER("n=%d --> append=%d", n, *append_offset);
 

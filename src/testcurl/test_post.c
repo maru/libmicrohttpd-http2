@@ -631,7 +631,6 @@ testMultithreadedPostCancelPart(int flags)
   int result = 0;
   struct CRBC crbc;
   int port;
-  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;

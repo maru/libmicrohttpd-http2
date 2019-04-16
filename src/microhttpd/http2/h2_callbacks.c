@@ -338,7 +338,7 @@ add_header (nghttp2_nv *nv, const char *key, const char *value)
  */
 static ssize_t
 response_read_cb (nghttp2_session *session, int32_t stream_id,
-                  uint8_t *buf, size_t buf_size, uint32_t *data_flags,
+                  uint8_t *buf, size_t length, uint32_t *data_flags,
                   nghttp2_data_source *source, void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *)user_data;
@@ -358,25 +358,13 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
   connection = h2->c;
   response = stream->c.response;
 
-  /* Check: the DATA frame has to enter in the write_buffer = 10 bytes
-     (frame header + padding) */
-  const size_t header_size = 10;
-  size_t left = connection->write_buffer_size - connection->write_buffer_append_offset;
-  if (left <= header_size) /* At least 1 data byte */
-    {
-      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                 stream->stream_id, NGHTTP2_ERR_NOMEM);
-      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-    }
-  size_t max_bytes = MHD_MIN (buf_size, left - header_size);
-
   /* Determine number of bytes to read for each type of response */
   if (response->data_size > 0)
     {
       /* Response in data buffer */
       size_t data_write_offset;
       data_write_offset = (size_t) stream->c.response_write_position - response->data_start;
-      nread = (ssize_t) MHD_MIN (max_bytes, response->data_size - data_write_offset);
+      nread = (ssize_t) MHD_MIN (length, response->data_size - data_write_offset);
     }
   else if (response->total_size == MHD_SIZE_UNKNOWN)
     {
@@ -406,13 +394,13 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
       else
         {
           response->data_size = ret;
-          nread = MHD_MIN ((ssize_t) max_bytes, ret);
+          nread = MHD_MIN ((ssize_t) length, ret);
         }
     }
   else
     {
       /* fd or callback with total size known */
-      nread = (ssize_t) MHD_MIN (max_bytes, response->total_size - stream->c.response_write_position);
+      nread = (ssize_t) MHD_MIN (length, response->total_size - stream->c.response_write_position);
     }
 
   /* We will write the complete DATA frame into the write_buffer in function send_data_cb. */

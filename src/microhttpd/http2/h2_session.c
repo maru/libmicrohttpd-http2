@@ -158,13 +158,16 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
         break;
 
       size_t n = MHD_MIN (outlen, data_len);
-      memcpy (out + *append_offset, data, n);
-      total_bytes += n;
+      if (n > 0)
+        {
+          memcpy (out + *append_offset, data, n);
+          total_bytes += n;
 
-      /* Update buffer offset */
-      outlen -= n;
-      *append_offset += n;
-      ENTER("n=%d --> append=%d", n, *append_offset);
+          /* Update buffer offset */
+          outlen -= n;
+          *append_offset += n;
+          ENTER("n=%d --> append=%d", n, *append_offset);
+        }
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)

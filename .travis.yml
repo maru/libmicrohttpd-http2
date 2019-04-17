@@ -2,7 +2,7 @@ language: c
 compiler: gcc
 sudo: false
 env:
-  NGHTTP2_VERSION=1.31.0
+  NGHTTP2_VERSION=1.37.0
   CURL_VERSION=7.50.0
   PREFIX_DIR=/usr/local
 addons:

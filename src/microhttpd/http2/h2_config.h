@@ -30,32 +30,24 @@
 
 struct h2_config_t;
 
-struct h2_config_t *
-h2_config_init (int is_tls);
+struct h2_config_t *h2_config_init (int is_tls);
 
-void
-h2_config_destroy (struct h2_config_t *conf);
+void h2_config_destroy (struct h2_config_t *conf);
 
 void
 h2_config_set_settings (struct h2_config_t *conf,
-                        size_t nmemb, h2_settings_entry *settings);
+			size_t nmemb, h2_settings_entry * settings);
 
-void
-h2_config_set_direct (struct h2_config_t *conf, int val);
+void h2_config_set_direct (struct h2_config_t *conf, int val);
 
-void
-h2_config_set_upgrade (struct h2_config_t *conf, int val);
+void h2_config_set_upgrade (struct h2_config_t *conf, int val);
 
-h2_settings_entry *
-h2_config_get_settings (const struct h2_config_t *conf);
+h2_settings_entry *h2_config_get_settings (const struct h2_config_t *conf);
 
-size_t
-h2_config_get_settings_len (const struct h2_config_t *conf);
+size_t h2_config_get_settings_len (const struct h2_config_t *conf);
 
-int
-h2_config_is_direct (const struct h2_config_t *conf);
+int h2_config_is_direct (const struct h2_config_t *conf);
 
-int
-h2_config_is_upgrade (const struct h2_config_t *conf);
+int h2_config_is_upgrade (const struct h2_config_t *conf);
 
 #endif

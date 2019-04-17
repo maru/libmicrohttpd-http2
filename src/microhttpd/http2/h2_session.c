@@ -79,7 +79,8 @@ h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream)
  *         Otherwise, sends a GOAWAY frame and return -1.
  */
 ssize_t
-h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
+h2_session_read_data (struct h2_session_t *h2, const uint8_t * in,
+		      size_t inlen)
 {
   struct MHD_Daemon *daemon = h2->c->daemon;
 
@@ -88,16 +89,18 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
   if (rv < 0)
     {
       if (rv != NGHTTP2_ERR_BAD_CLIENT_MAGIC)
-        {
-          MHD_DLOG (daemon,
-              _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
-              nghttp2_strerror (rv), rv);
-        }
-      ENTER("Error mem_recv: %s", nghttp2_strerror (rv));
+	{
+	  MHD_DLOG (daemon,
+		    _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
+		    nghttp2_strerror (rv), rv);
+	}
+      ENTER ("Error mem_recv: %s", nghttp2_strerror (rv));
       /* Should send a GOAWAY frame with last stream_id successfully received */
-      rv = nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE, h2->last_stream_id,
-                                  NGHTTP2_PROTOCOL_ERROR, NULL, 0);
-      rv = rv ?: nghttp2_session_send (h2->session);
+      rv =
+	nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE,
+			       h2->last_stream_id, NGHTTP2_PROTOCOL_ERROR,
+			       NULL, 0);
+      rv = rv ? : nghttp2_session_send (h2->session);
       return -1;
     }
   return rv;
@@ -116,8 +119,8 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen)
  *         Otherwise, returns -1.
  */
 ssize_t
-h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
-                       size_t *append_offset)
+h2_session_write_data (struct h2_session_t * h2, uint8_t * out, size_t outlen,
+		       size_t * append_offset)
 {
   /* If there is pending data from previous nghttp2_session_mem_send call */
   if (h2->pending_write_data)
@@ -133,11 +136,11 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
 
       /* Not enough space for all pending data */
       if (n < h2->pending_write_data_len)
-        {
-          h2->pending_write_data += n;
-          h2->pending_write_data_len -= n;
-          return n;
-        }
+	{
+	  h2->pending_write_data += n;
+	  h2->pending_write_data_len -= n;
+	  return n;
+	}
 
       /* Reset */
       h2->pending_write_data = NULL;
@@ -152,31 +155,31 @@ h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
       data_len = nghttp2_session_mem_send (h2->session, &data);
 
       if (data_len < 0)
-        return -1;
+	return -1;
 
       if (data_len == 0)
-        break;
+	break;
 
       size_t n = MHD_MIN (outlen, data_len);
       if (n > 0)
-        {
-          memcpy (out + *append_offset, data, n);
-          total_bytes += n;
+	{
+	  memcpy (out + *append_offset, data, n);
+	  total_bytes += n;
 
-          /* Update buffer offset */
-          outlen -= n;
-          *append_offset += n;
-          ENTER("n=%d --> append=%d", n, *append_offset);
-        }
+	  /* Update buffer offset */
+	  outlen -= n;
+	  *append_offset += n;
+	  ENTER ("n=%d --> append=%d", n, *append_offset);
+	}
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)
-        {
-          ENTER("pending data! %d", data_len - n);
-          h2->pending_write_data = data + n;
-          h2->pending_write_data_len = data_len - n;
-          break;
-        }
+	{
+	  ENTER ("pending data! %d", data_len - n);
+	  h2->pending_write_data = data + n;
+	  h2->pending_write_data_len = data_len - n;
+	  break;
+	}
     }
   return total_bytes;
 }
@@ -196,7 +199,7 @@ h2_session_send_preface (struct h2_session_t *h2)
 
   /* Flags currently ignored */
   rv = nghttp2_submit_settings (h2->session, NGHTTP2_FLAG_NONE,
-                                h2->settings, h2->settings_len);
+				h2->settings, h2->settings_len);
   if (rv != 0)
     {
       MHD_DLOG (daemon, _("Fatal error: %s\n"), nghttp2_strerror (rv));
@@ -217,18 +220,18 @@ h2_session_destroy (struct h2_session_t *h2)
   mhd_assert (NULL != h2);
 
   struct h2_stream_t *stream;
-  for (stream = h2->streams; h2->num_streams > 0 && stream != NULL; )
-   {
-     struct h2_stream_t *next = stream->next;
-     h2_stream_destroy (stream);
-     stream = next;
-   }
+  for (stream = h2->streams; h2->num_streams > 0 && stream != NULL;)
+    {
+      struct h2_stream_t *next = stream->next;
+      h2_stream_destroy (stream);
+      stream = next;
+    }
 
   if (NULL != h2->session)
-   {
-     nghttp2_session_del (h2->session);
-     h2->session = NULL;
-   }
+    {
+      nghttp2_session_del (h2->session);
+      h2->session = NULL;
+    }
 
   free (h2);
 }
@@ -261,8 +264,8 @@ h2_session_create (struct MHD_Connection *connection)
   h2->settings_len = h2_config_get_settings_len (daemon->h2_config);
 
   /* Create session and send server preface */
-  if ( (MHD_YES != h2_session_set_callbacks (h2)) ||
-       (MHD_YES != h2_session_send_preface (h2)) )
+  if ((MHD_YES != h2_session_set_callbacks (h2)) ||
+      (MHD_YES != h2_session_send_preface (h2)))
     {
       h2_session_destroy (h2);
       return NULL;
@@ -281,7 +284,7 @@ h2_session_create (struct MHD_Connection *connection)
  */
 int
 h2_session_upgrade (struct h2_session_t *h2,
-                    const char *settings, const char *method)
+		    const char *settings, const char *method)
 {
   char *settings_payload;
   size_t len;
@@ -291,11 +294,12 @@ h2_session_upgrade (struct h2_session_t *h2,
 
   /* Is it a HEAD request? */
   int head_request;
-  head_request = MHD_str_equal_caseless_ (method, MHD_HTTP_METHOD_HEAD) ? 1 : 0;
+  head_request =
+    MHD_str_equal_caseless_ (method, MHD_HTTP_METHOD_HEAD) ? 1 : 0;
 
   int ret;
   ret = nghttp2_session_upgrade2 (h2->session, settings_payload, len,
-                                  head_request, NULL);
+				  head_request, NULL);
   free (settings_payload);
 
   if (0 != ret)

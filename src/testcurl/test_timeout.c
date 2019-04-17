@@ -292,7 +292,6 @@ testWithTimeout ()
   /* NOTE: use of CONNECTTIMEOUT without also
    *   setting NOSIGNAL results in really weird
    *   crashes on my system! */
-  curl_easy_setopt (c, CURLOPT_VERBOSE, 1);
   curl_easy_setopt (c, CURLOPT_NOSIGNAL, 1);
   if (CURLE_OK != (errornum = curl_easy_perform (c)))
     {

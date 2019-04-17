@@ -154,18 +154,18 @@ MHD_TLS_set_alpn_protocols (struct MHD_Connection *connection)
 #ifdef HTTP2_SUPPORT
   if (0 != (connection->daemon->options & MHD_USE_HTTP2))
     {
-      protocols[cur].data = (unsigned char *)ALPN_HTTP_2_0;
+      protocols[cur].data = (unsigned char *) ALPN_HTTP_2_0;
       protocols[cur].size = ALPN_HTTP_2_0_LENGTH;
       cur++;
     }
 #endif /* HTTP2_SUPPORT */
 
-  protocols[cur].data = (unsigned char *)ALPN_HTTP_1_1;
+  protocols[cur].data = (unsigned char *) ALPN_HTTP_1_1;
   protocols[cur].size = ALPN_HTTP_1_1_LENGTH;
   cur++;
 
   ret = gnutls_alpn_set_protocols (connection->tls_session, protocols,
-     cur, GNUTLS_ALPN_SERVER_PRECEDENCE);
+				   cur, GNUTLS_ALPN_SERVER_PRECEDENCE);
 
   if (ret < 0)
     {
@@ -203,32 +203,35 @@ MHD_run_tls_handshake_ (struct MHD_Connection *connection)
 
 #ifdef HAS_ALPN
 	  gnutls_datum_t selected;
-	  ret = gnutls_alpn_get_selected_protocol(connection->tls_session, &selected);
+	  ret = gnutls_alpn_get_selected_protocol (connection->tls_session,
+						   &selected);
 #ifdef HTTP2_SUPPORT
-    if ( (0 == ret) && (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
-         (selected.size == ALPN_HTTP_2_0_LENGTH) &&
-         (0 == memcmp(ALPN_HTTP_2_0, selected.data,
-                 ALPN_HTTP_2_0_LENGTH)) )
-      {
-        selected.data = (unsigned char *)ALPN_HTTP_2_0;
-        h2_set_h2_callbacks (connection);
-      }
-    else
+	  if ((0 == ret)
+	      && (0 != (connection->daemon->options & MHD_USE_HTTP2))
+	      && (selected.size == ALPN_HTTP_2_0_LENGTH)
+	      && (0 ==
+		  memcmp (ALPN_HTTP_2_0, selected.data,
+			  ALPN_HTTP_2_0_LENGTH)))
+	    {
+	      selected.data = (unsigned char *) ALPN_HTTP_2_0;
+	      h2_set_h2_callbacks (connection);
+	    }
+	  else
 #endif /* HTTP2_SUPPORT */
-      {
-        /* Default HTTP version */
-        selected.data = (unsigned char *)ALPN_HTTP_1_1;
+	    {
+	      /* Default HTTP version */
+	      selected.data = (unsigned char *) ALPN_HTTP_1_1;
 #ifdef HTTP2_SUPPORT
-        h2_set_h1_callbacks (connection);
+	      h2_set_h1_callbacks (connection);
 #endif /* HTTP2_SUPPORT */
-      }
+	    }
 
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-    _("The negotiated protocol: %s\n"), selected.data);
+	  MHD_DLOG (connection->daemon,
+		    _("The negotiated protocol: %s\n"), selected.data);
 #endif /* HAVE_MESSAGES */
 #endif /* HAS_ALPN */
-	    return true;
+	  return true;
 	}
       if ( (GNUTLS_E_AGAIN == ret) ||
 	   (GNUTLS_E_INTERRUPTED == ret) )

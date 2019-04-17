@@ -171,7 +171,6 @@ testInternalPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
-  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -242,7 +241,6 @@ testMultithreadedPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
-  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -313,7 +311,6 @@ testMultithreadedPoolPost ()
   struct CBC cbc;
   CURLcode errornum;
   int port;
-  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -399,7 +396,6 @@ testExternalPost ()
   time_t start;
   struct timeval tv;
   int port;
-  fprintf(stderr, "%s\n", __FUNCTION__);
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;

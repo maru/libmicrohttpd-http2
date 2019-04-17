@@ -32,53 +32,56 @@
 #include <ctype.h>
 
 char status_string[600][4] = {
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "100", "101", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "200", "201", "202", "203", "204", "205", "206", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "300", "301", "302", "303", "304", "305", "306", "307", "308", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "400", "401", "402", "403", "404", "405", "406", "407", "408", "409",
- "410", "411", "412", "413", "414", "415", "416", "417", "", "",
- "", "421", "", "", "", "", "426", "", "428", "429", "", "431", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "451", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "500", "501", "502", "503", "504", "505", "", "", "", "", "", "511", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
- "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "" };
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "100", "101", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "200", "201", "202", "203", "204", "205", "206", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "300", "301", "302", "303", "304", "305", "306", "307", "308", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "400", "401", "402", "403", "404", "405", "406", "407", "408", "409",
+  "410", "411", "412", "413", "414", "415", "416", "417", "", "",
+  "", "421", "", "", "", "", "426", "", "428", "429", "", "431", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "451", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "500", "501", "502", "503", "504", "505", "", "", "", "", "", "511", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+  "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+};
 
-const size_t MHD_HTTP_HEADER_HOST_LEN = strlen(MHD_HTTP_HEADER_HOST);
+const size_t MHD_HTTP_HEADER_HOST_LEN = strlen (MHD_HTTP_HEADER_HOST);
 
-struct h2_pseudo_header_t {
+struct h2_pseudo_header_t
+{
   const char *name;
   size_t len;
 };
 
 static struct h2_pseudo_header_t h2_pseudo_headers[] = {
-  { .name = ":method",    .len = 7 },
-  { .name = ":scheme",    .len = 7 },
+  { .name = ":method",    .len = 7  },
+  { .name = ":scheme",    .len = 7  },
   { .name = ":authority", .len = 10 },
-  { .name = ":path",      .len = 5 },
+  { .name = ":path",      .len = 5  },
 };
 
-enum h2_pseudo_headers_idx {
+enum h2_pseudo_headers_idx
+{
   H2_HEADER_METHOD, H2_HEADER_SCHEME, H2_HEADER_AUTH, H2_HEADER_PATH
 };
 
@@ -104,16 +107,16 @@ str_tolower (char *s)
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_begin_headers_cb (nghttp2_session *session,
-                     const nghttp2_frame *frame, void *user_data)
+on_begin_headers_cb (nghttp2_session * session,
+		     const nghttp2_frame * frame, void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Daemon *daemon = h2->c->daemon;
   ENTER ("XXXX [id=%zu]", h2->session_id);
 
-  if ( !((frame->hd.type == NGHTTP2_HEADERS) &&
-         (frame->headers.cat == NGHTTP2_HCAT_REQUEST)) )
+  if (!((frame->hd.type == NGHTTP2_HEADERS) &&
+	(frame->headers.cat == NGHTTP2_HCAT_REQUEST)))
     {
       /* Frame is not beginning of a new stream */
       return 0;
@@ -152,7 +155,8 @@ on_begin_headers_cb (nghttp2_session *session,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuelen)
+header_parse_path (struct h2_stream_t *stream, const char *value,
+		   size_t valuelen)
 {
   struct MHD_Daemon *daemon = stream->c.daemon;
   /* Process the URI. See MHD_OPTION_URI_LOG_CALLBACK */
@@ -160,8 +164,8 @@ header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuele
     {
       stream->c.client_aware = true;
       stream->c.client_context
-          = daemon->uri_log_callback (daemon->uri_log_callback_cls,
-                                      stream->c.url, &stream->c);
+	= daemon->uri_log_callback (daemon->uri_log_callback_cls,
+				    stream->c.url, &stream->c);
     }
   char *args;
   args = memchr (value, '?', valuelen);
@@ -170,22 +174,22 @@ header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuele
     {
       args[0] = '\0';
       size_t argslen = valuelen - 1;
-      valuelen = (size_t)(args - (char *) value);
+      valuelen = (size_t) (args - (char *) value);
       argslen -= valuelen;
       args++;
 
       char *fragment = memchr (args, '#', argslen);
       if (NULL != fragment)
-        {
-          fragment[0] = '\0';
-          argslen = (size_t)(fragment - (char *) args);
-        }
+	{
+	  fragment[0] = '\0';
+	  argslen = (size_t) (fragment - (char *) args);
+	}
 
       /* note that this call clobbers 'query' */
       unsigned int unused_num_headers;
 
       MHD_parse_arguments_ (&stream->c, MHD_GET_ARGUMENT_KIND, args,
-        &connection_add_header, &unused_num_headers);
+			    &connection_add_header, &unused_num_headers);
 
     }
   return 0;
@@ -206,19 +210,20 @@ header_parse_path (struct h2_stream_t *stream, const char *value, size_t valuele
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
-              const uint8_t *name,  size_t namelen,
-              const uint8_t *value, size_t valuelen,
-              uint8_t flags, void *user_data)
+on_header_cb (nghttp2_session * session, const nghttp2_frame * frame,
+	      const uint8_t * name, size_t namelen,
+	      const uint8_t * value, size_t valuelen,
+	      uint8_t flags, void *user_data)
 {
 
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Daemon *daemon = h2->c->daemon;
-  ENTER();
+  ENTER ();
 
   /* Get stream */
-  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  stream =
+    nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (NULL == stream)
     {
       return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -227,17 +232,18 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
   h2_debug_print_header (h2->session_id, stream->stream_id, name, value);
 
   /* Not a pseudo header :hhhhhh */
-  if ( (namelen > 0) && (name[0] != ':') )
+  if ((namelen > 0) && (name[0] != ':'))
     {
-      return h2_stream_add_recv_header (stream, name, namelen, value, valuelen);
+      return h2_stream_add_recv_header (stream, name, namelen, value,
+					valuelen);
     }
 
   int header;
   for (header = 0; header < sizeof (h2_pseudo_headers); header++)
     {
-      if ( (namelen == h2_pseudo_headers[header].len) &&
-           (0 == memcmp (h2_pseudo_headers[header].name, name, namelen)) )
-        break;
+      if ((namelen == h2_pseudo_headers[header].len) &&
+	  (0 == memcmp (h2_pseudo_headers[header].name, name, namelen)))
+	break;
     }
 
   if (header >= sizeof (h2_pseudo_headers))
@@ -249,18 +255,19 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
     {
       /* Add header Host: */
       return h2_stream_add_recv_header (stream,
-                                MHD_HTTP_HEADER_HOST, MHD_HTTP_HEADER_HOST_LEN,
-                                value, valuelen);
+					MHD_HTTP_HEADER_HOST,
+					MHD_HTTP_HEADER_HOST_LEN, value,
+					valuelen);
     }
 
   char *buf = MHD_pool_allocate (stream->c.pool, valuelen + 1, MHD_YES);
   if (NULL == buf)
     {
       if (H2_HEADER_PATH == header)
-        {
-          stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
-          return 0;
-        }
+	{
+	  stream->c.responseCode = MHD_HTTP_URI_TOO_LONG;
+	  return 0;
+	}
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
   memcpy (buf, value, valuelen + 1);
@@ -268,29 +275,29 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
   switch (header)
     {
       /* :method */
-      case H2_HEADER_METHOD:
-        stream->c.method = buf;
-        break;
+    case H2_HEADER_METHOD:
+      stream->c.method = buf;
+      break;
 
       /* :scheme */
-      case H2_HEADER_SCHEME:
-        stream->scheme = buf;
-        break;
+    case H2_HEADER_SCHEME:
+      stream->scheme = buf;
+      break;
 
       /* :path */
-      case H2_HEADER_PATH:
-        if (0 != header_parse_path (stream, buf, valuelen))
-          {
-            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-          }
-        daemon->unescape_callback (daemon->unescape_callback_cls,
-                                   &stream->c, buf);
-        stream->c.url = buf;
-        break;
+    case H2_HEADER_PATH:
+      if (0 != header_parse_path (stream, buf, valuelen))
+	{
+	  return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+	}
+      daemon->unescape_callback (daemon->unescape_callback_cls,
+				 &stream->c, buf);
+      stream->c.url = buf;
+      break;
 
       /* :authority */
-      case H2_HEADER_AUTH:
-        break;
+    case H2_HEADER_AUTH:
+      break;
     }
   return 0;
 }
@@ -304,12 +311,12 @@ on_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
  * @param value value of header
  */
 static void
-add_header (nghttp2_nv *nv, const char *key, const char *value)
+add_header (nghttp2_nv * nv, const char *key, const char *value)
 {
-  nv->name = (uint8_t*)key;
-  nv->namelen = strlen(key);
-  nv->value = (uint8_t*)value;
-  nv->valuelen = strlen(value);
+  nv->name = (uint8_t *) key;
+  nv->namelen = strlen (key);
+  nv->value = (uint8_t *) value;
+  nv->valuelen = strlen (value);
   nv->flags = NGHTTP2_NV_FLAG_NONE;
   ENTER ("FIXME: HEADERS ARE COPIED");
   // NGHTTP2_NV_FLAG_NO_COPY_NAME | NGHTTP2_NV_FLAG_NO_COPY_VALUE
@@ -337,15 +344,15 @@ add_header (nghttp2_nv *nv, const char *key, const char *value)
  *        - NGHTTP2_ERR_CALLBACK_FAILURE: session failure.
  */
 static ssize_t
-response_read_cb (nghttp2_session *session, int32_t stream_id,
-                  uint8_t *buf, size_t length, uint32_t *data_flags,
-                  nghttp2_data_source *source, void *user_data)
+response_read_cb (nghttp2_session * session, int32_t stream_id,
+		  uint8_t * buf, size_t length, uint32_t * data_flags,
+		  nghttp2_data_source * source, void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Connection *connection;
   struct MHD_Response *response;
-  ssize_t nread; /* number of bytes to read */
+  ssize_t nread;		/* number of bytes to read */
 
   ENTER ("XXXX [id=%zu]", h2->session_id);
   /* Get current stream */
@@ -363,8 +370,10 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
     {
       /* Response in data buffer */
       size_t data_write_offset;
-      data_write_offset = (size_t) stream->c.response_write_position - response->data_start;
-      nread = (ssize_t) MHD_MIN (length, response->data_size - data_write_offset);
+      data_write_offset =
+	(size_t) stream->c.response_write_position - response->data_start;
+      nread =
+	(ssize_t) MHD_MIN (length, response->data_size - data_write_offset);
     }
   else if (response->total_size == MHD_SIZE_UNKNOWN)
     {
@@ -372,42 +381,47 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
       mhd_assert (response->crc != NULL);
       MHD_mutex_lock_chk_ (&response->mutex);
       ssize_t ret = response->crc (response->crc_cls,
-                                   stream->c.response_write_position,
-                                   response->data, response->data_buffer_size);
+				   stream->c.response_write_position,
+				   response->data,
+				   response->data_buffer_size);
 
       MHD_mutex_unlock_chk_ (&response->mutex);
       if (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret)
-        {
-          /* Error, reset stream */
-          return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-        }
+	{
+	  /* Error, reset stream */
+	  return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+	}
       else if (((ssize_t) MHD_CONTENT_READER_END_OF_STREAM) == ret)
-        {
-          nread = 0;
-        }
+	{
+	  nread = 0;
+	}
       else if (0 == ret)
-        {
-          ENTER ("FIXME: DEFERRED STREAM [session_id=%d stream_id=%d]",
-                 h2->session_id, stream->stream_id);
-          return NGHTTP2_ERR_DEFERRED;
-        }
+	{
+	  ENTER ("FIXME: DEFERRED STREAM [session_id=%d stream_id=%d]",
+		 h2->session_id, stream->stream_id);
+	  return NGHTTP2_ERR_DEFERRED;
+	}
       else
-        {
-          response->data_size = ret;
-          nread = MHD_MIN ((ssize_t) length, ret);
-        }
+	{
+	  response->data_size = ret;
+	  nread = MHD_MIN ((ssize_t) length, ret);
+	}
     }
   else
     {
       /* fd or callback with total size known */
-      nread = (ssize_t) MHD_MIN (length, response->total_size - stream->c.response_write_position);
+      nread =
+	(ssize_t) MHD_MIN (length,
+			   response->total_size -
+			   stream->c.response_write_position);
     }
 
   /* We will write the complete DATA frame into the write_buffer in function send_data_cb. */
   *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
 
   /* Last DATA frame */
-  if ((nread == 0) || (response->total_size == stream->c.response_write_position + nread))
+  if ((nread == 0)
+      || (response->total_size == stream->c.response_write_position + nread))
     {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
 
@@ -417,45 +431,47 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
       /* Count the number of trailers to send */
       struct MHD_HTTP_Header *pos;
       for (pos = response->first_header; NULL != pos; pos = pos->next)
-        {
-          if (pos->kind == MHD_FOOTER_KIND)
-            {
-              nvlen++;
-            }
-        }
+	{
+	  if (pos->kind == MHD_FOOTER_KIND)
+	    {
+	      nvlen++;
+	    }
+	}
       if (nvlen > 0)
-        {
-          nva = MHD_pool_allocate (stream->c.pool, sizeof (nghttp2_nv)*nvlen, MHD_YES);
-          if (NULL == nva)
-            return nread;
+	{
+	  nva =
+	    MHD_pool_allocate (stream->c.pool, sizeof (nghttp2_nv) * nvlen,
+			       MHD_YES);
+	  if (NULL == nva)
+	    return nread;
 
-          /* Add trailers */
-          for (pos = response->first_header; NULL != pos; pos = pos->next)
-          {
-            if (pos->kind == MHD_FOOTER_KIND)
-            {
-              add_header (&nva[i++], pos->header, pos->value);
-            }
-          }
-          int rv = nghttp2_submit_trailer (session, stream_id, nva, nvlen);
-          if (rv != 0)
-          {
-            if (nghttp2_is_fatal(rv))
-            {
-              return NGHTTP2_ERR_CALLBACK_FAILURE;
-            }
-          }
-          else
-          {
-            *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-          }
-        }
+	  /* Add trailers */
+	  for (pos = response->first_header; NULL != pos; pos = pos->next)
+	    {
+	      if (pos->kind == MHD_FOOTER_KIND)
+		{
+		  add_header (&nva[i++], pos->header, pos->value);
+		}
+	    }
+	  int rv = nghttp2_submit_trailer (session, stream_id, nva, nvlen);
+	  if (rv != 0)
+	    {
+	      if (nghttp2_is_fatal (rv))
+		{
+		  return NGHTTP2_ERR_CALLBACK_FAILURE;
+		}
+	    }
+	  else
+	    {
+	      *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+	    }
+	}
 
       if (nghttp2_session_get_stream_remote_close (session, stream_id) == 0)
-        {
-          nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                     stream_id, NGHTTP2_NO_ERROR);
-        }
+	{
+	  nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+				     stream_id, NGHTTP2_NO_ERROR);
+	}
     }
   ENTER ("XXXX nread=%d", nread);
   return nread;
@@ -472,9 +488,10 @@ response_read_cb (nghttp2_session *session, int32_t stream_id,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
+submit_response_headers (nghttp2_session * session,
+			 struct h2_stream_t *stream)
 {
-  ENTER();
+  ENTER ();
   if (0 == stream->c.responseCode)
     {
       return NGHTTP2_REFUSED_STREAM;
@@ -490,30 +507,29 @@ submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
   if (NULL != response)
     {
       for (pos = response->first_header; NULL != pos; pos = pos->next)
-        {
-          if ((pos->kind == MHD_HEADER_KIND) || (pos->kind == MHD_FOOTER_KIND))
-            nvlen++;
-        }
+	{
+	  if ((pos->kind == MHD_HEADER_KIND)
+	      || (pos->kind == MHD_FOOTER_KIND))
+	    nvlen++;
+	}
 
       /* content-length header */
       if (response->total_size != MHD_SIZE_UNKNOWN)
-        nvlen++;
+	nvlen++;
     }
   /* Allocate memory; check if there is enough in the pool */
-  nva = MHD_pool_allocate (stream->c.pool, sizeof (nghttp2_nv)*nvlen, MHD_YES);
+  nva =
+    MHD_pool_allocate (stream->c.pool, sizeof (nghttp2_nv) * nvlen, MHD_YES);
   if (NULL == nva)
     {
 #ifdef HAVE_MESSAGES
-      MHD_DLOG (daemon,
-                _("Not enough memory in pool for headers!\n"));
+      MHD_DLOG (daemon, _("Not enough memory in pool for headers!\n"));
 #endif
       return NGHTTP2_ERR_NOMEM;
     }
   size_t i = 0;
-  /* Check status code value, to detect programming errors */
-  mhd_assert (stream->c.responseCode < sizeof(status_string)/sizeof(status_string[100]));
-
   /* :status */
+  mhd_assert (stream->c.responseCode < 600);
   add_header (&nva[i++], ":status", status_string[stream->c.responseCode]);
 
   /* date */
@@ -526,25 +542,28 @@ submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
   if (NULL != response)
     {
       if (response->total_size != MHD_SIZE_UNKNOWN)
-        {
-          snprintf (clen, sizeof(clen), "%" PRIu64, response->total_size);
-          add_header (&nva[i++], "content-length", clen);
-        }
+	{
+	  snprintf (clen, sizeof (clen), "%" PRIu64, response->total_size);
+	  add_header (&nva[i++], "content-length", clen);
+	}
 
       /* Additional headers */
       for (pos = response->first_header; NULL != pos; pos = pos->next)
-        {
-          if (pos->kind == MHD_HEADER_KIND)
-            add_header (&nva[i++], pos->header, pos->value);
-          else if (pos->kind == MHD_FOOTER_KIND)
-            add_header (&nva[i++], "trailer", str_tolower (pos->header));
-        }
+	{
+	  if (pos->kind == MHD_HEADER_KIND)
+	    add_header (&nva[i++], pos->header, pos->value);
+	  else if (pos->kind == MHD_FOOTER_KIND)
+	    add_header (&nva[i++], "trailer", str_tolower (pos->header));
+	}
     }
   int r;
-  if ((0 == strcmp (MHD_HTTP_METHOD_HEAD, stream->c.method)) || (NULL == response))
+  if ((0 == strcmp (MHD_HTTP_METHOD_HEAD, stream->c.method))
+      || (NULL == response))
     {
       /* Only HEADERS frame */
-      r = nghttp2_submit_response (session, stream->stream_id, nva, nvlen, NULL);
+      r =
+	nghttp2_submit_response (session, stream->stream_id, nva, nvlen,
+				 NULL);
     }
   else
     {
@@ -552,7 +571,9 @@ submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
       nghttp2_data_provider data_prd;
       data_prd.source.fd = response->fd;
       data_prd.read_callback = response_read_cb;
-      r = nghttp2_submit_response (session, stream->stream_id, nva, nvlen, &data_prd);
+      r =
+	nghttp2_submit_response (session, stream->stream_id, nva, nvlen,
+				 &data_prd);
     }
   return r;
 }
@@ -568,17 +589,18 @@ submit_response_headers (nghttp2_session *session, struct h2_stream_t *stream)
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
-                  void *user_data)
+on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
+		  void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   int error_code;
 
   ENTER ("XXXX [id=%zu]", h2->session_id);
   h2_debug_print_frame (h2->session_id, PRINT_RECV, frame);
 
-  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  stream =
+    nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   /* Stream not found: frame is not HEADERS or DATA */
   if (NULL == stream)
     {
@@ -593,12 +615,13 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
       stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
       error_code = submit_response_headers (session, stream);
       if (0 != error_code)
-        {
-          ENTER("Error processing the request: %s", nghttp2_strerror (error_code));
-          /* Serious internal error, close stream */
-          nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                     stream->stream_id, error_code);
-        }
+	{
+	  ENTER ("Error processing the request: %s",
+		 nghttp2_strerror (error_code));
+	  /* Serious internal error, close stream */
+	  nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+				     stream->stream_id, error_code);
+	}
       return 0;
     }
 
@@ -606,71 +629,76 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
     {
     case NGHTTP2_HEADERS:
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS))
-        {
-          if (need_100_continue (&stream->c))
-            {
-              ENTER ("XXXX FIXME: PLEASE TEST 100-CONTINUE");
-              nghttp2_nv nva;
-              add_header (&nva, ":status", status_string[100]);
-              error_code = nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE,
-                                                   stream->stream_id, NULL,
-                                                   &nva, 1, NULL);
-              if (0 != error_code)
-                {
-                  ENTER("Error submiting headers: %s", nghttp2_strerror (error_code));
-                  /* Serious internal error, close stream */
-                  nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                             stream->stream_id, error_code);
-                  return 0;
-                }
-            }
-            ENTER ("XXXX HEADERS +END_HEADERS");
-          /* First call */
-          size_t unused = 0;
-          stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
-          h2_stream_call_connection_handler (stream, NULL, &unused);
-        }
-      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
-        {
-          ENTER ("XXXX HEADERS +END_STREAM");
-          /* Final call to application handler: GET, HEAD requests */
-          size_t unused = 0;
-          stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-          ENTER ("XXXX [id=%d] HEADERS +END_STREAM response %p", h2->session_id, stream->c.response);
-          h2_stream_call_connection_handler (stream, NULL, &unused);
-          ENTER ("XXXX [id=%d] response %p responseCode=%d, connection %p", h2->session_id, stream->c.response, stream->c.responseCode, &stream->c);
-          error_code = submit_response_headers (session, stream);
-          if (0 != error_code)
-            {
-              ENTER("Error submiting response headers: %s", nghttp2_strerror (error_code));
-              /* Serious internal error, close stream */
-              nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                         stream->stream_id, error_code);
-              return 0;
-            }
-        }
-      break;
+	{
+	  if (need_100_continue (&stream->c))
+	    {
+	      ENTER ("XXXX FIXME: PLEASE TEST 100-CONTINUE");
+	      nghttp2_nv nva;
+	      add_header (&nva, ":status", status_string[100]);
+	      error_code = nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE,
+						   stream->stream_id, NULL,
+						   &nva, 1, NULL);
+	      if (0 != error_code)
+		{
+		  ENTER ("Error submiting headers: %s",
+			 nghttp2_strerror (error_code));
+		  /* Serious internal error, close stream */
+		  nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+					     stream->stream_id, error_code);
+		  return 0;
+		}
+	    }
+	  ENTER ("XXXX HEADERS +END_HEADERS");
+	  /* First call */
+	  size_t unused = 0;
+	  stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
+	  h2_stream_call_connection_handler (stream, NULL, &unused);
+	}
+    case NGHTTP2_DATA:
+      // if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
+	// {
+	//   ENTER ("XXXX HEADERS +END_STREAM");
+	//   /* Final call to application handler: GET, HEAD requests */
+	//   size_t unused = 0;
+	//   stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
+	//   // ENTER ("XXXX [id=%d] HEADERS +END_STREAM response %p",
+	// 	//  h2->session_id, stream->c.response);
+	//   h2_stream_call_connection_handler (stream, NULL, &unused);
+	//   // ENTER ("XXXX [id=%d] response %p responseCode=%d, connection %p",
+	// 	//  h2->session_id, stream->c.response, stream->c.responseCode,
+	// 	//  &stream->c);
+	//   error_code = submit_response_headers (session, stream);
+	//   if (0 != error_code)
+	//     {
+	//       ENTER ("Error submiting response headers: %s",
+	// 	     nghttp2_strerror (error_code));
+	//       /* Serious internal error, close stream */
+	//       nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+	// 				 stream->stream_id, error_code);
+	//       return 0;
+	//     }
+	// }
+      // break;
 
-      case NGHTTP2_DATA:
-        if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
-          {
-            ENTER ("XXXX DATA +END_STREAM");
-            /* Final call to application handler: POST, PUT requests */
-            int error_code;
-            size_t unused = 0;
-            stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-            h2_stream_call_connection_handler (stream, NULL, &unused);
-            error_code = submit_response_headers (session, stream);
-            if (0 != error_code)
-              {
-                ENTER("Error submiting response headers: %s", nghttp2_strerror (error_code));
-                /* Serious internal error, close stream */
-                nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-                                           stream->stream_id, error_code);
-                return 0;
-              }
-          }
-        break;
+      if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
+	{
+	  ENTER ("XXXX DATA +END_STREAM");
+	  /* Final call to application handler: POST, PUT requests */
+	  size_t unused = 0;
+	  stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
+	  h2_stream_call_connection_handler (stream, NULL, &unused);
+	  error_code = submit_response_headers (session, stream);
+	  if (0 != error_code)
+	    {
+	      ENTER ("Error submiting response headers: %s",
+		     nghttp2_strerror (error_code));
+	      /* Serious internal error, close stream */
+	      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
+					 stream->stream_id, error_code);
+	      return 0;
+	    }
+	}
+      break;
     }
   return 0;
 }
@@ -696,11 +724,11 @@ on_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
  *        - NGHTTP2_ERR_CALLBACK_FAILURE: session failure.
  */
 static int
-send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
-              const uint8_t *framehd, size_t length,
-              nghttp2_data_source *source, void *user_data)
+send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
+	      const uint8_t * framehd, size_t length,
+	      nghttp2_data_source * source, void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Connection *connection;
   struct MHD_Response *response;
@@ -710,7 +738,8 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
   mhd_assert (h2 != NULL);
 
   ENTER ("XXXX [id=%zu]", h2->session_id);
-  stream = nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
+  stream =
+    nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (NULL == stream)
     {
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -723,14 +752,17 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
 
   /* Space left in connection->write_buffer */
   size_t left;
-  left = connection->write_buffer_size - connection->write_buffer_append_offset;
+  left =
+    connection->write_buffer_size - connection->write_buffer_append_offset;
 
   /* Check if there is enough space to write the DATA frame */
-  if ((stream->c.suspended) || (left < 9 + length + padlen)  /* 9 = frame header */)
+  if ((stream->c.suspended)
+      || (left < 9 + length + padlen) /* 9 = frame header */ )
     {
       return NGHTTP2_ERR_WOULDBLOCK;
     }
-  ENTER ("XXXX append=%zu left=%zu", connection->write_buffer_append_offset, left);
+  ENTER ("XXXX append=%zu left=%zu", connection->write_buffer_append_offset,
+	 left);
   buffer = &connection->write_buffer[connection->write_buffer_append_offset];
 
   /* Copy header */
@@ -756,17 +788,17 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
       /* File or response size known */
       MHD_mutex_lock_chk_ (&response->mutex);
       ssize_t ret = response->crc (response->crc_cls,
-                                   stream->c.response_write_position,
-                                   buffer, length);
+				   stream->c.response_write_position,
+				   buffer, length);
       MHD_mutex_unlock_chk_ (&response->mutex);
       if ((((ssize_t) MHD_CONTENT_READER_END_OF_STREAM) == ret) ||
-          (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret))
-        {
-          response->total_size = stream->c.response_write_position;
+	  (((ssize_t) MHD_CONTENT_READER_END_WITH_ERROR) == ret))
+	{
+	  response->total_size = stream->c.response_write_position;
 
-          /* error, close stream */
-          return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
-        }
+	  /* error, close stream */
+	  return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+	}
     }
 
   *(buffer + length) = 0;
@@ -785,13 +817,15 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
 
   /* Reset data buffer for chunked responses */
   if ((response->total_size == MHD_SIZE_UNKNOWN) &&
-      ((stream->c.response_write_position - response->data_start) == response->data_size))
+      ((stream->c.response_write_position - response->data_start) ==
+       response->data_size))
     {
       response->data_size = 0;
       response->data_start = stream->c.response_write_position;
     }
 
-  ENTER ("XXXX XXX update append=%zu", connection->write_buffer_append_offset);
+  ENTER ("XXXX XXX update append=%zu",
+	 connection->write_buffer_append_offset);
   return 0;
 }
 
@@ -810,11 +844,11 @@ send_data_cb (nghttp2_session *session, nghttp2_frame *frame,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
-                       int32_t stream_id, const uint8_t *data,
-                       size_t len, void *user_data)
+on_data_chunk_recv_cb (nghttp2_session * session, uint8_t flags,
+		       int32_t stream_id, const uint8_t * data,
+		       size_t len, void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct MHD_Daemon *daemon = h2->c->daemon;
   struct h2_stream_t *stream;
   mhd_assert (h2 != NULL);
@@ -831,16 +865,16 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
     {
       /* Check if there is enough space in read_buffer */
       while (len > stream->c.read_buffer_size - stream->c.read_buffer_offset)
-        {
-          if (MHD_YES != try_grow_read_buffer (&stream->c))
-            {
-              stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-              return 0;
-            }
-        }
+	{
+	  if (MHD_YES != try_grow_read_buffer (&stream->c))
+	    {
+	      stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	      return 0;
+	    }
+	}
       /* Add data to read_buffer and pass it to call_handler */
       memcpy (&stream->c.read_buffer[stream->c.read_buffer_offset],
-              data, len);
+	      data, len);
 
       stream->c.read_buffer_offset += len;
       /* Change values */
@@ -850,12 +884,14 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
 
   left_unprocessed = len;
   stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
-  h2_stream_call_connection_handler (stream, (char *)data, &left_unprocessed);
+  h2_stream_call_connection_handler (stream, (char *) data,
+				     &left_unprocessed);
 
   /* This should never happen! */
   if (left_unprocessed > len)
     {
-      mhd_panic (mhd_panic_cls, __FILE__, __LINE__, _("libmicrohttpd API violation"));
+      mhd_panic (mhd_panic_cls, __FILE__, __LINE__,
+		 _("libmicrohttpd API violation"));
     }
 
   /* Client did not process everything, save unprocessed data */
@@ -863,25 +899,25 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
     {
       size_t unprocessed_offset = len - left_unprocessed;
       if (0 != stream->c.read_buffer_offset)
-        {
-          /* Same memory areas */
-          memmove (stream->c.read_buffer, &data[unprocessed_offset],
-            left_unprocessed);
-        }
+	{
+	  /* Same memory areas */
+	  memmove (stream->c.read_buffer, &data[unprocessed_offset],
+		   left_unprocessed);
+	}
       else
-        {
-          /* Check if there is enough space in read_buffer */
-          while (len > stream->c.read_buffer_size)
-            {
-              if (MHD_YES != try_grow_read_buffer (&stream->c))
-                {
-                  stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-                  return 0;
-                }
-            }
-          memcpy (stream->c.read_buffer, &data[unprocessed_offset],
-            left_unprocessed);
-        }
+	{
+	  /* Check if there is enough space in read_buffer */
+	  while (len > stream->c.read_buffer_size)
+	    {
+	      if (MHD_YES != try_grow_read_buffer (&stream->c))
+		{
+		  stream->c.responseCode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		  return 0;
+		}
+	    }
+	  memcpy (stream->c.read_buffer, &data[unprocessed_offset],
+		  left_unprocessed);
+	}
       /* Update number of saved bytes */
       stream->c.read_buffer_offset = left_unprocessed;
     }
@@ -903,10 +939,10 @@ on_data_chunk_recv_cb (nghttp2_session *session, uint8_t flags,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_frame_send_cb (nghttp2_session *session, const nghttp2_frame *frame,
-                  void *user_data)
+on_frame_send_cb (nghttp2_session * session, const nghttp2_frame * frame,
+		  void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   ENTER ("XXXX [id=%zu]", h2->session_id);
 
   h2_debug_print_frame (h2->session_id, PRINT_SEND, frame);
@@ -925,10 +961,10 @@ on_frame_send_cb (nghttp2_session *session, const nghttp2_frame *frame,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-error_cb (nghttp2_session *session, const char *msg, size_t len,
-          void *user_data)
+error_cb (nghttp2_session * session, const char *msg, size_t len,
+	  void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   mhd_assert (h2 != NULL);
   ENTER ("XXXX [id=%zu] %s", h2->session_id, msg);
   return 0;
@@ -945,12 +981,14 @@ error_cb (nghttp2_session *session, const char *msg, size_t len,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_invalid_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
-                          int error_code, void *user_data)
+on_invalid_frame_recv_cb (nghttp2_session * session,
+			  const nghttp2_frame * frame, int error_code,
+			  void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   mhd_assert (h2 != NULL);
-  ENTER ("XXXX [id=%zu] INVALID: %s", h2->session_id, nghttp2_strerror(error_code));
+  ENTER ("XXXX [id=%zu] INVALID: %s", h2->session_id,
+	 nghttp2_strerror (error_code));
   return 0;
 }
 
@@ -971,14 +1009,15 @@ on_invalid_frame_recv_cb (nghttp2_session *session, const nghttp2_frame *frame,
  * @return If header is ignored, returns 0. Otherwise, returns an error.
  */
 static int
-on_invalid_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
-                      const uint8_t *name,  size_t namelen,
-                      const uint8_t *value, size_t valuelen,
-                      uint8_t flags, void *user_data)
+on_invalid_header_cb (nghttp2_session * session, const nghttp2_frame * frame,
+		      const uint8_t * name, size_t namelen,
+		      const uint8_t * value, size_t valuelen,
+		      uint8_t flags, void *user_data)
 {
-  (void)flags;
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
-  ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color("\033[1;34m"), name, do_color("\033[0m"), value);
+  (void) flags;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
+  ENTER ("XXXX [id=%zu] %s%s%s: %s", h2->session_id, do_color ("\033[1;34m"),
+	 name, do_color ("\033[0m"), value);
   return 0;
 }
 
@@ -993,12 +1032,12 @@ on_invalid_header_cb (nghttp2_session *session, const nghttp2_frame *frame,
  * @return If succeeds, returns 0. Otherwise, returns an error.
  */
 static int
-on_stream_close_cb (nghttp2_session *session, int32_t stream_id,
-                    uint32_t error_code, void *user_data)
+on_stream_close_cb (nghttp2_session * session, int32_t stream_id,
+		    uint32_t error_code, void *user_data)
 {
-  struct h2_session_t *h2 = (struct h2_session_t *)user_data;
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
-  (void)error_code;
+  (void) error_code;
   ENTER ("XXXX [id=%zu] stream_id=%zu", h2->session_id, stream_id);
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
@@ -1009,8 +1048,10 @@ on_stream_close_cb (nghttp2_session *session, int32_t stream_id,
 
   if (error_code)
     {
-      ENTER ("XXXX [stream_id=%d] Closing with err=%s", stream_id, nghttp2_strerror(error_code));
-      nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, stream_id, error_code);
+      ENTER ("XXXX [stream_id=%d] Closing with err=%s", stream_id,
+	     nghttp2_strerror (error_code));
+      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE, stream_id,
+				 error_code);
     }
   h2_session_remove_stream (h2, stream);
   return 0;
@@ -1040,34 +1081,31 @@ h2_session_set_callbacks (struct h2_session_t *h2)
     }
 
   nghttp2_session_callbacks_set_on_frame_recv_callback (callbacks,
-    on_frame_recv_cb);
+							on_frame_recv_cb);
 
   nghttp2_session_callbacks_set_on_frame_send_callback (callbacks,
-    on_frame_send_cb);
+							on_frame_send_cb);
 
   nghttp2_session_callbacks_set_on_stream_close_callback (callbacks,
-    on_stream_close_cb);
+							  on_stream_close_cb);
 
-  nghttp2_session_callbacks_set_on_header_callback (callbacks,
-    on_header_cb);
+  nghttp2_session_callbacks_set_on_header_callback (callbacks, on_header_cb);
 
   nghttp2_session_callbacks_set_on_data_chunk_recv_callback (callbacks,
-    on_data_chunk_recv_cb);
+							     on_data_chunk_recv_cb);
 
   nghttp2_session_callbacks_set_on_invalid_frame_recv_callback (callbacks,
-    on_invalid_frame_recv_cb);
+								on_invalid_frame_recv_cb);
 
-  nghttp2_session_callbacks_set_error_callback (callbacks,
-    error_cb);
+  nghttp2_session_callbacks_set_error_callback (callbacks, error_cb);
 
   nghttp2_session_callbacks_set_on_begin_headers_callback (callbacks,
-    on_begin_headers_cb);
+							   on_begin_headers_cb);
 
-  nghttp2_session_callbacks_set_send_data_callback (callbacks,
-    send_data_cb);
+  nghttp2_session_callbacks_set_send_data_callback (callbacks, send_data_cb);
 
   nghttp2_session_callbacks_set_on_invalid_header_callback (callbacks,
-    on_invalid_header_cb);
+							    on_invalid_header_cb);
 
   rv = nghttp2_session_server_new (&h2->session, callbacks, h2);
   if (rv != 0)

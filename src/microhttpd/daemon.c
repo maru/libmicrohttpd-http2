@@ -1110,11 +1110,11 @@ call_handlers (struct MHD_Connection *con,
 	   read_ready)
         {
 #ifdef HTTP2_SUPPORT
-          con->handle_read_cls (con);
-          ret = con->handle_idle_cls (con);
+	  con->handle_read_cls (con);
+	  ret = con->handle_idle_cls (con);
 #else
-          MHD_connection_handle_read (con);
-          ret = MHD_connection_handle_idle (con);
+	  MHD_connection_handle_read (con);
+	  ret = MHD_connection_handle_idle (con);
 #endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
@@ -1124,11 +1124,11 @@ call_handlers (struct MHD_Connection *con,
 	   write_ready)
         {
 #ifdef HTTP2_SUPPORT
-          con->handle_write_cls (con);
-          ret = con->handle_idle_cls (con);
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
 #else
-          MHD_connection_handle_write (con);
-          ret = MHD_connection_handle_idle (con);
+	  MHD_connection_handle_write (con);
+	  ret = MHD_connection_handle_idle (con);
 #endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
@@ -1166,16 +1166,16 @@ call_handlers (struct MHD_Connection *con,
   else if (on_fasttrack && con->sk_nonblck)
     {
       if (MHD_CONNECTION_HEADERS_SENDING == con->state)
-        {
+	{
 #ifdef HTTP2_SUPPORT
-          con->handle_write_cls (con);
-          ret = con->handle_idle_cls (con);
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
 #else
-          MHD_connection_handle_write (con);
-          /* Always call 'MHD_connection_handle_idle()' after each read/write. */
-          ret = MHD_connection_handle_idle (con);
+	  MHD_connection_handle_write (con);
+	  /* Always call 'MHD_connection_handle_idle()' after each read/write. */
+	  ret = MHD_connection_handle_idle (con);
 #endif /* HTTP2_SUPPORT */
-        }
+	}
       /* If all headers were sent by single write_handler() and
        * response body is prepared by single MHD_connection_handle_idle()
        * call - continue. */
@@ -1183,11 +1183,11 @@ call_handlers (struct MHD_Connection *con,
           (MHD_CONNECTION_CHUNKED_BODY_READY == con->state))
         {
 #ifdef HTTP2_SUPPORT
-          con->handle_write_cls (con);
-          ret = con->handle_idle_cls (con);
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
 #else
-          MHD_connection_handle_write (con);
-          ret = MHD_connection_handle_idle (con);
+	  MHD_connection_handle_write (con);
+	  ret = MHD_connection_handle_idle (con);
 #endif /* HTTP2_SUPPORT */
         }
     }
@@ -1868,9 +1868,9 @@ thread_main_handle_connection (void *data)
           MHD_update_last_activity_ (con); /* Reset timeout timer. */
           /* Process response queued during suspend and update states. */
 #ifdef HTTP2_SUPPORT
-          con->handle_idle_cls (con);
+	  con->handle_idle_cls (con);
 #else
-          MHD_connection_handle_idle (con);
+	  MHD_connection_handle_idle (con);
 #endif /* HTTP2_SUPPORT */
           was_suspended = false;
         }
@@ -2632,7 +2632,7 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
   connection->suspended = true;
 
 #ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
+  if (connection->http_version == HTTP_VERSION (2, 0))
     {
       h2_stream_suspend (connection);
     }
@@ -5046,47 +5046,48 @@ parse_options_va (struct MHD_Daemon *daemon,
 #endif /* HAVE_MESSAGES */
 	  break;
 #ifdef HTTP2_SUPPORT
-  case MHD_OPTION_HTTP2_SETTINGS:
-    if (0 != (daemon->options & MHD_USE_HTTP2))
-      {
-        size_t nmemb = va_arg (ap, size_t);
-        h2_config_set_settings (daemon->h2_config,
-                                nmemb, va_arg (ap, h2_settings_entry *));
-      }
-    else
-      {
-        MHD_DLOG (daemon,
-                  _("MHD_OPTION_HTTP2_SETTINGS specified for daemon "
-                    "without MHD_USE_HTTP2 flag set.\n"));
-        return MHD_NO;
-      }
-    break;
-  case MHD_OPTION_HTTP2_DIRECT:
-    if (0 != (daemon->options & MHD_USE_HTTP2))
-      {
-        h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
-      }
-    else
-      {
-        MHD_DLOG (daemon,
-                  _("MHD_OPTION_HTTP2_DIRECT specified for daemon "
-                    "without MHD_USE_HTTP2 flag set.\n"));
-        return MHD_NO;
-      }
-    break;
-  case MHD_OPTION_HTTP2_UPGRADE:
-    if (0 != (daemon->options & MHD_USE_HTTP2))
-      {
-        h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
-      }
-    else
-      {
-        MHD_DLOG (daemon,
-                  _("MHD_OPTION_HTTP2_UPGRADE specified for daemon "
-                    "without MHD_USE_HTTP2 flag set.\n"));
-        return MHD_NO;
-      }
-    break;
+	case MHD_OPTION_HTTP2_SETTINGS:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      size_t nmemb = va_arg (ap, size_t);
+	      h2_config_set_settings (daemon->h2_config,
+				      nmemb, va_arg (ap,
+						     h2_settings_entry *));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_SETTINGS specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
+	case MHD_OPTION_HTTP2_DIRECT:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_DIRECT specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
+	case MHD_OPTION_HTTP2_UPGRADE:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_UPGRADE specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
@@ -5145,8 +5146,8 @@ parse_options_va (struct MHD_Daemon *daemon,
                   /* all options taking 'int' */
                 case MHD_OPTION_STRICT_FOR_CLIENT:
 #ifdef HTTP2_SUPPORT
-                case MHD_OPTION_HTTP2_DIRECT:
-                case MHD_OPTION_HTTP2_UPGRADE:
+		case MHD_OPTION_HTTP2_DIRECT:
+		case MHD_OPTION_HTTP2_UPGRADE:
 #endif /* ! HTTP2_SUPPORT */
                   if (MHD_YES != parse_options (daemon,
                                                 servaddr,
@@ -6545,9 +6546,9 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
 
 #ifdef HTTP2_SUPPORT
       if (0 != (daemon->options & MHD_USE_HTTP2))
-        {
-          h2_config_destroy (daemon->h2_config);
-        }
+	{
+	  h2_config_destroy (daemon->h2_config);
+	}
 #endif /* HTTP2_SUPPORT */
 
 #ifdef DAUTH_SUPPORT

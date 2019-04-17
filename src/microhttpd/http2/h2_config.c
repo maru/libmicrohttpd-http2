@@ -57,13 +57,14 @@ struct h2_config_t
 struct h2_config_t *
 h2_config_init (int is_tls)
 {
-#if HTTP2_DEBUG
-  set_timer ();
-  set_color_output (isatty(fileno(stderr)));
-#endif
+  if (HTTP2_DEBUG)
+    {
+      set_timer ();
+      set_color_output (isatty (fileno (stderr)));
+    }
 
-  struct h2_config_t *conf = calloc(1, sizeof(struct h2_config_t));
-  conf->h2_direct  = is_tls ? 0 : 1;
+  struct h2_config_t *conf = calloc (1, sizeof (struct h2_config_t));
+  conf->h2_direct = is_tls ? 0 : 1;
   conf->h2_upgrade = is_tls ? 0 : 1;
 
   return conf;
@@ -77,7 +78,7 @@ h2_config_destroy (struct h2_config_t *conf)
 
 void
 h2_config_set_settings (struct h2_config_t *conf,
-                        size_t nmemb, h2_settings_entry *settings)
+			size_t nmemb, h2_settings_entry * settings)
 {
   conf->h2_settings_size = nmemb;
   conf->h2_settings = settings;
@@ -86,7 +87,7 @@ h2_config_set_settings (struct h2_config_t *conf,
 void
 h2_config_set_direct (struct h2_config_t *conf, int val)
 {
-  conf->h2_direct  = val ? 1 : 0;
+  conf->h2_direct = val ? 1 : 0;
 }
 
 void
@@ -102,7 +103,7 @@ h2_config_get_settings (const struct h2_config_t *conf)
 }
 
 size_t
-h2_config_get_settings_len (const struct h2_config_t *conf)
+h2_config_get_settings_len (const struct h2_config_t * conf)
 {
   return conf->h2_settings_size;
 }

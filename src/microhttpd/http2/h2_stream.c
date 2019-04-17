@@ -42,7 +42,7 @@
  * @param stream_id stream identifier
  * @return new stream, NULL if error.
  */
-struct h2_stream_t*
+struct h2_stream_t *
 h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
 {
   struct h2_stream_t *stream;
@@ -86,12 +86,12 @@ h2_stream_destroy (struct h2_stream_t *stream)
       stream->c.response = NULL;
 
       if ((NULL != daemon->notify_completed) && (stream->c.client_aware))
-        {
-          stream->c.client_aware = false;
-          daemon->notify_completed (daemon->notify_completed_cls,
-            &stream->c, &stream->c.client_context,
-            MHD_REQUEST_TERMINATED_COMPLETED_OK);
-        }
+	{
+	  stream->c.client_aware = false;
+	  daemon->notify_completed (daemon->notify_completed_cls,
+				    &stream->c, &stream->c.client_context,
+				    MHD_REQUEST_TERMINATED_COMPLETED_OK);
+	}
     }
   MHD_pool_destroy (stream->c.pool);
   free (stream);
@@ -113,15 +113,16 @@ h2_stream_destroy (struct h2_stream_t *stream)
  */
 int
 h2_stream_add_recv_header (struct h2_stream_t *stream,
-                           const uint8_t *name, const size_t namelen,
-                           const uint8_t *value, const size_t valuelen)
+			   const uint8_t * name, const size_t namelen,
+			   const uint8_t * value, const size_t valuelen)
 {
   struct MHD_Daemon *daemon = stream->c.daemon;
 
-  if ( (namelen == H2_HEADER_CONTENT_LENGTH_LEN) &&
-       (0 == memcmp (H2_HEADER_CONTENT_LENGTH, name, H2_HEADER_CONTENT_LENGTH_LEN)) )
+  if ((namelen == H2_HEADER_CONTENT_LENGTH_LEN) &&
+      (0 ==
+       memcmp (H2_HEADER_CONTENT_LENGTH, name, H2_HEADER_CONTENT_LENGTH_LEN)))
     {
-      stream->c.remaining_upload_size = atol(value);
+      stream->c.remaining_upload_size = atol (value);
       return 0;
     }
 
@@ -138,23 +139,23 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
   memcpy (val, value, valuelen + 1);
 
   int r;
-  if ( (namelen == H2_HEADER_COOKIE_LEN) &&
-       (0 == memcmp (H2_HEADER_COOKIE, name, H2_HEADER_COOKIE_LEN)) )
+  if ((namelen == H2_HEADER_COOKIE_LEN) &&
+      (0 == memcmp (H2_HEADER_COOKIE, name, H2_HEADER_COOKIE_LEN)))
     {
       r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
       r = (r == MHD_YES) ? parse_cookie_header (&stream->c) : r;
     }
   else
-  {
-    /* Other headers */
-    r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
-  }
+    {
+      /* Other headers */
+      r = MHD_set_connection_value (&stream->c, MHD_HEADER_KIND, key, val);
+    }
 
   if (MHD_YES != r)
     {
 #ifdef HAVE_MESSAGES
       MHD_DLOG (daemon,
-                  _("Not enough memory in pool to allocate header record!\n"));
+		_("Not enough memory in pool to allocate header record!\n"));
 #endif
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
     }
@@ -175,18 +176,21 @@ h2_stream_add_recv_header (struct h2_stream_t *stream,
  */
 int
 h2_stream_call_connection_handler (struct h2_stream_t *stream,
-                                   char *upload_data, size_t *upload_data_size)
+				   char *upload_data,
+				   size_t * upload_data_size)
 {
   struct MHD_Daemon *daemon = stream->c.daemon;
 
   if ((NULL != stream->c.response) || (0 != stream->c.responseCode))
-    return MHD_YES;                  /* already queued a response */
+    return MHD_YES;		/* already queued a response */
 
   stream->c.in_idle = true;
   stream->c.client_aware = true;
   int ret = daemon->default_handler (daemon->default_handler_cls,
-              &stream->c, stream->c.url, stream->c.method, MHD_HTTP_VERSION_2_0,
- 					    upload_data, upload_data_size, &stream->c.client_context);
+				     &stream->c, stream->c.url,
+				     stream->c.method, MHD_HTTP_VERSION_2_0,
+				     upload_data, upload_data_size,
+				     &stream->c.client_context);
   stream->c.in_idle = false;
   return ret;
 }

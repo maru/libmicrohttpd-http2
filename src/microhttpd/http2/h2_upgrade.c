@@ -45,23 +45,27 @@ h2_is_h2_upgrade (struct MHD_Connection *connection)
 
   /* Is an upgrade to http2? */
   if (NULL == (upgrade = MHD_lookup_connection_value (connection,
-                           MHD_HEADER_KIND, MHD_HTTP_HEADER_UPGRADE)))
+						      MHD_HEADER_KIND,
+						      MHD_HTTP_HEADER_UPGRADE)))
     {
       return MHD_NO;
     }
 
   /* Is a connection for upgrade? */
-  if ( (NULL == (conn = MHD_lookup_connection_value (connection,
-                         MHD_HEADER_KIND, MHD_HTTP_HEADER_CONNECTION))) ||
-       (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_UPGRADE)) ||
-       (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_HTTP2_SETTINGS)) )
+  if ((NULL == (conn = MHD_lookup_connection_value (connection,
+						    MHD_HEADER_KIND,
+						    MHD_HTTP_HEADER_CONNECTION)))
+      || (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_UPGRADE))
+      ||
+      (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_HTTP2_SETTINGS)))
     {
       return MHD_NO;
     }
 
   /* Has the HTTP2 settings? */
   if (NULL == (settings = MHD_lookup_connection_value (connection,
-                            MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS)))
+						       MHD_HEADER_KIND,
+						       MHD_HTTP_HEADER_HTTP2_SETTINGS)))
     {
       return MHD_NO;
     }
@@ -92,21 +96,22 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
 
   /* Get base64 decoded settings from client */
   settings = MHD_lookup_connection_value (connection,
-                MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS);
+					  MHD_HEADER_KIND,
+					  MHD_HTTP_HEADER_HTTP2_SETTINGS);
 
   /* Create HTTP/1 response */
-  response = MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT);
+  response =
+    MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT);
 
   /* Connection: Upgrade */
   MHD_add_response_header (response,
-                           MHD_HTTP_HEADER_CONNECTION, MHD_HTTP_HEADER_UPGRADE);
+			   MHD_HTTP_HEADER_CONNECTION,
+			   MHD_HTTP_HEADER_UPGRADE);
   /* Upgrade: h2c or h2 */
-  MHD_add_response_header (response,
-                           MHD_HTTP_HEADER_UPGRADE, protocol);
+  MHD_add_response_header (response, MHD_HTTP_HEADER_UPGRADE, protocol);
   /* HTTP/1.1 101 Switching Protocols */
   ret = MHD_queue_response (connection,
-                            MHD_HTTP_SWITCHING_PROTOCOLS,
-                            response);
+			    MHD_HTTP_SWITCHING_PROTOCOLS, response);
   if (MHD_YES != ret)
     {
       return MHD_NO;
@@ -117,7 +122,8 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   if (MHD_YES != build_header_response (connection))
     {
       connection_close_error (connection,
-            _("Closing connection (failed to create response header)\n"));
+			      _
+			      ("Closing connection (failed to create response header)\n"));
       return MHD_NO;
     }
 

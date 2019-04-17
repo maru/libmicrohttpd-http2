@@ -104,23 +104,23 @@ void
 h2_session_add_stream (struct h2_session_t *h2, struct h2_stream_t *stream);
 
 void
-h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream);
+h2_session_remove_stream (struct h2_session_t *h2,
+			  struct h2_stream_t *stream);
 
 ssize_t
-h2_session_read_data (struct h2_session_t *h2, const uint8_t *in, size_t inlen);
+h2_session_read_data (struct h2_session_t *h2, const uint8_t * in,
+		      size_t inlen);
 
 ssize_t
-h2_session_write_data (struct h2_session_t *h2, uint8_t *out, size_t outlen,
-                       size_t *append_offset);
+h2_session_write_data (struct h2_session_t *h2, uint8_t * out, size_t outlen,
+		       size_t * append_offset);
 
-struct h2_session_t *
-h2_session_create (struct MHD_Connection *connection);
+struct h2_session_t *h2_session_create (struct MHD_Connection *connection);
 
-void
-h2_session_destroy (struct h2_session_t *h2);
+void h2_session_destroy (struct h2_session_t *h2);
 
 int
 h2_session_upgrade (struct h2_session_t *h2,
-                    const char *settings, const char *method);
+		    const char *settings, const char *method);
 
 #endif

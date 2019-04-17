@@ -28,7 +28,6 @@
 #ifndef H2_CALLBACKS_H
 #define H2_CALLBACKS_H
 
-int
-h2_session_set_callbacks (struct h2_session_t *h2);
+int h2_session_set_callbacks (struct h2_session_t *h2);
 
 #endif

@@ -942,7 +942,7 @@ MHD_connection_close_ (struct MHD_Connection *connection,
   struct MHD_Response *resp = connection->response;
 
 #ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
+  if (connection->http_version == HTTP_VERSION (2, 0))
     {
       h2_connection_close (connection);
     }
@@ -2915,9 +2915,9 @@ MHD_connection_handle_read (struct MHD_Connection *connection)
 #endif
 
 #ifdef HTTP2_SUPPORT
-  /* Peek first bytes and check if it's an h2 preface */
-  if ((0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
-      (MHD_CONNECTION_INIT == connection->state) &&
+  /* Peek first bytes and check if it is an h2 preface */
+  if ((MHD_CONNECTION_INIT == connection->state) &&
+      (0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
       (0 != h2_config_is_direct (connection->daemon->h2_config)) &&
       (MHD_YES == h2_is_h2_preface (connection)))
     {
@@ -3527,14 +3527,14 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
           continue;
         case MHD_CONNECTION_FOOTERS_RECEIVED:
 #ifdef HTTP2_SUPPORT
-          /* Check if the connection wants an h2 upgrade */
-          if ((0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
-              (0 != h2_config_is_upgrade (connection->daemon->h2_config)) &&
-              (MHD_YES == h2_is_h2_upgrade (connection)))
-            {
-              h2_do_h2_upgrade (connection);
-              break;
-            }
+	  /* Check if the connection wants an h2 upgrade */
+	  if ((0 != (connection->daemon->options & MHD_USE_HTTP2)) &&
+	      (0 != h2_config_is_upgrade (connection->daemon->h2_config)) &&
+	      (MHD_YES == h2_is_h2_upgrade (connection)))
+	    {
+	      h2_do_h2_upgrade (connection);
+	      break;
+	    }
 #endif /* HTTP2_SUPPORT */
           call_connection_handler (connection); /* "final" call */
           if (connection->state == MHD_CONNECTION_CLOSED)

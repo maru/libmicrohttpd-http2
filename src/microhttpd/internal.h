@@ -543,7 +543,7 @@ enum MHD_TLS_CONN_STATE
 /**
  * Should all state transitions be printed to stderr?
  */
-#define DEBUG_STATES MHD_NO
+#define DEBUG_STATES MHD_YES
 
 
 #ifdef HAVE_MESSAGES
@@ -1051,7 +1051,7 @@ struct MHD_Connection
   struct h2_session_t *h2;
 
   /**
-   * Offset where we are start reading from @e read_buffer.
+   * Offset where we are start processing from @e read_buffer.
    */
   size_t read_buffer_start_offset;
 

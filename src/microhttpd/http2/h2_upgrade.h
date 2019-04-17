@@ -28,10 +28,8 @@
 #ifndef H2_UPGRADE_H
 #define H2_UPGRADE_H
 
-int
-h2_is_h2_upgrade (struct MHD_Connection *connection);
+int h2_is_h2_upgrade (struct MHD_Connection *connection);
 
-int
-h2_do_h2_upgrade (struct MHD_Connection *connection);
+int h2_do_h2_upgrade (struct MHD_Connection *connection);
 
 #endif

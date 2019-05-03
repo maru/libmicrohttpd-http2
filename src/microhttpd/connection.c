@@ -1069,11 +1069,14 @@ need_100_continue (struct MHD_Connection *connection)
 
   return ( (NULL == connection->response) &&
 	   (NULL != connection->version) &&
-       (!MHD_str_equal_caseless_(connection->version,
-			     MHD_HTTP_VERSION_1_0)) &&
-	   (NULL != (expect = MHD_lookup_connection_value (connection,
-							   MHD_HEADER_KIND,
-							   MHD_HTTP_HEADER_EXPECT))) &&
+       (MHD_str_equal_caseless_(connection->version,
+			     MHD_HTTP_VERSION_1_1)) &&
+           (MHD_NO != MHD_lookup_connection_value_n (connection,
+                                                     MHD_HEADER_KIND,
+                                                     MHD_HTTP_HEADER_EXPECT,
+                                                     MHD_STATICSTR_LEN_(MHD_HTTP_HEADER_EXPECT),
+                                                     &expect,
+                                                     NULL)) &&
 	   (MHD_str_equal_caseless_(expect,
                                     "100-continue")) &&
 	   (connection->continue_message_write_offset <
@@ -1818,9 +1821,9 @@ build_header_response (struct MHD_Connection *connection)
             simply only force adding a content-length header if this
             is not a 'connect' or if the response is not empty
             (which is kind of more sane, because if some crazy
-            application did return content with a 2xx status code, 
+            application did return content with a 2xx status code,
             then having a content-length might again be a good idea).
-           
+
             Note that the change from 'SHOULD NOT' to 'MUST NOT' is
             a recent development of the HTTP 1.1 specification.
           */
@@ -2321,6 +2324,7 @@ int
 parse_cookie_header (struct MHD_Connection *connection)
 {
   const char *hdr;
+  size_t hdr_len;
   char *cpy;
   char *pos;
   char *sce;
@@ -2331,13 +2335,15 @@ parse_cookie_header (struct MHD_Connection *connection)
   char old;
   int quotes;
 
-  hdr = MHD_lookup_connection_value (connection,
-				     MHD_HEADER_KIND,
-				     MHD_HTTP_HEADER_COOKIE);
-  if (NULL == hdr)
+  if (MHD_NO == MHD_lookup_connection_value_n (connection,
+                                               MHD_HEADER_KIND,
+                                               MHD_HTTP_HEADER_COOKIE,
+                                               MHD_STATICSTR_LEN_(MHD_HTTP_HEADER_COOKIE),
+                                               &hdr,
+                                               &hdr_len))
     return MHD_YES;
   cpy = MHD_pool_allocate (connection->pool,
-                           strlen (hdr) + 1,
+                           hdr_len + 1,
                            MHD_YES);
   if (NULL == cpy)
     {
@@ -2352,7 +2358,8 @@ parse_cookie_header (struct MHD_Connection *connection)
     }
   memcpy (cpy,
           hdr,
-          strlen (hdr) + 1);
+          hdr_len);
+  cpy[hdr_len] = '\0';
   pos = cpy;
   while (NULL != pos)
     {
@@ -2997,10 +3004,13 @@ parse_connection_headers (struct MHD_Connection *connection)
        (NULL != connection->version) &&
        (MHD_str_equal_caseless_(MHD_HTTP_VERSION_1_1,
                                 connection->version)) &&
-       (NULL ==
-        MHD_lookup_connection_value (connection,
-                                     MHD_HEADER_KIND,
-                                     MHD_HTTP_HEADER_HOST)) )
+       (MHD_NO ==
+        MHD_lookup_connection_value_n (connection,
+                                       MHD_HEADER_KIND,
+                                       MHD_HTTP_HEADER_HOST,
+                                       MHD_STATICSTR_LEN_(MHD_HTTP_HEADER_HOST),
+                                       NULL,
+                                       NULL)) )
     {
       int iret;
 
@@ -3037,10 +3047,12 @@ parse_connection_headers (struct MHD_Connection *connection)
     }
 
   connection->remaining_upload_size = 0;
-  enc = MHD_lookup_connection_value (connection,
-				     MHD_HEADER_KIND,
-				     MHD_HTTP_HEADER_TRANSFER_ENCODING);
-  if (NULL != enc)
+  if (MHD_NO != MHD_lookup_connection_value_n (connection,
+                                               MHD_HEADER_KIND,
+                                               MHD_HTTP_HEADER_TRANSFER_ENCODING,
+                                               MHD_STATICSTR_LEN_(MHD_HTTP_HEADER_TRANSFER_ENCODING),
+                                               &enc,
+                                               NULL))
     {
       connection->remaining_upload_size = MHD_SIZE_UNKNOWN;
       if (MHD_str_equal_caseless_(enc,
@@ -3049,10 +3061,12 @@ parse_connection_headers (struct MHD_Connection *connection)
     }
   else
     {
-      clen = MHD_lookup_connection_value (connection,
-					  MHD_HEADER_KIND,
-					  MHD_HTTP_HEADER_CONTENT_LENGTH);
-      if (NULL != clen)
+      if (MHD_NO != MHD_lookup_connection_value_n (connection,
+                                                   MHD_HEADER_KIND,
+                                                   MHD_HTTP_HEADER_CONTENT_LENGTH,
+                                                   MHD_STATICSTR_LEN_(MHD_HTTP_HEADER_CONTENT_LENGTH),
+                                                   &clen,
+                                                   NULL))
         {
           end = clen + MHD_str_to_uint64_ (clen,
                                            &connection->remaining_upload_size);

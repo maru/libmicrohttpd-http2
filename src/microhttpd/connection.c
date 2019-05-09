@@ -472,7 +472,7 @@ sendfile_adapter (struct MHD_Connection *connection)
  * @param connection connection to check
  * @return #MHD_YES if force push is possible, #MHD_NO otherwise
  */
-static int
+int
 socket_flush_possible(struct MHD_Connection *connection)
 {
   (void)connection; /* Mute compiler warning. */
@@ -604,7 +604,7 @@ socket_start_no_buffering (struct MHD_Connection *connection)
  * @param connection connection to be processed
  * @return #MHD_YES on success, #MHD_NO otherwise
  */
-static int
+int
 socket_start_no_buffering_flush (struct MHD_Connection *connection)
 {
   int res = MHD_YES;
@@ -634,7 +634,7 @@ socket_start_no_buffering_flush (struct MHD_Connection *connection)
  * @param connection connection to be processed
  * @return #MHD_YES on success, #MHD_NO otherwise
  */
-static int
+int
 socket_start_normal_buffering (struct MHD_Connection *connection)
 {
 #if defined(TCP_NODELAY)
@@ -3532,8 +3532,11 @@ MHD_connection_handle_idle (struct MHD_Connection *connection)
 	      (0 != h2_config_is_upgrade (connection->daemon->h2_config)) &&
 	      (MHD_YES == h2_is_h2_upgrade (connection)))
 	    {
-	      h2_do_h2_upgrade (connection);
-	      break;
+          if (MHD_YES == h2_do_h2_upgrade (connection))
+            {
+              connection->in_idle = false;
+              return MHD_YES;
+            }
 	    }
 #endif /* HTTP2_SUPPORT */
           call_connection_handler (connection); /* "final" call */

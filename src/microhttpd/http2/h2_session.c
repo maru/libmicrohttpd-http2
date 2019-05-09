@@ -94,13 +94,11 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t * in,
 		    _("nghttp2_session_mem_recv () returned error: %s %zd\n"),
 		    nghttp2_strerror (rv), rv);
 	}
-      ENTER ("Error mem_recv: %s", nghttp2_strerror (rv));
       /* Should send a GOAWAY frame with last stream_id successfully received */
       rv =
 	nghttp2_submit_goaway (h2->session, NGHTTP2_FLAG_NONE,
 			       h2->last_stream_id, NGHTTP2_PROTOCOL_ERROR,
 			       NULL, 0);
-      rv = rv ? : nghttp2_session_send (h2->session);
       return -1;
     }
   return rv;
@@ -122,38 +120,37 @@ ssize_t
 h2_session_write_data (struct h2_session_t * h2, uint8_t * out, size_t outlen,
 		       size_t * append_offset)
 {
+  ssize_t total_bytes = 0;
+
   /* If there is pending data from previous nghttp2_session_mem_send call */
   if (h2->pending_write_data)
     {
-      ENTER ("h2->pending_write_data=%zu", h2->pending_write_data_len);
       size_t n = MHD_MIN (outlen, h2->pending_write_data_len);
 
-      memcpy (out, h2->pending_write_data, n);
+      memcpy (out + *append_offset, h2->pending_write_data, n);
+      total_bytes += n;
 
       /* Update buffer offset */
       outlen -= n;
-      out += n;
+      *append_offset += n;
 
       /* Not enough space for all pending data */
       if (n < h2->pending_write_data_len)
 	{
 	  h2->pending_write_data += n;
 	  h2->pending_write_data_len -= n;
-	  return n;
+	  return total_bytes;
 	}
-
       /* Reset */
       h2->pending_write_data = NULL;
       h2->pending_write_data_len = 0;
     }
 
-  ssize_t total_bytes = 0;
   for (;;)
     {
       const uint8_t *data;
       ssize_t data_len;
       data_len = nghttp2_session_mem_send (h2->session, &data);
-
       if (data_len < 0)
 	return -1;
 
@@ -169,13 +166,11 @@ h2_session_write_data (struct h2_session_t * h2, uint8_t * out, size_t outlen,
 	  /* Update buffer offset */
 	  outlen -= n;
 	  *append_offset += n;
-	  ENTER ("n=%d --> append=%d", n, *append_offset);
 	}
 
       /* Not enough space in write_buffer for all data */
       if (n < data_len)
 	{
-	  ENTER ("pending data! %d", data_len - n);
 	  h2->pending_write_data = data + n;
 	  h2->pending_write_data_len = data_len - n;
 	  break;
@@ -218,7 +213,7 @@ void
 h2_session_destroy (struct h2_session_t *h2)
 {
   mhd_assert (NULL != h2);
-
+ENTER();
   struct h2_stream_t *stream;
   for (stream = h2->streams; h2->num_streams > 0 && stream != NULL;)
     {
@@ -249,7 +244,7 @@ h2_session_create (struct MHD_Connection *connection)
 {
   struct MHD_Daemon *daemon = connection->daemon;
   int rv;
-
+ENTER();
   struct h2_session_t *h2 = calloc (1, sizeof (struct h2_session_t));
   if (NULL == h2)
     {

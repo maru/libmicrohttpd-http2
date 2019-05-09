@@ -61,6 +61,8 @@ void set_color_output (bool f);
 
 const char *do_color (const char *code);
 
+const char *frame_type (uint8_t type);
+
 void h2_debug_print_time ();
 
 #define ENTER(format, args...) { \

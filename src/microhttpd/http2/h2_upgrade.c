@@ -53,10 +53,8 @@ h2_is_h2_upgrade (struct MHD_Connection *connection)
 
   /* Is a connection for upgrade? */
   if ((NULL == (conn = MHD_lookup_connection_value (connection,
-						    MHD_HEADER_KIND,
-						    MHD_HTTP_HEADER_CONNECTION)))
-      || (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_UPGRADE))
-      ||
+						    MHD_HEADER_KIND, MHD_HTTP_HEADER_CONNECTION))) ||
+      (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_UPGRADE)) ||
       (!MHD_str_has_s_token_caseless_ (conn, MHD_HTTP_HEADER_HTTP2_SETTINGS)))
     {
       return MHD_NO;
@@ -64,8 +62,7 @@ h2_is_h2_upgrade (struct MHD_Connection *connection)
 
   /* Has the HTTP2 settings? */
   if (NULL == (settings = MHD_lookup_connection_value (connection,
-						       MHD_HEADER_KIND,
-						       MHD_HTTP_HEADER_HTTP2_SETTINGS)))
+						     MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS)))
     {
       return MHD_NO;
     }
@@ -96,9 +93,9 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
 
   /* Get base64 decoded settings from client */
   settings = MHD_lookup_connection_value (connection,
-					  MHD_HEADER_KIND,
-					  MHD_HTTP_HEADER_HTTP2_SETTINGS);
+					  MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS);
 
+  ENTER("[%d] write_size=%d offset=%d\n", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
   /* Create HTTP/1 response */
   response =
     MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT);
@@ -119,14 +116,16 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
 
   MHD_destroy_response (response);
 
+  ENTER("[%d] write_size=%d offset=%d\n", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
+  // connection->state = MHD_CONNECTION_BODY_SENT;
   if (MHD_YES != build_header_response (connection))
     {
       connection_close_error (connection,
-			      _
-			      ("Closing connection (failed to create response header)\n"));
+	         _("Closing connection (failed to create response header)\n"));
       return MHD_NO;
     }
 
+    ENTER("[%d] write_size=%d offset=%d\n", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
   h2_set_h2_callbacks (connection);
   if (NULL == connection->h2)
     {

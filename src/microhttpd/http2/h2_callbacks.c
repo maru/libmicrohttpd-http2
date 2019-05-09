@@ -113,7 +113,6 @@ on_begin_headers_cb (nghttp2_session * session,
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Daemon *daemon = h2->c->daemon;
-  ENTER ("XXXX [id=%zu]", h2->session_id);
 
   if (!((frame->hd.type == NGHTTP2_HEADERS) &&
 	(frame->headers.cat == NGHTTP2_HCAT_REQUEST)))
@@ -123,6 +122,7 @@ on_begin_headers_cb (nghttp2_session * session,
     }
 
   int32_t stream_id = frame->hd.stream_id;
+  ENTER("stream_id=%d", stream_id);
   stream = h2_stream_create (stream_id, h2->c);
   if (NULL == stream)
     {
@@ -187,10 +187,8 @@ header_parse_path (struct h2_stream_t *stream, const char *value,
 
       /* note that this call clobbers 'query' */
       unsigned int unused_num_headers;
-
       MHD_parse_arguments_ (&stream->c, MHD_GET_ARGUMENT_KIND, args,
 			    &connection_add_header, &unused_num_headers);
-
     }
   return 0;
 }
@@ -219,7 +217,6 @@ on_header_cb (nghttp2_session * session, const nghttp2_frame * frame,
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   struct MHD_Daemon *daemon = h2->c->daemon;
-  ENTER ();
 
   /* Get stream */
   stream =
@@ -354,7 +351,6 @@ response_read_cb (nghttp2_session * session, int32_t stream_id,
   struct MHD_Response *response;
   ssize_t nread;		/* number of bytes to read */
 
-  ENTER ("XXXX [id=%zu]", h2->session_id);
   /* Get current stream */
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
@@ -473,7 +469,6 @@ response_read_cb (nghttp2_session * session, int32_t stream_id,
 				     stream_id, NGHTTP2_NO_ERROR);
 	}
     }
-  ENTER ("XXXX nread=%d", nread);
   return nread;
 }
 
@@ -491,9 +486,9 @@ static int
 submit_response_headers (nghttp2_session * session,
 			 struct h2_stream_t *stream)
 {
-  ENTER ();
   if (0 == stream->c.responseCode)
     {
+      ENTER ("FIXME: REFUSED_STREAM");
       return NGHTTP2_REFUSED_STREAM;
     }
 
@@ -596,7 +591,6 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
   struct h2_stream_t *stream;
   int error_code;
 
-  ENTER ("XXXX [id=%zu]", h2->session_id);
   h2_debug_print_frame (h2->session_id, PRINT_RECV, frame);
 
   stream =
@@ -604,6 +598,12 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
   /* Stream not found: frame is not HEADERS or DATA */
   if (NULL == stream)
     {
+      if (frame->hd.type == NGHTTP2_GOAWAY)
+        {
+          int ret = nghttp2_submit_goaway (session, NGHTTP2_FLAG_NONE, h2->last_stream_id,
+                         NGHTTP2_NO_ERROR, NULL, 0);
+          ENTER("goaway=%d", ret);
+        }
       return 0;
     }
 
@@ -612,6 +612,7 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
    * the request. */
   if (0 != stream->c.responseCode)
     {
+      ENTER ("Error processing the request: %d", stream->c.responseCode);
       stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
       error_code = submit_response_headers (session, stream);
       if (0 != error_code)
@@ -632,7 +633,7 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
 	{
 	  if (need_100_continue (&stream->c))
 	    {
-	      ENTER ("XXXX FIXME: PLEASE TEST 100-CONTINUE");
+	      ENTER ("FIXME: PLEASE TEST 100-CONTINUE");
 	      nghttp2_nv nva;
 	      add_header (&nva, ":status", status_string[100]);
 	      error_code = nghttp2_submit_headers (session, NGHTTP2_FLAG_NONE,
@@ -648,45 +649,20 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
 		  return 0;
 		}
 	    }
-	  ENTER ("XXXX HEADERS +END_HEADERS");
 	  /* First call */
 	  size_t unused = 0;
 	  stream->c.state = MHD_CONNECTION_HEADERS_PROCESSED;
 	  h2_stream_call_connection_handler (stream, NULL, &unused);
 	}
     case NGHTTP2_DATA:
-      // if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
-	// {
-	//   ENTER ("XXXX HEADERS +END_STREAM");
-	//   /* Final call to application handler: GET, HEAD requests */
-	//   size_t unused = 0;
-	//   stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-	//   // ENTER ("XXXX [id=%d] HEADERS +END_STREAM response %p",
-	// 	//  h2->session_id, stream->c.response);
-	//   h2_stream_call_connection_handler (stream, NULL, &unused);
-	//   // ENTER ("XXXX [id=%d] response %p responseCode=%d, connection %p",
-	// 	//  h2->session_id, stream->c.response, stream->c.responseCode,
-	// 	//  &stream->c);
-	//   error_code = submit_response_headers (session, stream);
-	//   if (0 != error_code)
-	//     {
-	//       ENTER ("Error submiting response headers: %s",
-	// 	     nghttp2_strerror (error_code));
-	//       /* Serious internal error, close stream */
-	//       nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-	// 				 stream->stream_id, error_code);
-	//       return 0;
-	//     }
-	// }
-      // break;
-
+      /* HEADERS or DATA frame with +END_STREAM flag */
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
 	{
-	  ENTER ("XXXX DATA +END_STREAM");
 	  /* Final call to application handler: POST, PUT requests */
 	  size_t unused = 0;
 	  stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
 	  h2_stream_call_connection_handler (stream, NULL, &unused);
+          ENTER("submit_response_headers");
 	  error_code = submit_response_headers (session, stream);
 	  if (0 != error_code)
 	    {
@@ -735,9 +711,7 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
   char *buffer;
   size_t padlen;
   size_t pos;
-  mhd_assert (h2 != NULL);
 
-  ENTER ("XXXX [id=%zu]", h2->session_id);
   stream =
     nghttp2_session_get_stream_user_data (session, frame->hd.stream_id);
   if (NULL == stream)
@@ -749,7 +723,7 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
   response = stream->c.response;
   mhd_assert (response != NULL);
   padlen = frame->data.padlen;
-
+  ENTER("[id=%d] (stream_id=%d) len=%d", h2->session_id, stream->stream_id, length);
   /* Space left in connection->write_buffer */
   size_t left;
   left =
@@ -761,8 +735,6 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
     {
       return NGHTTP2_ERR_WOULDBLOCK;
     }
-  ENTER ("XXXX append=%zu left=%zu", connection->write_buffer_append_offset,
-	 left);
   buffer = &connection->write_buffer[connection->write_buffer_append_offset];
 
   /* Copy header */
@@ -781,7 +753,6 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
       /* Buffer response */
       pos = (size_t) stream->c.response_write_position - response->data_start;
       memcpy (buffer, &response->data[pos], length);
-      ENTER ("XXXX response->data: pos %d len %d", pos, length);
     }
   else if ((response->crc != NULL) && (length > 0))
     {
@@ -802,7 +773,6 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
     }
 
   *(buffer + length) = 0;
-  ENTER ("XXXX body: %s", buffer);
 
   /* Set padding */
   if (padlen > 0)
@@ -824,8 +794,6 @@ send_data_cb (nghttp2_session * session, nghttp2_frame * frame,
       response->data_start = stream->c.response_write_position;
     }
 
-  ENTER ("XXXX XXX update append=%zu",
-	 connection->write_buffer_append_offset);
   return 0;
 }
 
@@ -943,10 +911,7 @@ on_frame_send_cb (nghttp2_session * session, const nghttp2_frame * frame,
 		  void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
-  ENTER ("XXXX [id=%zu]", h2->session_id);
-
   h2_debug_print_frame (h2->session_id, PRINT_SEND, frame);
-
   return 0;
 }
 
@@ -965,7 +930,6 @@ error_cb (nghttp2_session * session, const char *msg, size_t len,
 	  void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
-  mhd_assert (h2 != NULL);
   ENTER ("XXXX [id=%zu] %s", h2->session_id, msg);
   return 0;
 }
@@ -986,7 +950,6 @@ on_invalid_frame_recv_cb (nghttp2_session * session,
 			  void *user_data)
 {
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
-  mhd_assert (h2 != NULL);
   ENTER ("XXXX [id=%zu] INVALID: %s", h2->session_id,
 	 nghttp2_strerror (error_code));
   return 0;
@@ -1023,6 +986,28 @@ on_invalid_header_cb (nghttp2_session * session, const nghttp2_frame * frame,
 
 
 /**
+ * A frame header is received.
+ *
+ * @param session    current http2 session
+ * @param hd         header frame received
+ * @param user_data  HTTP2 connection of type h2_session_t
+ * @return If header is ignored, returns 0. Otherwise, returns an error.
+ */
+static int
+on_begin_frame_cb (nghttp2_session *session, const nghttp2_frame_hd *hd,
+                   void *user_data)
+{
+  struct h2_session_t *h2 = (struct h2_session_t *) user_data;
+  ENTER ("XXXX [id=%zu] stream_id=%d %s", h2->session_id, hd->stream_id, frame_type(hd->type));
+  if ((hd->type == NGHTTP2_HEADERS) && (hd->stream_id < h2->last_stream_id))
+    {
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+  return 0;
+}
+
+
+/**
  * Stream is closed. If there was an error, a RST stream is sent.
  *
  * @param session    current http2 session
@@ -1038,7 +1023,6 @@ on_stream_close_cb (nghttp2_session * session, int32_t stream_id,
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   (void) error_code;
-  ENTER ("XXXX [id=%zu] stream_id=%zu", h2->session_id, stream_id);
 
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
@@ -1068,8 +1052,6 @@ on_stream_close_cb (nghttp2_session * session, int32_t stream_id,
 int
 h2_session_set_callbacks (struct h2_session_t *h2)
 {
-  mhd_assert (h2 != NULL);
-
   int rv;
   nghttp2_session_callbacks *callbacks;
 
@@ -1107,6 +1089,8 @@ h2_session_set_callbacks (struct h2_session_t *h2)
   nghttp2_session_callbacks_set_on_invalid_header_callback (callbacks,
 							    on_invalid_header_cb);
 
+  nghttp2_session_callbacks_set_on_begin_frame_callback (callbacks,
+                                                         on_begin_frame_cb);
   rv = nghttp2_session_server_new (&h2->session, callbacks, h2);
   if (rv != 0)
     {

@@ -69,18 +69,12 @@ h2_connection_handle_read (struct MHD_Connection *connection)
   if (connection->read_buffer_size == connection->read_buffer_offset)
     return;			/* No space for receiving data. */
 
-  struct h2_session_t *h2 = connection->h2;
-
-  mhd_assert (NULL != h2);
-
   ssize_t nread;
   nread = connection->recv_cls (connection,
 				&connection->read_buffer[connection->
 							 read_buffer_offset],
 				connection->read_buffer_size -
 				connection->read_buffer_offset);
-
-  ENTER ("recv(): %zd", nread);
 
   if (nread < 0)
     {
@@ -120,9 +114,6 @@ h2_connection_handle_read (struct MHD_Connection *connection)
 void
 h2_connection_handle_write (struct MHD_Connection *connection)
 {
-  struct h2_session_t *h2 = connection->h2;
-  mhd_assert (NULL != h2);
-
   if (MHD_CONNECTION_CLOSED == connection->state)
     return;
 
@@ -132,20 +123,16 @@ h2_connection_handle_write (struct MHD_Connection *connection)
       mhd_assert (MHD_TLS_CONN_CONNECTED == connection->tls_state);
     }
 #endif /* HTTPS_SUPPORT */
-
   size_t nwrite;
-  nwrite =
-    connection->write_buffer_append_offset -
-    connection->write_buffer_send_offset;
+  ssize_t nsent = 0;
+  nwrite = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
   if (nwrite > 0)
     {
-      ssize_t nsent;
       nsent =
 	connection->send_cls (connection,
 			      &connection->write_buffer[connection->
 							write_buffer_send_offset],
 			      nwrite);
-      ENTER ("send(): %zd / %zd", nsent, nwrite);
 
       if (nsent < 0)
 	{
@@ -159,6 +146,7 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 	  return;
 	}
 
+// ENTER("append_offset=%zu send_offset=%zu nsent=%zu", connection->write_buffer_append_offset, connection->write_buffer_send_offset, nsent);
       connection->write_buffer_send_offset += nsent;
       MHD_update_last_activity_ (connection);
 
@@ -168,6 +156,20 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 	  connection->write_buffer_append_offset = 0;
 	  connection->write_buffer_send_offset = 0;
 	}
+    }
+
+  struct h2_session_t *h2 = connection->h2;
+  if ((nghttp2_session_want_read (h2->session) == 0) &&
+      (nghttp2_session_want_write (h2->session) == 0) &&
+      (nsent == nwrite))
+    {
+      if (MHD_NO != socket_flush_possible (connection))
+        socket_start_no_buffering_flush (connection);
+      else
+        socket_start_normal_buffering (connection);
+
+      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_COMPLETED_OK);
+      connection->state = MHD_CONNECTION_CLOSED;
     }
 }
 
@@ -182,7 +184,6 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 int
 h2_connection_handle_idle (struct MHD_Connection *connection)
 {
-  ENTER ();
   struct h2_session_t *h2 = connection->h2;
 
   connection->in_idle = true;
@@ -200,6 +201,9 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
   if (nread > 0)
     {
       ssize_t rv;
+      // ENTER("XXX connection->read_buffer %p start=%d append=%d size=%d nread=%d", connection->read_buffer,
+      //           connection->read_buffer_start_offset, connection->read_buffer_offset, connection->read_buffer_size,
+      //           nread);
       rv = h2_session_read_data (h2,
 				 &connection->read_buffer
 				 [connection->read_buffer_start_offset],
@@ -241,7 +245,6 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
   size_t nwrite =
     connection->write_buffer_append_offset -
     connection->write_buffer_send_offset;
-  ENTER ("bytes to write = %d/%d", nwrite, left);
   if (nwrite > 0)
     {
       /* Next event is write */
@@ -253,6 +256,8 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
       connection->event_loop_info = MHD_EVENT_LOOP_INFO_READ;
     }
 
+    ENTER("nread=%zu nwrite=%zu", nread, nwrite);
+
 #ifdef EPOLL_SUPPORT
   /* Update epoll event if we are ready to recv or send any bytes */
   if (((nread > 0) || (nwrite > 0)) &&
@@ -262,19 +267,10 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
     }
 #endif /* EPOLL_SUPPORT */
 
-  if ((nghttp2_session_want_read (h2->session) == 0) &&
-      (nghttp2_session_want_write (h2->session) == 0))
-    {
-      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
-      connection->in_idle = false;
-      return MHD_YES;
-    }
-
   time_t timeout = connection->connection_timeout;
   if ((nwrite <= 0) && (0 != timeout) &&
       (timeout <= (MHD_monotonic_sec_counter () - connection->last_activity)))
     {
-      ENTER ("timeout");
       MHD_connection_close_ (connection,
 			     MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
     }
@@ -309,7 +305,11 @@ h2_stream_suspend (struct MHD_Connection *connection)
 void
 h2_connection_close (struct MHD_Connection *connection)
 {
-  ENTER ("");
+  ENTER();
+        size_t nwrite;
+        nwrite = connection->write_buffer_append_offset - connection->write_buffer_send_offset;
+        // ENTER("[id=%d] still=%zu %zu-%zu", connection->h2->session_id, nwrite, connection->write_buffer_append_offset, connection->write_buffer_send_offset);
+
   if (NULL == connection->h2)
     return;
 
@@ -382,7 +382,6 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
   char *data;
   if (NULL == connection->read_buffer)
     {
-      ENTER ("Allocate read_buffer size=%zu", size);
       data = MHD_pool_allocate (connection->pool, size, MHD_YES);
       if (NULL == data)
 	{
@@ -396,25 +395,30 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
       connection->read_buffer_size = size;
     }
 
-  size_t wsz = 1024;
-  do
+  if (NULL == connection->write_buffer)
     {
-      ENTER ("Trying write_buffer size=%zu", size);
-      data = MHD_pool_allocate (connection->pool, size, MHD_YES);
-      if (NULL == data)
-	{
-	  size -= wsz;
-	  wsz <<= 1;
-	  continue;
-	}
-      connection->write_buffer = data;
-      connection->write_buffer_append_offset = 0;
-      connection->write_buffer_send_offset = 0;
-      connection->write_buffer_size = size;
-      break;
-    }
-  while (size > wsz);
+      size_t wsz = 1024;
+      do
+        {
+          ENTER("size=%d", size);
+          data = MHD_pool_allocate (connection->pool, size, MHD_YES);
+          if (NULL == data)
+            {
+              size -= wsz;
+              wsz <<= 1;
+              continue;
+            }
 
+          connection->write_buffer = data;
+          connection->write_buffer_append_offset = 0;
+          connection->write_buffer_send_offset = 0;
+          connection->write_buffer_size = size;
+          break;
+        }
+      while (size > wsz);
+    }
+  // ENTER("read=%d write=%d\n", connection->read_buffer_size, connection->write_buffer_size);
+  // ENTER("read=%d write=%d\n", connection->read_buffer_offset, connection->write_buffer_append_offset);
   if (NULL == data)
     {
       MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);

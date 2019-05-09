@@ -35,6 +35,9 @@
 #define H2_HEADER_CONTENT_LENGTH     "content-length"
 #define H2_HEADER_CONTENT_LENGTH_LEN 14
 
+#undef COLOR_RED
+#define COLOR_RED    "\033[36;1m"
+
 /**
  * Create a new stream structure and add it to the session.
  *
@@ -51,7 +54,7 @@ h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
     {
       return NULL;
     }
-
+  ENTER("(stream_id=%d)", stream_id);
   stream->stream_id = stream_id;
 
   char *data;
@@ -79,7 +82,7 @@ void
 h2_stream_destroy (struct h2_stream_t *stream)
 {
   struct MHD_Daemon *daemon = stream->c.daemon;
-  ENTER ("stream_id=%zu", stream->stream_id);
+
   if (stream->c.response)
     {
       MHD_destroy_response (stream->c.response);
@@ -88,6 +91,8 @@ h2_stream_destroy (struct h2_stream_t *stream)
       if ((NULL != daemon->notify_completed) && (stream->c.client_aware))
 	{
 	  stream->c.client_aware = false;
+	  /* FIXME: test_quiesce_http2 */
+	  fprintf(stderr, "[%s:%d] &connection->client_context %p\n", __FILE__, __LINE__, &stream->c.client_context);
 	  daemon->notify_completed (daemon->notify_completed_cls,
 				    &stream->c, &stream->c.client_context,
 				    MHD_REQUEST_TERMINATED_COMPLETED_OK);
@@ -180,7 +185,7 @@ h2_stream_call_connection_handler (struct h2_stream_t *stream,
 				   size_t * upload_data_size)
 {
   struct MHD_Daemon *daemon = stream->c.daemon;
-
+  ENTER("(stream_id=%d)", stream->stream_id);
   if ((NULL != stream->c.response) || (0 != stream->c.responseCode))
     return MHD_YES;		/* already queued a response */
 

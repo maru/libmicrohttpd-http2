@@ -4069,7 +4069,11 @@ MHD_queue_response (struct MHD_Connection *connection,
       connection->state = MHD_CONNECTION_FOOTERS_RECEIVED;
     }
   if (! connection->in_idle)
+#ifdef HTTP2_SUPPORT
+    (void) connection->handle_idle_cls (connection);
+#else
     (void) MHD_connection_handle_idle (connection);
+#endif /* HTTP2_SUPPORT */
   MHD_update_last_activity_ (connection);
   return MHD_YES;
 }

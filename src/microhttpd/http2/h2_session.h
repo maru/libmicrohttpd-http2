@@ -100,6 +100,9 @@ struct h2_session_t
   MHD_thread_handle_ID_ pid;
 };
 
+struct h2_stream_t *
+h2_session_get_stream (struct h2_session_t *h2, uint32_t stream_id);
+
 void
 h2_session_add_stream (struct h2_session_t *h2, struct h2_stream_t *stream);
 
@@ -122,5 +125,8 @@ void h2_session_destroy (struct h2_session_t *h2);
 int
 h2_session_upgrade (struct h2_session_t *h2,
 		    const char *settings, const char *method);
+
+int
+h2_session_create_stream (struct h2_session_t *h2, int32_t stream_id);
 
 #endif

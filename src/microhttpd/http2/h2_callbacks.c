@@ -121,28 +121,9 @@ on_begin_headers_cb (nghttp2_session * session,
       return 0;
     }
 
-  int32_t stream_id = frame->hd.stream_id;
-  ENTER("stream_id=%d", stream_id);
-  stream = h2_stream_create (stream_id, h2->c);
-  if (NULL == stream)
-    {
-      /* Out of memory */
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-
   int rv;
-  rv = nghttp2_session_set_stream_user_data (session, stream_id, stream);
-  if (rv != 0)
-    {
-      h2_stream_destroy (stream);
-      return NGHTTP2_ERR_CALLBACK_FAILURE;
-    }
-
-  h2_session_add_stream (h2, stream);
-  h2->num_streams++;
-  h2->last_stream_id = stream_id;
-  stream->c.state = MHD_CONNECTION_HEADER_PART_RECEIVED;
-  return 0;
+  rv = h2_session_create_stream (h2, frame->hd.stream_id);
+  return rv;
 }
 
 
@@ -315,7 +296,7 @@ add_header (nghttp2_nv * nv, const char *key, const char *value)
   nv->value = (uint8_t *) value;
   nv->valuelen = strlen (value);
   nv->flags = NGHTTP2_NV_FLAG_NONE;
-  ENTER ("FIXME: HEADERS ARE COPIED");
+  // ENTER ("FIXME: HEADERS ARE COPIED");
   // NGHTTP2_NV_FLAG_NO_COPY_NAME | NGHTTP2_NV_FLAG_NO_COPY_VALUE
 }
 
@@ -360,6 +341,10 @@ response_read_cb (nghttp2_session * session, int32_t stream_id,
 
   connection = h2->c;
   response = stream->c.response;
+  if (NULL == response)
+    {
+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
 
   /* Determine number of bytes to read for each type of response */
   if (response->data_size > 0)
@@ -574,6 +559,25 @@ submit_response_headers (nghttp2_session * session,
 }
 
 
+void
+process_request_final (struct h2_session_t *h2, struct h2_stream_t *stream)
+{
+  /* Final call to application handler: POST, PUT requests */
+  size_t unused = 0;
+  stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
+  h2_stream_call_connection_handler (stream, NULL, &unused);
+      ENTER("submit_response_headers");
+  int error_code = submit_response_headers (h2->session, stream);
+  if (0 != error_code)
+    {
+      ENTER ("Error submiting response headers: %s",
+         nghttp2_strerror (error_code));
+      /* Serious internal error, close stream */
+      nghttp2_submit_rst_stream (h2->session, NGHTTP2_FLAG_NONE,
+                 stream->stream_id, error_code);
+    }
+}
+
 /**
  * A frame was received. If it is a DATA or HEADERS frame,
  * we pass the request to the MHD application.
@@ -658,21 +662,7 @@ on_frame_recv_cb (nghttp2_session * session, const nghttp2_frame * frame,
       /* HEADERS or DATA frame with +END_STREAM flag */
       if (0 != (frame->hd.flags & NGHTTP2_FLAG_END_STREAM))
 	{
-	  /* Final call to application handler: POST, PUT requests */
-	  size_t unused = 0;
-	  stream->c.state = MHD_CONNECTION_FOOTERS_RECEIVED;
-	  h2_stream_call_connection_handler (stream, NULL, &unused);
-          ENTER("submit_response_headers");
-	  error_code = submit_response_headers (session, stream);
-	  if (0 != error_code)
-	    {
-	      ENTER ("Error submiting response headers: %s",
-		     nghttp2_strerror (error_code));
-	      /* Serious internal error, close stream */
-	      nghttp2_submit_rst_stream (session, NGHTTP2_FLAG_NONE,
-					 stream->stream_id, error_code);
-	      return 0;
-	    }
+        process_request_final (h2, stream);
 	}
       break;
     }
@@ -1023,7 +1013,8 @@ on_stream_close_cb (nghttp2_session * session, int32_t stream_id,
   struct h2_session_t *h2 = (struct h2_session_t *) user_data;
   struct h2_stream_t *stream;
   (void) error_code;
-
+  ENTER("[stream_id=%d] ", stream_id);
+  
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
     {

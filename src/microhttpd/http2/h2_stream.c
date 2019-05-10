@@ -39,14 +39,16 @@
 #define COLOR_RED    "\033[36;1m"
 
 /**
- * Create a new stream structure and add it to the session.
+ * Create a new http2 stream structure.
  *
- * @param h2 HTTP/2 session
- * @param stream_id stream identifier
+ * @param stream_id     stream identifier
+ * @param connection    current connection
+ * @param create_pool   create memory pool for this stream
  * @return new stream, NULL if error.
  */
 struct h2_stream_t *
-h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
+h2_stream_create_ (int32_t stream_id, struct MHD_Connection *connection,
+                   int create_pool)
 {
   struct h2_stream_t *stream;
   stream = calloc (1, sizeof (struct h2_stream_t));
@@ -57,18 +59,49 @@ h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
   ENTER("(stream_id=%d)", stream_id);
   stream->stream_id = stream_id;
 
-  char *data;
-  stream->c.pool = MHD_pool_create (connection->daemon->pool_size);
-  if (NULL == stream->c.pool)
+  if (MHD_YES == create_pool)
     {
-      free (stream);
-      return NULL;
+      char *data;
+      stream->c.pool = MHD_pool_create (connection->daemon->pool_size);
+      if (NULL == stream->c.pool)
+        {
+          free (stream);
+          return NULL;
+        }
     }
   stream->c.daemon = connection->daemon;
   stream->c.pid = connection->pid;
   stream->c.version = MHD_HTTP_VERSION_2_0;
   stream->c.tls_session = connection->tls_session;
   return stream;
+}
+
+
+/**
+ * Create a new http2 stream structure.
+ *
+ * @param stream_id     stream identifier
+ * @param connection    current connection
+ * @return new stream, NULL if error.
+ */
+struct h2_stream_t *
+h2_stream_create (int32_t stream_id, struct MHD_Connection *connection)
+{
+  return h2_stream_create_ (stream_id, connection, MHD_YES);
+}
+
+
+/**
+ * Create a new http2 stream structure without a memory pool.
+ *
+ * @param stream_id     stream identifier
+ * @param connection    current connection
+ * @return new stream, NULL if error.
+ */
+struct h2_stream_t *
+h2_stream_create_no_pool (int32_t stream_id, struct MHD_Connection *connection)
+{
+  return h2_stream_create_ (stream_id, connection, MHD_NO);
 }
 
 

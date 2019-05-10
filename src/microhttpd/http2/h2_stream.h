@@ -69,6 +69,9 @@ struct h2_stream_t
 struct h2_stream_t *h2_stream_create (int32_t stream_id,
 				      struct MHD_Connection *connection);
 
+struct h2_stream_t *h2_stream_create_no_pool (int32_t stream_id,
+                      struct MHD_Connection *connection);
+
 void h2_stream_destroy (struct h2_stream_t *stream);
 
 int

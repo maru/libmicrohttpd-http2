@@ -39,6 +39,27 @@
 size_t num_sessions = 0;
 
 /**
+ * Get stream from the h2 stream list.
+ *
+ * @param h2 HTTP/2 session
+ * @param stream_id stream id
+ * @return stream if found, otherwise NULL
+ */
+struct h2_stream_t *
+h2_session_get_stream (struct h2_session_t *h2, uint32_t stream_id)
+{
+  mhd_assert (h2 != NULL);
+  struct h2_stream_t *stream = NULL;
+  for (stream = h2->streams; NULL != stream; stream = stream->next)
+    {
+      if (stream_id == stream->stream_id)
+        return stream;
+    }
+  return NULL;
+}
+
+
+/**
  * Add a stream to the end of the stream list.
  *
  * @param h2 HTTP/2 session
@@ -64,6 +85,8 @@ h2_session_remove_stream (struct h2_session_t *h2, struct h2_stream_t *stream)
   mhd_assert (h2->num_streams > 0);
   h2->num_streams--;
 
+  mhd_assert (stream);
+  ENTER("stream_id=%d", stream->stream_id);
   DLL_remove (h2->streams, h2->streams_tail, stream);
   h2_stream_destroy (stream);
 }
@@ -83,7 +106,7 @@ h2_session_read_data (struct h2_session_t *h2, const uint8_t * in,
 		      size_t inlen)
 {
   struct MHD_Daemon *daemon = h2->c->daemon;
-
+ENTER();
   ssize_t rv;
   rv = nghttp2_session_mem_recv (h2->session, in, inlen);
   if (rv < 0)
@@ -121,6 +144,7 @@ h2_session_write_data (struct h2_session_t * h2, uint8_t * out, size_t outlen,
 		       size_t * append_offset)
 {
   ssize_t total_bytes = 0;
+  ENTER();
 
   /* If there is pending data from previous nghttp2_session_mem_send call */
   if (h2->pending_write_data)
@@ -156,7 +180,7 @@ h2_session_write_data (struct h2_session_t * h2, uint8_t * out, size_t outlen,
 
       if (data_len == 0)
 	break;
-
+ENTER("data_len=%d", data_len);
       size_t n = MHD_MIN (outlen, data_len);
       if (n > 0)
 	{
@@ -303,5 +327,35 @@ h2_session_upgrade (struct h2_session_t *h2,
     }
   return MHD_YES;
 }
+
+
+int
+h2_session_create_stream (struct h2_session_t *h2, int32_t stream_id)
+{
+  nghttp2_session *session = h2->session;
+  struct h2_stream_t *stream;
+  ENTER("stream_id=%d", stream_id);
+  stream = h2_stream_create (stream_id, h2->c);
+  if (NULL == stream)
+    {
+      /* Out of memory */
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+  int rv;
+  rv = nghttp2_session_set_stream_user_data (session, stream_id, stream);
+  if (rv != 0)
+    {
+      h2_stream_destroy (stream);
+      return NGHTTP2_ERR_CALLBACK_FAILURE;
+    }
+
+  h2_session_add_stream (h2, stream);
+  h2->num_streams++;
+  h2->last_stream_id = stream_id;
+  stream->c.state = MHD_CONNECTION_HEADER_PART_RECEIVED;
+  return 0;
+}
+
 
 /* end of h2_session.c */

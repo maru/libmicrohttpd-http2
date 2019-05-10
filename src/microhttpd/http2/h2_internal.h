@@ -31,6 +31,7 @@
 #include "http2/h2_session.h"
 #include "http2/h2_stream.h"
 #include "http2/h2_callbacks.h"
+#include "http2/h2_util.h"
 
 enum
 { PRINT_SEND, PRINT_RECV };

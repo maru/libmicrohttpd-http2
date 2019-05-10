@@ -40,6 +40,42 @@
 #define H2_MAGIC_TOKEN_LEN_MIN 16
 #define H2_MAGIC_TOKEN_LEN 24
 
+
+/**
+ * Try growing the write buffer.  We initially claim half the available
+ * buffer space for the write buffer, decrement by MHD_BUF_INC_SIZE steps.
+ *
+ * @param connection the connection
+ * @return #MHD_YES on success, #MHD_NO on failure
+ */
+int
+try_grow_write_buffer (struct MHD_Connection *connection)
+{
+  void *buf;
+  size_t new_size;
+
+  new_size = connection->daemon->pool_size / 2 + MHD_BUF_INC_SIZE;
+
+  do
+    {
+      new_size -= MHD_BUF_INC_SIZE;
+      ENTER("new_size=%zu", new_size);
+      buf = MHD_pool_reallocate (connection->pool,
+                                 connection->write_buffer,
+                                 connection->write_buffer_size,
+                                 new_size);
+    } while ((NULL == buf) && (new_size > MHD_BUF_INC_SIZE));
+
+  if (NULL == buf)
+    return MHD_NO;
+  /* we can actually grow the buffer, do it! */
+  connection->write_buffer = buf;
+  connection->write_buffer_size = new_size;
+
+  return MHD_YES;
+}
+
+
 /**
  * Read data from the connection.
  *
@@ -146,7 +182,7 @@ h2_connection_handle_write (struct MHD_Connection *connection)
 	  return;
 	}
 
-// ENTER("append_offset=%zu send_offset=%zu nsent=%zu", connection->write_buffer_append_offset, connection->write_buffer_send_offset, nsent);
+// ENTER("size=%zu append_offset=%zu send_offset=%zu nsent=%zu", connection->write_buffer_size, connection->write_buffer_append_offset, connection->write_buffer_send_offset, nsent);
       connection->write_buffer_send_offset += nsent;
       MHD_update_last_activity_ (connection);
 
@@ -249,6 +285,7 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
     {
       /* Next event is write */
       connection->event_loop_info = MHD_EVENT_LOOP_INFO_WRITE;
+      // MHD_update_last_activity_ (connection);
     }
   else
     {
@@ -378,52 +415,23 @@ h2_set_h2_callbacks (struct MHD_Connection *connection)
     }
 
   /* Allocate read and write buffers for the connection */
-  size_t size = connection->daemon->pool_size / 2;
-  char *data;
-  if (NULL == connection->read_buffer)
+  if (MHD_YES != try_grow_write_buffer (connection))
     {
-      data = MHD_pool_allocate (connection->pool, size, MHD_YES);
-      if (NULL == data)
-	{
-	  MHD_connection_close_ (connection,
-				 MHD_REQUEST_TERMINATED_WITH_ERROR);
-	  return;
-	}
-      connection->read_buffer = data;
-      connection->read_buffer_start_offset = 0;
-      connection->read_buffer_offset = 0;
-      connection->read_buffer_size = size;
-    }
-
-  if (NULL == connection->write_buffer)
-    {
-      size_t wsz = 1024;
-      do
-        {
-          ENTER("size=%d", size);
-          data = MHD_pool_allocate (connection->pool, size, MHD_YES);
-          if (NULL == data)
-            {
-              size -= wsz;
-              wsz <<= 1;
-              continue;
-            }
-
-          connection->write_buffer = data;
-          connection->write_buffer_append_offset = 0;
-          connection->write_buffer_send_offset = 0;
-          connection->write_buffer_size = size;
-          break;
-        }
-      while (size > wsz);
-    }
-  // ENTER("read=%d write=%d\n", connection->read_buffer_size, connection->write_buffer_size);
-  // ENTER("read=%d write=%d\n", connection->read_buffer_offset, connection->write_buffer_append_offset);
-  if (NULL == data)
-    {
-      MHD_connection_close_ (connection, MHD_REQUEST_TERMINATED_WITH_ERROR);
+      MHD_connection_close_ (connection,
+                   MHD_REQUEST_TERMINATED_WITH_ERROR);
       return;
     }
+
+  if ((NULL == connection->read_buffer) &&
+      (MHD_YES != try_grow_read_buffer (connection)))
+    {
+      MHD_connection_close_ (connection,
+                   MHD_REQUEST_TERMINATED_WITH_ERROR);
+      return;
+    }
+
+  // ENTER("pool_size=%zu read_size=%d write_size=%d", connection->daemon->pool_size, connection->read_buffer_size, connection->write_buffer_size);
+  // ENTER("read_offset=%d write_offset=%d", connection->read_buffer_offset, connection->write_buffer_append_offset);
 }
 
 

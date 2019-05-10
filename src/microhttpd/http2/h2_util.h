@@ -20,17 +20,18 @@
 */
 
 /**
- * @file microhttpd/http2/h2_callbacks.h
- * @brief nghttp2 callbacks
+ * @file microhttpd/http2/h2_util.h
+ * @brief Utility methods
  * @author Maru Berezin
  */
 
-#ifndef H2_CALLBACKS_H
-#define H2_CALLBACKS_H
-
-int h2_session_set_callbacks (struct h2_session_t *h2);
+#ifndef H2_UTIL_H
+#define H2_UTIL_H
 
 void
-process_request_final (struct h2_session_t *h2, struct h2_stream_t *stream);
+util_reset_connection_buffers (struct MHD_Connection *connection);
+
+void
+util_copy_connection_buffers (struct MHD_Connection *dst, struct MHD_Connection *src);
 
 #endif

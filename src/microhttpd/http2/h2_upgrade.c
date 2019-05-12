@@ -111,6 +111,7 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   /* Upgrade: h2c or h2 */
   MHD_add_response_header (response, MHD_HTTP_HEADER_UPGRADE, protocol);
   /* HTTP/1.1 101 Switching Protocols */
+  mhd_assert (connection->response == NULL);
   if (MHD_YES != MHD_queue_response (connection,
                                    MHD_HTTP_SWITCHING_PROTOCOLS, response))
     {

@@ -25,8 +25,6 @@ THREAD_ONLY_TESTS = \
   test_termination \
   test_timeout
 
-
-
 if HAVE_POSIX_THREADS
 THREAD_ONLY_TESTS += \
   test_quiesce \
@@ -54,6 +52,11 @@ if ENABLE_DAUTH
     test_digestauth \
     test_digestauth_sha256 \
     test_digestauth_with_arguments
+if ENABLE_HTTP2
+  THREAD_ONLY_TESTS += \
+    test_digestauth_http2 test_digestauth_http2_direct \
+    test_digestauth_with_arguments_http2 test_digestauth_with_arguments_http2_direct
+endif
 endif
 
 if HAVE_CURL
@@ -78,23 +81,47 @@ check_PROGRAMS = \
 
 if ENABLE_HTTP2
 check_PROGRAMS += \
-  test_get_http2 \
-  test_get_sendfile_http2 \
-  test_urlparse_http2 \
-  test_delete_http2 \
-  test_put_http2 \
-  test_process_headers_http2 \
-  test_process_arguments_http2 \
-  test_parse_cookies_http2 \
-  test_large_put_http2 \
-  test_large_put_inc_http2 \
-  test_long_header_http2 \
-  test_get_chunked_http2 \
-  test_iplimit_http2 \
-  test_termination_http2 \
-  test_timeout_http2 \
-  test_callback_http2 \
-  perf_get_http2
+  test_get_http2 test_get_http2_direct \
+  test_get_sendfile_http2 test_get_sendfile_http2_direct \
+  test_urlparse_http2 test_urlparse_http2_direct \
+  test_delete_http2 test_delete_http2_direct \
+  test_put_http2 test_put_http2_direct \
+  test_process_headers_http2 test_process_headers_http2_direct \
+  test_process_arguments_http2 test_process_arguments_http2_direct \
+  test_parse_cookies_http2 test_parse_cookies_http2_direct \
+  test_large_put_http2 test_large_put_http2_direct \
+  test_large_put_inc_http2 test_large_put_inc_http2_direct \
+  test_long_header_http2 test_long_header_http2_direct \
+  test_get_chunked_http2 test_get_chunked_http2_direct \
+  test_iplimit_http2 test_iplimit_http2_direct \
+  test_termination_http2 test_termination_http2_direct \
+  test_timeout_http2 test_timeout_http2_direct \
+  test_callback_http2 test_callback_http2_direct \
+  perf_get_http2 perf_get_http2_direct
+
+endif
+
+if HAVE_FORK_WAITPID
+if HAVE_CURL_BINARY
+check_PROGRAMS += test_get_response_cleanup
+if ENABLE_HTTP2
+check_PROGRAMS += \
+  test_get_response_cleanup_http2 test_get_response_cleanup_http2_direct
+endif
+endif
+endif
+
+if HAVE_POSIX_THREADS
+check_PROGRAMS += \
+  test_quiesce \
+  test_concurrent_stop \
+  perf_get_concurrent
+if ENABLE_HTTP2
+check_PROGRAMS += \
+  test_quiesce_http2 test_quiesce_http2_direct \
+  test_concurrent_stop_http2 test_concurrent_stop_http2_direct \
+  perf_get_concurrent_http2 perf_get_concurrent_http2_direct
+endif
 endif
 
 if HAVE_POSTPROCESSOR
@@ -107,19 +134,9 @@ if HAVE_POSTPROCESSOR
   test_post_loop11
 if ENABLE_HTTP2
  check_PROGRAMS += \
-  test_post_http2 \
-  test_postform_http2 \
-  test_post_loop_http2
-
-endif
-endif
-
-if HAVE_FORK_WAITPID
-if HAVE_CURL_BINARY
-check_PROGRAMS += test_get_response_cleanup
-if ENABLE_HTTP2
-check_PROGRAMS += test_get_response_cleanup_http2
-endif
+  test_post_http2 test_post_http2_direct \
+  test_postform_http2 test_postform_http2_direct \
+  test_post_loop_http2 test_post_loop_http2_direct
 endif
 endif
 
@@ -539,5 +556,176 @@ test_termination_http2_LDADD = \
 test_timeout_http2_SOURCES = \
   test_timeout.c
 test_timeout_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_concurrent_stop_http2_direct_SOURCES = \
+  test_concurrent_stop.c
+test_concurrent_stop_http2_direct_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+test_concurrent_stop_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) @LIBCURL@
+
+test_get_http2_direct_SOURCES = \
+  test_get.c
+test_get_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_quiesce_http2_direct_SOURCES = \
+  test_quiesce.c
+test_quiesce_http2_direct_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+test_quiesce_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) @LIBCURL@
+
+test_quiesce_stream_http2_direct_SOURCES = \
+  test_quiesce_stream.c
+test_quiesce_streAM_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+test_quiesce_stream_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) @LIBCURL@
+
+test_callback_http2_direct_SOURCES = \
+  test_callback.c
+test_callback_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+perf_get_http2_direct_SOURCES = \
+  perf_get.c \
+  gauger.h
+perf_get_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+perf_get_concurrent_http2_direct_SOURCES = \
+  perf_get_concurrent.c \
+  gauger.h
+perf_get_concurrent_http2_direct_CFLAGS = \
+  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+perf_get_concurrent_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  $(PTHREAD_LIBS) @LIBCURL@
+
+test_digestauth_http2_direct_SOURCES = \
+  test_digestauth.c
+test_digestauth_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_digestauth_with_arguments_http2_direct_SOURCES = \
+  test_digestauth_with_arguments.c
+test_digestauth_with_arguments_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_get_sendfile_http2_direct_SOURCES = \
+  test_get_sendfile.c
+test_get_sendfile_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_urlparse_http2_direct_SOURCES = \
+  test_urlparse.c
+test_urlparse_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_get_response_cleanup_http2_direct_SOURCES = \
+  test_get_response_cleanup.c
+test_get_response_cleanup_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+test_get_chunked_http2_direct_SOURCES = \
+  test_get_chunked.c
+test_get_chunked_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_post_http2_direct_SOURCES = \
+  test_post.c
+test_post_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_process_headers_http2_direct_SOURCES = \
+  test_process_headers.c
+test_process_headers_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_parse_cookies_http2_direct_SOURCES = \
+  test_parse_cookies.c
+test_parse_cookies_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_process_arguments_http2_direct_SOURCES = \
+  test_process_arguments.c
+test_process_arguments_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_postform_http2_direct_SOURCES = \
+  test_postform.c
+test_postform_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_post_loop_http2_direct_SOURCES = \
+  test_post_loop.c
+test_post_loop_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_delete_http2_direct_SOURCES = \
+  test_delete.c
+test_delete_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_put_http2_direct_SOURCES = \
+  test_put.c
+test_put_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_large_put_http2_direct_SOURCES = \
+  test_large_put.c
+test_large_put_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_large_put_inc_http2_direct_SOURCES = \
+  test_large_put.c
+test_large_put_inc_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_long_header_http2_direct_SOURCES = \
+  test_long_header.c
+test_long_header_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_iplimit_http2_direct_SOURCES = \
+  test_iplimit.c
+test_iplimit_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_termination_http2_direct_SOURCES = \
+  test_termination.c
+test_termination_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_timeout_http2_direct_SOURCES = \
+  test_timeout.c
+test_timeout_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@

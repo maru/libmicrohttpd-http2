@@ -108,3 +108,4 @@ test_large_put_inc11
 test_delete
 test_digestauth_sha256
 *_http2
+*_http2_direct

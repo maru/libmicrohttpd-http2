@@ -178,7 +178,7 @@ int my_trace(CURL *handle, curl_infotype type,
 /**
  * HTTP version of connections.
  */
-int http_version = 0;
+int http_version = -1;
 
 /**
  * Use HTTP2 flag for daemon.
@@ -193,17 +193,16 @@ int use_http2 = 0;
 void
 set_http_version(const char *prog_name, int allow_1_0)
 {
+#ifdef HAVE_LIBCURL
 #ifdef HTTP2_SUPPORT
   if (has_in_name(prog_name, "_http2"))
     {
-#ifdef HAVE_CURL
-      if (0 == (CURL_VERSION_HTTP2 & curl_version_info(CURLVERSION_NOW)->features))
-        {
-          abort();
-        }
-#endif /* HAVE_CURL */
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
       use_http2 = MHD_USE_HTTP2;
+      http_version = CURL_HTTP_VERSION_2;
+      if (has_in_name(prog_name, "_http2_direct"))
+        {
+            http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+        }
     }
   else
 #endif /* HTTP2_SUPPORT */
@@ -211,6 +210,7 @@ set_http_version(const char *prog_name, int allow_1_0)
     http_version = CURL_HTTP_VERSION_1_1;
   else
     http_version = CURL_HTTP_VERSION_1_0;
+#endif /* HAVE_CURL */
 }
 
 #endif /* TEST_HELPERS_H_ */

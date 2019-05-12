@@ -139,27 +139,14 @@ main (int argc,
   struct epoll_event events_list[1];
   struct Request *req;
   uint64_t timer_expirations;
-  int use_http2 = 0;
-  uint16_t port;
 
-  switch (argc)
+  if (argc != 2)
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
-  d = MHD_start_daemon (MHD_USE_EPOLL | MHD_ALLOW_SUSPEND_RESUME | use_http2,
-                        port,
+  d = MHD_start_daemon (MHD_USE_EPOLL | MHD_ALLOW_SUSPEND_RESUME,
+                        atoi (argv[1]),
                         NULL, NULL, &ahc_echo, NULL,
                         MHD_OPTION_NOTIFY_COMPLETED, &connection_done, NULL,
                         MHD_OPTION_END);

@@ -201,5 +201,31 @@ get_date_string (char *date, size_t date_len, char *header, char *end_of_line);
 int
 need_100_continue (struct MHD_Connection *connection);
 
+void
+cleanup_connection (struct MHD_Connection *connection);
+
+int
+try_grow_read_buffer (struct MHD_Connection *connection);
+
+int
+build_header_response (struct MHD_Connection *connection);
+
+int
+connection_add_header (struct MHD_Connection *connection,
+                       const char *key, const char *value,
+                       enum MHD_ValueKind kind);
+
+int
+parse_cookie_header (struct MHD_Connection *connection);
+
+int
+socket_flush_possible (struct MHD_Connection *connection);
+
+int
+socket_start_no_buffering_flush (struct MHD_Connection *connection);
+
+int
+socket_start_normal_buffering (struct MHD_Connection *connection);
+
 #endif /* ! HTTP2_SUPPORT */
 #endif

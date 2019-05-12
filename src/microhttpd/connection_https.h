@@ -29,6 +29,15 @@
 #include "internal.h"
 
 #ifdef HTTPS_SUPPORT
+
+#if defined(GNUTLS_VERSION_NUMBER)
+#  if (GNUTLS_VERSION_NUMBER >= 0x030200)
+#    define HAS_ALPN
+#    define ALPN_HTTP_1_1_LENGTH 8
+#    define ALPN_HTTP_1_1 "http/1.1"
+#  endif
+#endif
+
 /**
  * Set connection callback function to be used through out
  * the processing of this secure connection.
@@ -46,7 +55,7 @@ MHD_set_https_callbacks (struct MHD_Connection *connection);
  * @return true on success, false otherwise
  */
 bool
-MHD_tls_set_alpn_protocols (struct MHD_Connection *connection);
+MHD_TLS_set_alpn_protocols (struct MHD_Connection *connection);
 
 #endif /* HAS_ALPN */
 

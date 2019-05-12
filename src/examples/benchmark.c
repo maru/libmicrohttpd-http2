@@ -132,23 +132,10 @@ main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
   unsigned int i;
-  int use_http2 = 0;
-  uint16_t port;
 
-  switch (argc)
+  if (argc != 2)
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
   response = MHD_create_response_from_buffer (strlen (PAGE),
@@ -159,12 +146,12 @@ main (int argc, char *const *argv)
 				  MHD_HTTP_HEADER_CONNECTION,
 				  "close");
 #endif
-  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK | use_http2
+  d = MHD_start_daemon (MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_SUPPRESS_DATE_NO_CLOCK
 #ifdef EPOLL_SUPPORT
 			| MHD_USE_EPOLL | MHD_USE_TURBO
 #endif
 			,
-                        port,
+                        atoi (argv[1]),
                         NULL, NULL, &ahc_echo, NULL,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 120,
 			MHD_OPTION_THREAD_POOL_SIZE, (unsigned int) NUMBER_OF_THREADS,

@@ -151,7 +151,11 @@ endif
 
 if ENABLE_HTTP2
 libmicrohttpd_la_SOURCES += \
-  connection_http2.c connection_http2.h
+  http2/h2_config.c http2/h2_upgrade.c \
+  http2/h2_connection.c http2/h2_callbacks.c \
+  http2/h2_session.c http2/h2_stream.c \
+  http2/h2_helper.c http2/h2_util.c \
+  http2/h2.h
 endif
 
 
@@ -343,7 +347,7 @@ test_options_SOURCES = \
   test_options.c
 test_options_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la
-  
+
 test_start_stop_http2_SOURCES = \
   test_start_stop.c
 test_start_stop_http2_LDADD = \

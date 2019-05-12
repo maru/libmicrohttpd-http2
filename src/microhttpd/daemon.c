@@ -56,10 +56,6 @@
 #endif /* MHD_HTTPS_REQUIRE_GRYPT */
 #endif /* HTTPS_SUPPORT */
 
-#ifdef HTTP2_SUPPORT
-#include "connection_http2.h"
-#endif /* HTTP2_SUPPORT */
-
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -1139,8 +1135,13 @@ call_handlers (struct MHD_Connection *con,
       if ( (MHD_EVENT_LOOP_INFO_READ == con->event_loop_info) &&
 	   read_ready)
         {
-          MHD_connection_handle_read (con);
-          ret = MHD_connection_handle_idle (con);
+#ifdef HTTP2_SUPPORT
+	  con->handle_read_cls (con);
+	  ret = con->handle_idle_cls (con);
+#else
+	  MHD_connection_handle_read (con);
+	  ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
       /* No need to check value of 'ret' here as closed connection
@@ -1148,8 +1149,13 @@ call_handlers (struct MHD_Connection *con,
       if ( (MHD_EVENT_LOOP_INFO_WRITE == con->event_loop_info) &&
 	   write_ready)
         {
-          MHD_connection_handle_write (con);
-          ret = MHD_connection_handle_idle (con);
+#ifdef HTTP2_SUPPORT
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
+#else
+	  MHD_connection_handle_write (con);
+	  ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           states_info_processed = true;
         }
     }
@@ -1157,13 +1163,21 @@ call_handlers (struct MHD_Connection *con,
     {
       MHD_connection_close_ (con,
                              MHD_REQUEST_TERMINATED_WITH_ERROR);
+#ifdef HTTP2_SUPPORT
+      return con->handle_idle_cls (con);
+#else
       return MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
     }
 
   if (!states_info_processed)
     { /* Connection is not read or write ready, but external conditions
        * may be changed and need to be processed. */
+#ifdef HTTP2_SUPPORT
+      ret = con->handle_idle_cls (con);
+#else
       ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
     }
   /* Fast track for fast connections. */
   /* If full request was read by single read_handler() invocation
@@ -1178,19 +1192,29 @@ call_handlers (struct MHD_Connection *con,
   else if (on_fasttrack && con->sk_nonblck)
     {
       if (MHD_CONNECTION_HEADERS_SENDING == con->state)
-        {
-          MHD_connection_handle_write (con);
-          /* Always call 'MHD_connection_handle_idle()' after each read/write. */
-          ret = MHD_connection_handle_idle (con);
-        }
+	{
+#ifdef HTTP2_SUPPORT
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
+#else
+	  MHD_connection_handle_write (con);
+	  /* Always call 'MHD_connection_handle_idle()' after each read/write. */
+	  ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
+	}
       /* If all headers were sent by single write_handler() and
        * response body is prepared by single MHD_connection_handle_idle()
        * call - continue. */
       if ((MHD_CONNECTION_NORMAL_BODY_READY == con->state) ||
           (MHD_CONNECTION_CHUNKED_BODY_READY == con->state))
         {
-          MHD_connection_handle_write (con);
-          ret = MHD_connection_handle_idle (con);
+#ifdef HTTP2_SUPPORT
+	  con->handle_write_cls (con);
+	  ret = con->handle_idle_cls (con);
+#else
+	  MHD_connection_handle_write (con);
+	  ret = MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
         }
     }
 
@@ -1870,7 +1894,11 @@ thread_main_handle_connection (void *data)
         {
           MHD_update_last_activity_ (con); /* Reset timeout timer. */
           /* Process response queued during suspend and update states. */
-          MHD_connection_handle_idle (con);
+#ifdef HTTP2_SUPPORT
+	  con->handle_idle_cls (con);
+#else
+	  MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
           was_suspended = false;
         }
 
@@ -2107,7 +2135,11 @@ thread_main_handle_connection (void *data)
                            (daemon->shutdown) ?
                            MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
                            MHD_REQUEST_TERMINATED_WITH_ERROR);
+#ifdef HTTP2_SUPPORT
+  con->handle_idle_cls (con);
+#else
   MHD_connection_handle_idle (con);
+#endif /* HTTP2_SUPPORT */
 exit:
   if (NULL != con->response)
     {
@@ -2455,6 +2487,10 @@ internal_add_connection (struct MHD_Daemon *daemon,
   connection->sk_nonblck = non_blck;
   connection->daemon = daemon;
   connection->last_activity = MHD_monotonic_sec_counter();
+#ifdef HTTP2_SUPPORT
+  /* Default protocol */
+  h2_set_h1_callbacks (connection);
+#endif /* HTTP2_SUPPORT */
 
   if (0 == (daemon->options & MHD_USE_TLS))
     {
@@ -2492,7 +2528,7 @@ internal_add_connection (struct MHD_Daemon *daemon,
 
 #ifdef HAS_ALPN
       /* Set ALPN protocols */
-      MHD_tls_set_alpn_protocols (connection);
+      MHD_TLS_set_alpn_protocols (connection);
 #endif /* HAS_ALPN */
 
       switch (daemon->cred_type)
@@ -2547,23 +2583,6 @@ internal_add_connection (struct MHD_Daemon *daemon,
       goto cleanup;
 #endif /* ! HTTPS_SUPPORT */
     }
-
-#ifdef HTTP2_SUPPORT
-  /* Set http version  */
-  if (0 != (daemon->options & MHD_USE_HTTP2))
-    {
-      /*
-       * In this first version of the prototype, when the flag MHD_USE_HTTP2 is set,
-       * only HTTP/2 connections will be handled.
-       */
-      connection->http_version = HTTP_VERSION(2, 0);
-      connection->state = MHD_CONNECTION_HTTP2_INIT;
-    }
-  else
-    {
-      connection->http_version = HTTP_VERSION(1, 1);
-    }
-#endif /* ! HTTP2_SUPPORT */
 
 #if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
   MHD_mutex_lock_chk_ (&daemon->cleanup_connection_mutex);
@@ -2755,10 +2774,11 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
+
 #ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION(2, 0))
+  if (connection->http_version == HTTP_VERSION (2, 0))
     {
-      MHD_http2_suspend_stream (connection);
+      h2_stream_suspend (connection);
     }
 #endif /* HTTP2_SUPPORT */
 
@@ -4517,7 +4537,11 @@ MHD_epoll (struct MHD_Daemon *daemon,
   while (NULL != (pos = prev))
     {
       prev = pos->prevX;
+#ifdef HTTP2_SUPPORT
+      pos->handle_idle_cls (pos);
+#else
       MHD_connection_handle_idle (pos);
+#endif /* HTTP2_SUPPORT */
     }
   /* Connections with the default timeout are sorted by prepending
      them to the head of the list whenever we touch the connection;
@@ -4527,7 +4551,11 @@ MHD_epoll (struct MHD_Daemon *daemon,
   while (NULL != (pos = prev))
     {
       prev = pos->prevX;
+#ifdef HTTP2_SUPPORT
+      pos->handle_idle_cls (pos);
+#else
       MHD_connection_handle_idle (pos);
+#endif /* HTTP2_SUPPORT */
       if (MHD_CONNECTION_CLOSED != pos->state)
 	break; /* sorted by timeout, no need to visit the rest! */
     }
@@ -5216,7 +5244,7 @@ parse_options_va (struct MHD_Daemon *daemon,
                                                 unsigned int);
 	  break;
 	case MHD_OPTION_STRICT_FOR_CLIENT:
-          daemon->strict_for_client = va_arg (ap, int);;
+          daemon->strict_for_client = va_arg (ap, int);
 #ifdef HAVE_MESSAGES
 	  if ( (0 != (daemon->options & MHD_USE_PEDANTIC_CHECKS)) &&
 	       (1 != daemon->strict_for_client) )
@@ -5228,12 +5256,48 @@ parse_options_va (struct MHD_Daemon *daemon,
 #endif /* HAVE_MESSAGES */
 	  break;
 #ifdef HTTP2_SUPPORT
-        case MHD_OPTION_H2_SETTINGS:
-          daemon->h2_settings_len = va_arg (ap,
-                                        size_t);
-          daemon->h2_settings = va_arg (ap,
-                                        nghttp2_settings_entry *);
-          break;
+	case MHD_OPTION_HTTP2_SETTINGS:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      size_t nmemb = va_arg (ap, size_t);
+	      h2_config_set_settings (daemon->h2_config,
+				      nmemb, va_arg (ap,
+						     h2_settings_entry *));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_SETTINGS specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
+	case MHD_OPTION_HTTP2_DIRECT:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      h2_config_set_direct (daemon->h2_config, va_arg (ap, int));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_DIRECT specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
+	case MHD_OPTION_HTTP2_UPGRADE:
+	  if (0 != (daemon->options & MHD_USE_HTTP2))
+	    {
+	      h2_config_set_upgrade (daemon->h2_config, va_arg (ap, int));
+	    }
+	  else
+	    {
+	      MHD_DLOG (daemon,
+			_("MHD_OPTION_HTTP2_UPGRADE specified for daemon "
+			  "without MHD_USE_HTTP2 flag set.\n"));
+	      return MHD_NO;
+	    }
+	  break;
 #endif /* ! HTTP2_SUPPORT */
 	case MHD_OPTION_ARRAY:
 	  oa = va_arg (ap, struct MHD_OptionItem*);
@@ -5291,6 +5355,10 @@ parse_options_va (struct MHD_Daemon *daemon,
                   break;
                   /* all options taking 'int' */
                 case MHD_OPTION_STRICT_FOR_CLIENT:
+#ifdef HTTP2_SUPPORT
+		case MHD_OPTION_HTTP2_DIRECT:
+		case MHD_OPTION_HTTP2_UPGRADE:
+#endif /* ! HTTP2_SUPPORT */
                   if (MHD_YES != parse_options (daemon,
                                                 servaddr,
                                                 opt,
@@ -5333,7 +5401,7 @@ parse_options_va (struct MHD_Daemon *daemon,
 		  /* options taking size_t-number followed by pointer */
 		case MHD_OPTION_DIGEST_AUTH_RANDOM:
 #ifdef HTTP2_SUPPORT
-		case MHD_OPTION_H2_SETTINGS:
+		case MHD_OPTION_HTTP2_SETTINGS:
 #endif /* ! HTTP2_SUPPORT */
 		  if (MHD_YES != parse_options (daemon,
 						servaddr,
@@ -5574,10 +5642,6 @@ MHD_start_daemon_va (unsigned int flags,
       return NULL;
 #endif /* ! UPGRADE_SUPPORT */
     }
-#ifndef HTTP2_SUPPORT
-  if (0 != (*pflags & MHD_USE_HTTP2))
-    return NULL;
-#endif /* ! HTTP2_SUPPORT */
 
   if (NULL == dh)
     return NULL;
@@ -5641,9 +5705,15 @@ MHD_start_daemon_va (unsigned int flags,
 			    NULL);
     }
 #endif /* HTTPS_SUPPORT */
+
 #ifdef HTTP2_SUPPORT
-  gettimeofday(&tm_start, NULL);
+  if (0 != (*pflags & MHD_USE_HTTP2))
+    {
+      int is_tls = (0 != (*pflags & MHD_USE_TLS)) ? 1 : 0;
+      daemon->h2_config = h2_config_init (is_tls);
+    }
 #endif /* HTTP2_SUPPORT */
+
   daemon->listen_fd = MHD_INVALID_SOCKET;
   daemon->listening_address_reuse = 0;
   daemon->options = *pflags;
@@ -6755,6 +6825,13 @@ MHD_stop_daemon (struct MHD_Daemon *daemon)
               gnutls_psk_free_server_credentials (daemon->psk_cred);
         }
 #endif /* HTTPS_SUPPORT */
+
+#ifdef HTTP2_SUPPORT
+      if (0 != (daemon->options & MHD_USE_HTTP2))
+	{
+	  h2_config_destroy (daemon->h2_config);
+	}
+#endif /* HTTP2_SUPPORT */
 
 #ifdef DAUTH_SUPPORT
       free (daemon->nnc);

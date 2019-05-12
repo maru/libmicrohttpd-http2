@@ -103,6 +103,9 @@ static size_t
 putBuffer_fail (void *stream, size_t size, size_t nmemb, void *ptr)
 {
   (void)stream;(void)size;(void)nmemb;(void)ptr;        /* Unused. Silent compiler warning. */
+  unsigned int *http_version = ptr;
+  /* If http2: sleep to force timeout */
+  if (*http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) sleep (3);
   return 0;
 }
 
@@ -240,6 +243,7 @@ testWithTimeout ()
   CURL *c;
   char buf[2048];
   struct CBC cbc;
+  unsigned int pos = 0;
   int done_flag = 0;
   CURLcode errornum;
   int port;
@@ -278,7 +282,7 @@ testWithTimeout ()
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
   curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
   curl_easy_setopt (c, CURLOPT_READFUNCTION, &putBuffer_fail);
-  curl_easy_setopt (c, CURLOPT_READDATA, &testWithTimeout);
+  curl_easy_setopt (c, CURLOPT_READDATA, &http_version);
   curl_easy_setopt (c, CURLOPT_UPLOAD, 1L);
   curl_easy_setopt (c, CURLOPT_INFILESIZE_LARGE, (curl_off_t) 8L);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
@@ -293,8 +297,7 @@ testWithTimeout ()
     {
       curl_easy_cleanup (c);
       MHD_stop_daemon (d);
-      if (errornum == CURLE_GOT_NOTHING ||
-          ((errornum == CURLE_RECV_ERROR) && (http_version > CURL_HTTP_VERSION_1_1)))
+      if (errornum == CURLE_GOT_NOTHING || errornum == CURLE_SEND_ERROR)
     	  /* mhd had the timeout */
     	  return 0;
       else

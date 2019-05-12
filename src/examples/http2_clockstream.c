@@ -17,16 +17,17 @@
      Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 /**
- * @file clockstream.c
+ * @file http2_clockstream.c
  * @brief streams the current time every second.
- *        Based on suspend_resume_epoll.c example.
+ *        Based on clockstream demo
+ *        from https://github.com/bradfitz/http2/tree/master/h2demo
+ *        and the suspend_resume_epoll.c example.
  * @author Maru Berezin
- * @author Robert D Kocisko
- * @author Christian Grothoff
  */
 
 #include "platform.h"
 #include <microhttpd.h>
+#include <microhttpd_http2.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <limits.h>
@@ -44,7 +45,7 @@ static int epfd;
 
 static struct epoll_event evt;
 
-const int RESPONSE_MAX_LEN = 2048;
+const size_t RESPONSE_MAX_LEN = 2048;
 
 const char intro[] = "# ~1KB of junk to force browsers to start rendering immediately: \n";
 const char junk[] =  "# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n";
@@ -148,8 +149,9 @@ ahc_echo (void *cls,
   struct MHD_Response *response;
   int ret;
   struct Request* req;
-  struct itimerspec ts;
+  (void)cls;               /* Unused. Silence compiler warning. */
   (void)url;               /* Unused. Silence compiler warning. */
+  (void)method;            /* Unused. Silence compiler warning. */
   (void)version;           /* Unused. Silence compiler warning. */
   (void)upload_data;       /* Unused. Silence compiler warning. */
   (void)upload_data_size;  /* Unused. Silence compiler warning. */
@@ -180,7 +182,10 @@ connection_done(struct MHD_Connection *connection,
                 void **con_cls,
                 enum MHD_RequestTerminationCode toe)
 {
+  (void)connection;        /* Unused. Silence compiler warning. */
+  (void)toe;               /* Unused. Silence compiler warning. */
   free(*con_cls);
+  return MHD_YES;
 }
 
 
@@ -194,27 +199,19 @@ main (int argc,
   struct epoll_event events_list[1];
   struct Request *req;
   uint64_t timer_expirations;
-  int use_http2 = 0;
   uint16_t port;
 
-  switch (argc)
+  if (argc == 2)
     {
-    case 2:
       port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+    }
+  else
+    {
+      printf ("%s PORT\n", argv[0]);
       return 1;
     }
 
-  d = MHD_start_daemon (use_http2 | MHD_USE_EPOLL | MHD_ALLOW_SUSPEND_RESUME,
+  d = MHD_start_daemon (MHD_USE_HTTP2 | MHD_USE_EPOLL | MHD_ALLOW_SUSPEND_RESUME,
                         port,
                         NULL, NULL, &ahc_echo, NULL,
                         MHD_OPTION_NOTIFY_COMPLETED, &connection_done, NULL,

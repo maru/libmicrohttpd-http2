@@ -687,7 +687,6 @@ testEmptyGet (int poll_flag)
   curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
   curl_easy_setopt (c, CURLOPT_DEBUGFUNCTION, &curlExcessFound);
   curl_easy_setopt (c, CURLOPT_DEBUGDATA, &excess_found);
-  curl_easy_setopt (c, CURLOPT_VERBOSE, 1);
   curl_easy_setopt (c, CURLOPT_FAILONERROR, 1);
   curl_easy_setopt (c, CURLOPT_TIMEOUT, 150L);
   curl_easy_setopt (c, CURLOPT_CONNECTTIMEOUT, 150L);

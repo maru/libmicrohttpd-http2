@@ -27,6 +27,8 @@
  *        run tests against.  Note that the number of threads may need
  *        to be adjusted depending on the number of available cores.
  *        Logic is identical to demo.c, just adds HTTPS support.
+ *        This demonstration uses key/cert stored in static string. Optionally,
+ *        use gnutls_load_file() to load them from file.
  * @author Christian Grothoff
  */
 #include "platform.h"
@@ -561,7 +563,7 @@ process_upload_data (void *cls,
 		uc->category,
 		filename);
       for (i=strlen (fn)-1;i>=0;i--)
-	if (! isprint ((int) fn[i]))
+	if (! isprint ((unsigned char) fn[i]))
 	  fn[i] = '_';
       uc->fd = open (fn,
 		     O_CREAT | O_EXCL
@@ -927,23 +929,14 @@ int
 main (int argc, char *const *argv)
 {
   struct MHD_Daemon *d;
-  int use_http2 = 0;
-  uint16_t port;
+  unsigned int port;
 
-  switch (argc)
+  if ( (argc != 2) ||
+       (1 != sscanf (argv[1], "%u", &port)) ||
+       (UINT16_MAX < port) )
     {
-    case 2:
-      port = atoi (argv[1]);
-      break;
-    case 3:
-      if (strcmp(argv[1], "-h2") == 0)
-        {
-          use_http2 = MHD_USE_HTTP2;
-          port = atoi (argv[2]);
-          break;
-        }
-    default:
-      printf ("%s [-h2] PORT\n", argv[0]);
+      fprintf (stderr,
+	       "%s PORT\n", argv[0]);
       return 1;
     }
   #ifndef MINGW
@@ -968,7 +961,7 @@ main (int argc, char *const *argv)
 							     MHD_RESPMEM_PERSISTENT);
   mark_as_html (internal_error_response);
   update_directory ();
-  d = MHD_start_daemon (MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_TLS | use_http2,
+  d = MHD_start_daemon (MHD_USE_AUTO | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG | MHD_USE_TLS,
                         port,
                         NULL, NULL,
 			&generate_page, NULL,
@@ -979,8 +972,8 @@ main (int argc, char *const *argv)
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) (120 /* seconds */),
 			MHD_OPTION_THREAD_POOL_SIZE, (unsigned int) NUMBER_OF_THREADS,
 			MHD_OPTION_NOTIFY_COMPLETED, &response_completed_callback, NULL,
-                        MHD_OPTION_HTTPS_MEM_KEY, srv_signed_key_pem,
-                        MHD_OPTION_HTTPS_MEM_CERT, srv_signed_cert_pem,
+			MHD_OPTION_HTTPS_MEM_KEY, srv_signed_key_pem,
+			MHD_OPTION_HTTPS_MEM_CERT, srv_signed_cert_pem,
 			MHD_OPTION_END);
   if (NULL == d)
     return 1;

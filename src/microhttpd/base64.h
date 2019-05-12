@@ -11,6 +11,9 @@
 
 #include "platform.h"
 
+/**
+ * @warning Returned value must be freed.
+ */
 char *
 BASE64Decode(const char* src);
 

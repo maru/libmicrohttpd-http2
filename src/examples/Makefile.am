@@ -68,6 +68,12 @@ noinst_PROGRAMS += \
 endif
 endif
 
+if ENABLE_HTTP2
+noinst_PROGRAMS += \
+  http2_clockstream http2_minimal_example
+endif
+
+
 if HAVE_W32
 AM_CFLAGS += -DWINDOWS
 endif
@@ -197,4 +203,14 @@ https_fileserver_example.c
 https_fileserver_example_CPPFLAGS = \
  $(AM_CPPFLAGS) $(GNUTLS_CPPFLAGS)
 https_fileserver_example_LDADD = \
+ $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+http2_clockstream_SOURCES = \
+ http2_clockstream.c
+http2_clockstream_LDADD = \
+ $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+http2_minimal_example_SOURCES = \
+ http2_minimal_example.c
+http2_minimal_example_LDADD = \
  $(top_builddir)/src/microhttpd/libmicrohttpd.la

@@ -192,9 +192,6 @@ main (int argc, char *const *argv)
 
   set_http_version(argv[0], 0);
 
-  char *use_http_version = (http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) ?
-                           "--http2-prior-knowledge" : "--http1.1";
-
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
   else

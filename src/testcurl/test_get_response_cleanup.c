@@ -70,8 +70,6 @@ static pid_t
 fork_curl (const char *url)
 {
   pid_t ret;
-  char *use_http_version = (http_version == CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE) ?
-                           "--http2-prior-knowledge" : "--http1.1";
 
   ret = fork();
   if (ret != 0)

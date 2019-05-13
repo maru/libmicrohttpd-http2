@@ -186,6 +186,11 @@ int http_version = 0;
 int use_http2 = 0;
 
 /**
+ * HTTP version string for curl.
+ */
+char *use_http_version;
+
+/**
  * Set HTTP version using the program name.
  * @param prog_name program name, may include path
  * @param allow_1_0 allow HTTP/1.0
@@ -202,15 +207,30 @@ set_http_version(const char *prog_name, int allow_1_0)
           abort();
         }
 #endif /* HAVE_CURL */
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+      if (has_in_name(prog_name, "_http2_direct"))
+        {
+          http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+          use_http_version = "--http2-prior-knowledge";
+        }
+      else
+        {
+          http_version = CURL_HTTP_VERSION_2;
+          use_http_version = "--http2";
+        }
       use_http2 = MHD_USE_HTTP2;
     }
   else
 #endif /* HTTP2_SUPPORT */
   if ((has_in_name(prog_name, "11")) || !allow_1_0)
-    http_version = CURL_HTTP_VERSION_1_1;
+    {
+      http_version = CURL_HTTP_VERSION_1_1;
+      use_http_version = "--http1.1";
+    }
   else
-    http_version = CURL_HTTP_VERSION_1_0;
+    {
+      http_version = CURL_HTTP_VERSION_1_0;
+      use_http_version = "--http1.0";
+    }
 }
 
 #endif /* TEST_HELPERS_H_ */

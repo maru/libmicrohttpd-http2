@@ -379,7 +379,7 @@ test_quiesce_http2_LDADD = \
 
 test_quiesce_stream_http2_SOURCES = \
   test_quiesce_stream.c
-test_quiesce_streAM_CFLAGS = \
+test_quiesce_stream_http2_CFLAGS = \
   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
 test_quiesce_stream_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
@@ -550,7 +550,7 @@ test_quiesce_http2_direct_LDADD = \
 
 test_quiesce_stream_http2_direct_SOURCES = \
   test_quiesce_stream.c
-test_quiesce_streAM_CFLAGS = \
+test_quiesce_stream_http2_direct_CFLAGS = \
   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
 test_quiesce_stream_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \

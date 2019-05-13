@@ -1855,8 +1855,8 @@ AC_ARG_ENABLE([http2],
    [AS_HELP_STRING([--enable-http2],
                [enable HTTP2 support (yes, no)[no]])],
    [enable_http2=${enableval}])
-if test "x$enable_http2" = "xyes"
-then
+AS_IF([test "x$enable_http2" = "xyes"],
+  [
   # nghttp2
   have_nghttp2_pkgcfg=no
   want_http2=yes
@@ -1864,21 +1864,20 @@ then
   AC_ARG_WITH(nghttp2,
      [AS_HELP_STRING([[--with-nghttp2[=PFX]]],[use nghttp2 for HTTP2 support, optional PFX overrides pkg-config data for nghttp2 headers (PFX/include) and libs (PFX/lib)])],
      [
-      case $with_nghttp2 in
-        no)
+      AS_CASE([$with_nghttp2],
+       [no],[
           AC_MSG_RESULT([[nghttp2 disabled]])
           want_http2=no
-          ;;
-        yes)
+       ],
+       [yes],[
           AC_MSG_RESULT([[automatically, forced]])
           want_http2=yes
-          ;;
-        *)
+       ],
+       [
           AC_MSG_RESULT([[-I$with_nghttp2/include -L$with_nghttp2/lib -lnghttp2]])
           want_http2=yes
           try_with_nghttp2=yes
-          ;;
-      esac
+       ])
      ],
      [AC_MSG_RESULT([[automatically]])
      want_http2=yes
@@ -2002,10 +2001,9 @@ then
      enable_http2=no
      MSG_HTTP2="no (lacking libnghttp2)"
     ]
-  )
-else
-  MSG_HTTP2="no (disabled)"
-fi
+  )],
+  [MSG_HTTP2="no (disabled)"]
+)
 
 AC_MSG_CHECKING(whether to support HTTP2)
 AC_MSG_RESULT([$MSG_HTTP2])

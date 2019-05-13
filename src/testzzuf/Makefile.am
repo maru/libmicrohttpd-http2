@@ -19,7 +19,7 @@ THREAD_ONLY_TESTS = \
   test_long_header
 if ENABLE_HTTP2
 THREAD_ONLY_TESTS += \
-  test_long_header_http2
+  test_long_header_http2 test_long_header_http2_direct
 endif
 
 check_PROGRAMS = \
@@ -38,13 +38,13 @@ check_PROGRAMS = \
 
 if ENABLE_HTTP2
 check_PROGRAMS += \
-  test_get_http2 \
-  test_get_chunked_http2 \
-  test_post_http2 \
-  test_post_form_http2 \
-  test_put_http2 \
-  test_put_chunked_http2 \
-  test_put_large_http2 \
+  test_get_http2 test_get_http2_direct \
+  test_get_chunked_http2 test_get_chunked_http2_direct \
+  test_post_http2 test_post_http2_direct \
+  test_post_form_http2 test_post_form_http2_direct \
+  test_put_http2 test_put_http2_direct \
+  test_put_chunked_http2 test_put_chunked_http2_direct \
+  test_put_large_http2 test_put_large_http2_direct
 endif
 
 if USE_POSIX_THREADS
@@ -139,13 +139,6 @@ test_long_header_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_long_header11_SOURCES = \
-  test_long_header.c
-test_long_header11_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  @LIBCURL@
-
-
 test_get_http2_SOURCES = \
   test_get.c
 test_get_http2_LDADD = \
@@ -191,5 +184,53 @@ test_put_large_http2_LDADD = \
 test_long_header_http2_SOURCES = \
   test_long_header.c
 test_long_header_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_get_http2_direct_SOURCES = \
+  test_get.c
+test_get_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_get_chunked_http2_direct_SOURCES = \
+  test_get_chunked.c
+test_get_chunked_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_post_http2_direct_SOURCES = \
+  test_post.c
+test_post_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_post_form_http2_direct_SOURCES = \
+  test_post_form.c
+test_post_form_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_put_http2_direct_SOURCES = \
+  test_put.c
+test_put_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_put_chunked_http2_direct_SOURCES = \
+  test_put_chunked.c
+test_put_chunked_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_put_large_http2_direct_SOURCES = \
+  test_put_large.c
+test_put_large_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_long_header_http2_direct_SOURCES = \
+  test_long_header.c
+test_long_header_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@

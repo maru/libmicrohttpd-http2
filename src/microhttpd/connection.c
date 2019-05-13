@@ -478,7 +478,7 @@ sendfile_adapter (struct MHD_Connection *connection)
  * @param connection connection to check
  * @return true if force push is possible, false otherwise
  */
-_MHD_static_inline bool
+bool
 socket_flush_possible(struct MHD_Connection *connection)
 {
   (void)connection; /* Mute compiler warning. */
@@ -594,7 +594,7 @@ socket_start_no_buffering (struct MHD_Connection *connection)
  * @param connection connection to be processed
  * @return true on success, false otherwise
  */
-_MHD_static_inline bool
+bool
 socket_start_no_buffering_flush (struct MHD_Connection *connection)
 {
   bool res;
@@ -636,7 +636,7 @@ socket_start_no_buffering_flush (struct MHD_Connection *connection)
  * @param connection connection to be processed
  * @return true on success, false otherwise
  */
-_MHD_static_inline bool
+bool
 socket_start_normal_buffering (struct MHD_Connection *connection)
 {
   mhd_assert(NULL != connection);

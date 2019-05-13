@@ -212,19 +212,20 @@ build_header_response (struct MHD_Connection *connection);
 
 int
 connection_add_header (struct MHD_Connection *connection,
-                       const char *key, const char *value,
+                       const char *key, size_t key_size,
+                       const char *value, size_t value_size,
                        enum MHD_ValueKind kind);
 
 int
 parse_cookie_header (struct MHD_Connection *connection);
 
-int
+bool
 socket_flush_possible (struct MHD_Connection *connection);
 
-int
+bool
 socket_start_no_buffering_flush (struct MHD_Connection *connection);
 
-int
+bool
 socket_start_normal_buffering (struct MHD_Connection *connection);
 
 #endif /* ! HTTP2_SUPPORT */

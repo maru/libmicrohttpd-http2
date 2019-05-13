@@ -65,6 +65,7 @@ if ENABLE_DAUTH
 if ENABLE_HTTP2
   THREAD_ONLY_TESTS += \
     test_digestauth_http2 test_digestauth_http2_direct \
+    test_digestauth_sha256_http2 test_digestauth_sha256_http2_direct \
     test_digestauth_with_arguments_http2 test_digestauth_with_arguments_http2_direct
 endif
 endif
@@ -720,3 +721,15 @@ test_timeout_http2_direct_SOURCES = \
 test_timeout_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
+
+test_digestauth_sha256_http2_SOURCES = \
+  test_digestauth_sha256.c
+test_digestauth_sha256_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_digestauth_sha256_http2_direct_SOURCES = \
+  test_digestauth_sha256.c
+test_digestauth_sha256_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@

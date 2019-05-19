@@ -264,13 +264,13 @@ on_header_cb (nghttp2_session * session, const nghttp2_frame * frame,
 
       /* :path */
     case H2_HEADER_PATH:
+      stream->c.url = buf;
       if (0 != header_parse_path (stream, buf, valuelen))
 	{
 	  return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
 	}
       daemon->unescape_callback (daemon->unescape_callback_cls,
 				 &stream->c, buf);
-      stream->c.url = buf;
       break;
 
       /* :authority */
@@ -1014,7 +1014,7 @@ on_stream_close_cb (nghttp2_session * session, int32_t stream_id,
   struct h2_stream_t *stream;
   (void) error_code;
   ENTER("[stream_id=%d] ", stream_id);
-  
+
   stream = nghttp2_session_get_stream_user_data (session, stream_id);
   if (NULL == stream)
     {

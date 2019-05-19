@@ -47,3 +47,4 @@ po/configargs.stamp
 **~
 doc/libmicrohttpd.log
 src/examples/suspend_resume_epoll
+build-aux/

@@ -221,16 +221,6 @@ main (int argc, char *const *argv)
   (void) argc;   /* Unused. Silent compiler warning. */
   const char *sl;
 
-#ifdef HTTP2_SUPPORT
-  if (has_in_name(argv[0], "_http2"))
-    {
-      http_version = CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
-      flags = MHD_USE_HTTP2;
-    }
-  else
-#endif /* HTTP2_SUPPORT */
-    http_version = CURL_HTTP_VERSION_1_1;
-
   set_http_version(argv[0], 1);
 
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))

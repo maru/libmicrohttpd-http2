@@ -102,7 +102,7 @@ testExternalGet ()
 {
   struct MHD_Daemon *d;
 
-  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG | http2_flag,
+  d = MHD_start_daemon (use_http2 | MHD_USE_ERROR_LOG,
                         0, NULL, NULL,
 			&ahc_echo, "GET",
 			MHD_OPTION_END);

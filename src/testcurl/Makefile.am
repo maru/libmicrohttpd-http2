@@ -24,6 +24,14 @@ THREAD_ONLY_TESTS = \
   test_iplimit11 \
   test_termination \
   test_timeout
+if ENABLE_HTTP2
+THREAD_ONLY_TESTS += \
+  test_urlparse_http2 test_urlparse_http2_direct \
+  test_long_header_http2 test_long_header_http2_direct \
+  test_iplimit_http2 test_iplimit_http2_direct \
+  test_termination_http2 test_termination_http2_direct \
+  test_timeout_http2 test_timeout_http2_direct
+endif
 
 if HAVE_POSIX_THREADS
 THREAD_ONLY_TESTS += \
@@ -32,9 +40,9 @@ THREAD_ONLY_TESTS += \
   perf_get_concurrent
 if ENABLE_HTTP2
 THREAD_ONLY_TESTS += \
-  test_quiesce_http2 \
-  test_concurrent_stop_http2 \
-  perf_get_concurrent_http2
+  test_quiesce_http2 test_quiesce_http2_direct \
+  test_concurrent_stop_http2 test_concurrent_stop_http2_direct \
+  perf_get_concurrent_http2 perf_get_concurrent_http2_direct
 endif
 
 if HAVE_CURL_BINARY
@@ -42,7 +50,7 @@ THREAD_ONLY_TESTS += \
   test_quiesce_stream
 if ENABLE_HTTP2
 THREAD_ONLY_TESTS += \
-  test_quiesce_stream_http2
+  test_quiesce_stream_http2 test_quiesce_stream_http2_direct
 endif
 endif
 endif
@@ -55,6 +63,7 @@ if ENABLE_DAUTH
 if ENABLE_HTTP2
   THREAD_ONLY_TESTS += \
     test_digestauth_http2 test_digestauth_http2_direct \
+	test_digestauth_sha256_http2 test_digestauth_sha256_http2_direct \
     test_digestauth_with_arguments_http2 test_digestauth_with_arguments_http2_direct
 endif
 endif
@@ -83,7 +92,6 @@ if ENABLE_HTTP2
 check_PROGRAMS += \
   test_get_http2 test_get_http2_direct \
   test_get_sendfile_http2 test_get_sendfile_http2_direct \
-  test_urlparse_http2 test_urlparse_http2_direct \
   test_delete_http2 test_delete_http2_direct \
   test_put_http2 test_put_http2_direct \
   test_process_headers_http2 test_process_headers_http2_direct \
@@ -91,14 +99,10 @@ check_PROGRAMS += \
   test_parse_cookies_http2 test_parse_cookies_http2_direct \
   test_large_put_http2 test_large_put_http2_direct \
   test_large_put_inc_http2 test_large_put_inc_http2_direct \
-  test_long_header_http2 test_long_header_http2_direct \
   test_get_chunked_http2 test_get_chunked_http2_direct \
-  test_iplimit_http2 test_iplimit_http2_direct \
-  test_termination_http2 test_termination_http2_direct \
-  test_timeout_http2 test_timeout_http2_direct \
+  test_put_chunked_http2 test_put_chunked_http2_direct \
   test_callback_http2 test_callback_http2_direct \
   perf_get_http2 perf_get_http2_direct
-
 endif
 
 if HAVE_FORK_WAITPID
@@ -108,19 +112,6 @@ if ENABLE_HTTP2
 check_PROGRAMS += \
   test_get_response_cleanup_http2 test_get_response_cleanup_http2_direct
 endif
-endif
-endif
-
-if HAVE_POSIX_THREADS
-check_PROGRAMS += \
-  test_quiesce \
-  test_concurrent_stop \
-  perf_get_concurrent
-if ENABLE_HTTP2
-check_PROGRAMS += \
-  test_quiesce_http2 test_quiesce_http2_direct \
-  test_concurrent_stop_http2 test_concurrent_stop_http2_direct \
-  perf_get_concurrent_http2 perf_get_concurrent_http2_direct
 endif
 endif
 
@@ -729,3 +720,27 @@ test_timeout_http2_direct_SOURCES = \
 test_timeout_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
+
+test_put_chunked_http2_SOURCES = \
+  test_put_chunked.c
+test_put_chunked_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_put_chunked_http2_direct_SOURCES = \
+  test_put_chunked.c
+test_put_chunked_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
+
+test_digestauth_sha256_http2_SOURCES = \
+  test_digestauth_sha256.c
+test_digestauth_sha256_http2_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@
+
+test_digestauth_sha256_http2_direct_SOURCES = \
+  test_digestauth_sha256.c
+test_digestauth_sha256_http2_direct_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBGCRYPT_LIBS@ @LIBCURL@

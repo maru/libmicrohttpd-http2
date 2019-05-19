@@ -35,3 +35,4 @@ upgrade_example
 /timeout
 http2_*
 !http2_*.c
+http_*compression

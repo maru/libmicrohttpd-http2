@@ -507,7 +507,6 @@ main (int argc, char *const *argv)
   (void)argc;   /* Unused. Silent compiler warning. */
 
   set_http_version(argv[0], 1);
-    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
   if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_THREADS))
     {
       errorCount += testInternalGet ();

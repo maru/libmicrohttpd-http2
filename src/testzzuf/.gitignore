@@ -43,3 +43,4 @@
 /daemontest_get11
 *.exe
 *_http2
+*_http2_direct

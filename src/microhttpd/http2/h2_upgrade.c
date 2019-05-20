@@ -93,6 +93,9 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   const char *settings;
   int ret;
 
+  if (NULL != connection->response)
+    return MHD_NO;
+
   /* Get base64 decoded settings from client */
   settings = MHD_lookup_connection_value (connection,
 					  MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS);
@@ -111,7 +114,6 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   /* Upgrade: h2c or h2 */
   MHD_add_response_header (response, MHD_HTTP_HEADER_UPGRADE, protocol);
   /* HTTP/1.1 101 Switching Protocols */
-  mhd_assert (connection->response == NULL);
   if (MHD_YES != MHD_queue_response (connection,
                                    MHD_HTTP_SWITCHING_PROTOCOLS, response))
     {

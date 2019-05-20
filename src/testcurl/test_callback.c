@@ -58,7 +58,6 @@ called_twice(void *cls, uint64_t pos, char *buf, size_t max)
   return MHD_CONTENT_READER_END_WITH_ERROR;
 }
 
-
 static int
 callback(void *cls,
          struct MHD_Connection *connection,
@@ -69,7 +68,8 @@ callback(void *cls,
 	 size_t *upload_data_size,
          void **con_cls)
 {
-  struct callback_closure *cbc = calloc(1, sizeof(struct callback_closure));
+  static int ptr;
+  struct callback_closure *cbc;
   struct MHD_Response *r;
   int ret;
 
@@ -79,8 +79,15 @@ callback(void *cls,
   (void)version;
   (void)upload_data; /* Unused. Silent compiler warning. */
   (void)upload_data_size;
-  (void)con_cls;         /* Unused. Silent compiler warning. */
 
+  if (&ptr != *con_cls)
+    {
+      *con_cls = &ptr;
+      return MHD_YES;
+    }
+  *con_cls = NULL;
+
+  cbc = calloc(1, sizeof(struct callback_closure));
   if (NULL == cbc)
     return MHD_NO;
   r = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 1024,
@@ -170,6 +177,7 @@ main(int argc, char **argv)
   if (multi == NULL)
     {
       curl_easy_cleanup (c);
+      curl_global_cleanup ();
       MHD_stop_daemon (d);
       return 1;
     }
@@ -178,6 +186,7 @@ main(int argc, char **argv)
     {
       curl_multi_cleanup (multi);
       curl_easy_cleanup (c);
+      curl_global_cleanup ();
       MHD_stop_daemon (d);
       return 2;
     }
@@ -198,6 +207,7 @@ main(int argc, char **argv)
 	      curl_multi_remove_handle (multi, c);
 	      curl_multi_cleanup (multi);
 	      curl_easy_cleanup (c);
+	      curl_global_cleanup ();
 	      MHD_stop_daemon (d);
 	      return 3;
 	    }
@@ -208,6 +218,7 @@ main(int argc, char **argv)
           curl_multi_remove_handle (multi, c);
           curl_multi_cleanup (multi);
           curl_easy_cleanup (c);
+          curl_global_cleanup ();
           MHD_stop_daemon (d);
 	  return 4;
 	}
@@ -242,6 +253,7 @@ main(int argc, char **argv)
 		  curl_multi_remove_handle (multi, c);
 		  curl_multi_cleanup (multi);
 		  curl_easy_cleanup (c);
+		  curl_global_cleanup ();
 		  c = NULL;
 		  multi = NULL;
 		}

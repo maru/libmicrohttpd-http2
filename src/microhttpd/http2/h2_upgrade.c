@@ -147,7 +147,7 @@ ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connectio
   connection->write_buffer_append_offset += tmp_conn.write_buffer_append_offset;
 
   /* Upgrade to HTTP/2 connection */
-  ret = h2_session_upgrade (connection->h2, settings, connection->method);
+  ret = h2_session_upgrade (connection->h2, settings, tmp_conn.method);
 
   ENTER("[%d] h2_set_h2_callbacks: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
 

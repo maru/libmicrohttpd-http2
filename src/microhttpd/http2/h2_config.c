@@ -57,12 +57,10 @@ struct h2_config_t
 struct h2_config_t *
 h2_config_init (int is_tls)
 {
-  if (HTTP2_DEBUG)
-    {
-      set_timer ();
-      set_color_output (isatty (fileno (stderr)));
-    }
-
+#if HTTP2_DEBUG
+  set_timer ();
+  set_color_output (isatty (fileno (stderr)));
+#endif
   struct h2_config_t *conf = calloc (1, sizeof (struct h2_config_t));
   conf->h2_direct = is_tls ? 0 : 1;
   conf->h2_upgrade = is_tls ? 0 : 1;

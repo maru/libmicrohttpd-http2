@@ -46,6 +46,10 @@ util_reset_connection_buffers (struct MHD_Connection *connection)
 
   connection->headers_received = NULL;
   connection->headers_received_tail = NULL;
+
+  connection->method = NULL;
+  connection->url = NULL;
+  connection->client_context = NULL;
 }
 
 void

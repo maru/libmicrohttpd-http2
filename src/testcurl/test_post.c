@@ -229,6 +229,10 @@ testInternalPost ()
     return 4;
   if (0 != strncmp ("/hello_world", cbc.buf, strlen ("/hello_world")))
     return 8;
+
+  if (check_curl_h2_upgrade (c, http_version) == 0)
+    return 1L << 19;
+
   return 0;
 }
 
@@ -299,6 +303,10 @@ testMultithreadedPost ()
     return 64;
   if (0 != strncmp ("/hello_world", cbc.buf, strlen ("/hello_world")))
     return 128;
+
+  if (check_curl_h2_upgrade (c, http_version) == 0)
+    return 1L << 19;
+
   return 0;
 }
 
@@ -370,6 +378,10 @@ testMultithreadedPoolPost ()
     return 64;
   if (0 != strncmp ("/hello_world", cbc.buf, strlen ("/hello_world")))
     return 128;
+
+  if (check_curl_h2_upgrade (c, http_version) == 0)
+    return 1L << 19;
+
   return 0;
 }
 
@@ -396,6 +408,7 @@ testExternalPost ()
   time_t start;
   struct timeval tv;
   int port;
+  int h2_upgrade_not_done = 0;
 
   if (MHD_NO != MHD_is_feature_supported (MHD_FEATURE_AUTODETECT_BIND_PORT))
     port = 0;
@@ -509,6 +522,7 @@ testExternalPost ()
                         "curl_multi_perform",
                         __FILE__,
                         __LINE__, curl_easy_strerror (msg->data.result));
+              h2_upgrade_not_done = check_curl_h2_upgrade (c, http_version) == 0;
               curl_multi_remove_handle (multi, c);
               curl_multi_cleanup (multi);
               curl_easy_cleanup (c);
@@ -528,6 +542,10 @@ testExternalPost ()
     return 8192;
   if (0 != strncmp ("/hello_world", cbc.buf, strlen ("/hello_world")))
     return 16384;
+
+  if (h2_upgrade_not_done)
+    return 1L << 19;
+
   return 0;
 }
 
@@ -733,6 +751,10 @@ testMultithreadedPostCancelPart(int flags)
 
   if (!result && (cbc.pos != 0))
     result = 262144;
+
+  /* HTTP/2 Upgrade should not happen */
+  if (check_curl_h2_upgrade (c, http_version) == 1)
+    result = 1L << 19;
 
   curl_easy_cleanup (c);
   MHD_stop_daemon (d);

@@ -233,7 +233,8 @@ test_urlparse_LDADD = \
 test_get_response_cleanup_SOURCES = \
   test_get_response_cleanup.c
 test_get_response_cleanup_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
 
 test_get_chunked_SOURCES = \
   test_get_chunked.c
@@ -458,7 +459,8 @@ test_urlparse_http2_LDADD = \
 test_get_response_cleanup_http2_SOURCES = \
   test_get_response_cleanup.c
 test_get_response_cleanup_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
 
 test_get_chunked_http2_SOURCES = \
   test_get_chunked.c
@@ -629,7 +631,8 @@ test_urlparse_http2_direct_LDADD = \
 test_get_response_cleanup_http2_direct_SOURCES = \
   test_get_response_cleanup.c
 test_get_response_cleanup_http2_direct_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+  @LIBCURL@
 
 test_get_chunked_http2_direct_SOURCES = \
   test_get_chunked.c

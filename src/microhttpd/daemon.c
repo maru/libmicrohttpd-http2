@@ -2741,6 +2741,14 @@ internal_add_connection (struct MHD_Daemon *daemon,
 void
 internal_suspend_connection_ (struct MHD_Connection *connection)
 {
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION (2, 0))
+    {
+      h2_connection_suspend (connection);
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
+
   struct MHD_Daemon *daemon = connection->daemon;
 
 #if defined(MHD_USE_POSIX_THREADS) || defined(MHD_USE_W32_THREADS)
@@ -2774,13 +2782,6 @@ internal_suspend_connection_ (struct MHD_Connection *connection)
               daemon->suspended_connections_tail,
               connection);
   connection->suspended = true;
-
-#ifdef HTTP2_SUPPORT
-  if (connection->http_version == HTTP_VERSION (2, 0))
-    {
-      h2_stream_suspend (connection);
-    }
-#endif /* HTTP2_SUPPORT */
 
 #ifdef EPOLL_SUPPORT
   if (0 != (daemon->options & MHD_USE_EPOLL))
@@ -2873,6 +2874,13 @@ MHD_suspend_connection (struct MHD_Connection *connection)
 void
 MHD_resume_connection (struct MHD_Connection *connection)
 {
+#ifdef HTTP2_SUPPORT
+  if (connection->http_version == HTTP_VERSION (2, 0))
+    {
+      h2_connection_resume (connection);
+      return;
+    }
+#endif /* HTTP2_SUPPORT */
   struct MHD_Daemon *daemon = connection->daemon;
 
   if (0 == (daemon->options & MHD_TEST_ALLOW_SUSPEND_RESUME))

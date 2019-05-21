@@ -30,9 +30,9 @@
 
 int h2_is_h2_preface (struct MHD_Connection *connection);
 
-void h2_stream_suspend (struct MHD_Connection *connection);
+void h2_connection_suspend (struct MHD_Connection *connection);
 
-void h2_stream_resume (struct MHD_Connection *connection);
+void h2_connection_resume (struct MHD_Connection *connection);
 
 void h2_connection_close (struct MHD_Connection *connection);
 

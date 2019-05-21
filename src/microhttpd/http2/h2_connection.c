@@ -317,20 +317,21 @@ h2_connection_handle_idle (struct MHD_Connection *connection)
 }
 
 /**
- *
+ * Resume handling of network data for suspended connection.
+ * @param connection the connection to resume
  */
 void
-h2_stream_resume (struct MHD_Connection *connection)
+h2_connection_resume (struct MHD_Connection *connection)
 {
 }
 
 
 /**
  * Suspend handling of network data for the current stream.
- * @param connection connection to handle
+ * @param connection connection to suspend
  */
 void
-h2_stream_suspend (struct MHD_Connection *connection)
+h2_connection_suspend (struct MHD_Connection *connection)
 {
 }
 

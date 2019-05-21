@@ -72,6 +72,7 @@ h2_stream_create_ (int32_t stream_id, struct MHD_Connection *connection,
   stream->c.daemon = connection->daemon;
   stream->c.pid = connection->pid;
   stream->c.version = MHD_HTTP_VERSION_2_0;
+  stream->c.http_version = HTTP_VERSION (2, 0);
   stream->c.tls_session = connection->tls_session;
   return stream;
 }
@@ -125,7 +126,7 @@ h2_stream_destroy (struct h2_stream_t *stream)
 	{
 	  stream->c.client_aware = false;
 	  /* FIXME: test_quiesce_http2 */
-	  fprintf(stderr, "[%s:%d] &connection->client_context %p\n", __FILE__, __LINE__, &stream->c.client_context);
+	  fprintf(stderr, "[%s:%d] connection->client_context %p\n", __FILE__, __LINE__, stream->c.client_context);
 	  daemon->notify_completed (daemon->notify_completed_cls,
 				    &stream->c, &stream->c.client_context,
 				    MHD_REQUEST_TERMINATED_COMPLETED_OK);

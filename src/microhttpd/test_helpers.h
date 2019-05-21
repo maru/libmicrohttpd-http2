@@ -237,15 +237,15 @@ set_http_version(const char *prog_name, int allow_1_0)
  *         Return 1 if the connection performed the upgrade,
  *         otherwise, return 0.
  */
-int check_curl_h2_upgrade (CURL *c, int http_version)
-{
-  if (CURL_HTTP_VERSION_2_0 != http_version)
-    return -1;
-  long http_version_res;
-#ifdef HAVE_LIBCURL
-  curl_easy_getinfo(c, CURLINFO_HTTP_VERSION, &http_version_res);
-#endif /* HAVE_LIBCURL */
-  return http_version_res == http_version;
-}
+// int check_curl_h2_upgrade (CURL *c, int http_version)
+// {
+//   if (CURL_HTTP_VERSION_2_0 != http_version)
+//     return -1;
+//   long http_version_res;
+// #ifdef HAVE_LIBCURL
+//   curl_easy_getinfo (c, CURLINFO_HTTP_VERSION, &http_version_res);
+// #endif /* HAVE_LIBCURL */
+//   return http_version_res == http_version;
+// }
 
 #endif /* TEST_HELPERS_H_ */

@@ -50,10 +50,13 @@ util_reset_connection_buffers (struct MHD_Connection *connection)
   connection->method = NULL;
   connection->url = NULL;
   connection->client_context = NULL;
+
+  connection->response = 0;
+  connection->responseCode = 0;
 }
 
 void
-util_copy_connection_buffers (struct MHD_Connection *dst, struct MHD_Connection *src)
+util_copy_connection_buffers (struct MHD_Connection *src, struct MHD_Connection *dst)
 {
   dst->pool = src->pool;
 
@@ -74,4 +77,11 @@ util_copy_connection_buffers (struct MHD_Connection *dst, struct MHD_Connection 
   dst->method = src->method;
   dst->url = src->url;
   dst->client_context = src->client_context;
+}
+
+void
+util_copy_connection_response (struct MHD_Connection *src, struct MHD_Connection *dst)
+{
+  dst->response = src->response;
+  dst->responseCode = src->responseCode;
 }

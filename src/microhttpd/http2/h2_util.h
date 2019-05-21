@@ -32,6 +32,9 @@ void
 util_reset_connection_buffers (struct MHD_Connection *connection);
 
 void
-util_copy_connection_buffers (struct MHD_Connection *dst, struct MHD_Connection *src);
+util_copy_connection_buffers (struct MHD_Connection *src, struct MHD_Connection *dst);
+
+void
+util_copy_connection_response (struct MHD_Connection *src, struct MHD_Connection *dst);
 
 #endif

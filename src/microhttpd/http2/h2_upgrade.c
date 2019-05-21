@@ -93,9 +93,6 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   const char *settings;
   int ret;
 
-  if (NULL != connection->response)
-    return MHD_NO;
-
   /* Get base64 decoded settings from client */
   settings = MHD_lookup_connection_value (connection,
 					  MHD_HEADER_KIND, MHD_HTTP_HEADER_HTTP2_SETTINGS);
@@ -114,6 +111,9 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   /* Upgrade: h2c or h2 */
   MHD_add_response_header (response, MHD_HTTP_HEADER_UPGRADE, protocol);
   /* HTTP/1.1 101 Switching Protocols */
+  struct MHD_Connection tmp_conn;
+  util_copy_connection_response (connection, &tmp_conn);
+
   if (MHD_YES != MHD_queue_response (connection,
                                    MHD_HTTP_SWITCHING_PROTOCOLS, response))
     {
@@ -129,8 +129,7 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
 ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
 
   /***************************************************************************/
-  struct MHD_Connection tmp_conn;
-  util_copy_connection_buffers (&tmp_conn, connection);
+  util_copy_connection_buffers (connection, &tmp_conn);
   util_reset_connection_buffers (connection);
 
   /***************************************************************************/
@@ -161,10 +160,10 @@ ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connectio
 ENTER("stream_id=%d", stream->stream_id);
   /* Assign pool memory */
   MHD_pool_destroy (stream->c.pool);
-  util_copy_connection_buffers (&stream->c, &tmp_conn);
+  util_copy_connection_buffers (&tmp_conn, &stream->c);
+  util_copy_connection_response (&tmp_conn, &stream->c);
   //   connection->state = MHD_CONNECTION_HEADERS_SENDING;
   // ENTER("[%d] handle_write_cls: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
-
   process_request_final (connection->h2, stream);
   // h2_session_remove_stream (connection->h2, stream);
   return connection->handle_idle_cls (connection);

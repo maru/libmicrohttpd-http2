@@ -40,17 +40,18 @@ THREAD_ONLY_TESTS += \
   perf_get_concurrent
 if ENABLE_HTTP2
 THREAD_ONLY_TESTS += \
-  test_quiesce_http2 test_quiesce_http2_direct \
-  test_concurrent_stop_http2 test_concurrent_stop_http2_direct \
+  test_concurrent_stop_http2_direct \
   perf_get_concurrent_http2 perf_get_concurrent_http2_direct
+  #  test_quiesce_http2 test_quiesce_http2_direct \
+  #  test_concurrent_stop_http2
 endif
 
 if HAVE_CURL_BINARY
 THREAD_ONLY_TESTS += \
   test_quiesce_stream
 if ENABLE_HTTP2
-THREAD_ONLY_TESTS += \
-  test_quiesce_stream_http2 test_quiesce_stream_http2_direct
+# THREAD_ONLY_TESTS += \
+#   test_quiesce_stream_http2 test_quiesce_stream_http2_direct
 endif
 endif
 endif
@@ -98,11 +99,12 @@ check_PROGRAMS += \
   test_process_arguments_http2 test_process_arguments_http2_direct \
   test_parse_cookies_http2 test_parse_cookies_http2_direct \
   test_large_put_http2 test_large_put_http2_direct \
-  test_large_put_inc_http2 test_large_put_inc_http2_direct \
+  test_large_put_inc_http2_direct \
   test_get_chunked_http2 test_get_chunked_http2_direct \
   test_put_chunked_http2 test_put_chunked_http2_direct \
   test_callback_http2 test_callback_http2_direct \
   perf_get_http2 perf_get_http2_direct
+#  test_large_put_inc_http2
 endif
 
 if HAVE_FORK_WAITPID
@@ -380,13 +382,13 @@ test_timeout_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_concurrent_stop_http2_SOURCES = \
-  test_concurrent_stop.c
-test_concurrent_stop_http2_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_concurrent_stop_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+# test_concurrent_stop_http2_SOURCES = \
+#   test_concurrent_stop.c
+# test_concurrent_stop_http2_CFLAGS = \
+#   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+# test_concurrent_stop_http2_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   $(PTHREAD_LIBS) @LIBCURL@
 
 test_get_http2_SOURCES = \
   test_get.c
@@ -394,21 +396,21 @@ test_get_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_quiesce_http2_SOURCES = \
-  test_quiesce.c
-test_quiesce_http2_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_quiesce_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+# test_quiesce_http2_SOURCES = \
+#   test_quiesce.c
+# test_quiesce_http2_CFLAGS = \
+#   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+# test_quiesce_http2_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   $(PTHREAD_LIBS) @LIBCURL@
 
-test_quiesce_stream_http2_SOURCES = \
-  test_quiesce_stream.c
-test_quiesce_stream_http2_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_quiesce_stream_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+# test_quiesce_stream_http2_SOURCES = \
+#   test_quiesce_stream.c
+# test_quiesce_stream_http2_CFLAGS = \
+#   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+# test_quiesce_stream_http2_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   $(PTHREAD_LIBS) @LIBCURL@
 
 test_callback_http2_SOURCES = \
   test_callback.c
@@ -522,11 +524,11 @@ test_large_put_http2_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_large_put_inc_http2_SOURCES = \
-  test_large_put.c
-test_large_put_inc_http2_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  @LIBCURL@
+# test_large_put_inc_http2_SOURCES = \
+#   test_large_put.c
+# test_large_put_inc_http2_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   @LIBCURL@
 
 test_long_header_http2_SOURCES = \
   test_long_header.c
@@ -566,21 +568,21 @@ test_get_http2_direct_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
 
-test_quiesce_http2_direct_SOURCES = \
-  test_quiesce.c
-test_quiesce_http2_direct_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_quiesce_http2_direct_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+# test_quiesce_http2_direct_SOURCES = \
+#   test_quiesce.c
+# test_quiesce_http2_direct_CFLAGS = \
+#   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+# test_quiesce_http2_direct_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   $(PTHREAD_LIBS) @LIBCURL@
 
-test_quiesce_stream_http2_direct_SOURCES = \
-  test_quiesce_stream.c
-test_quiesce_stream_http2_direct_CFLAGS = \
-  $(PTHREAD_CFLAGS) $(AM_CFLAGS)
-test_quiesce_stream_http2_direct_LDADD = \
-  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
-  $(PTHREAD_LIBS) @LIBCURL@
+# test_quiesce_stream_http2_direct_SOURCES = \
+#   test_quiesce_stream.c
+# test_quiesce_stream_http2_direct_CFLAGS = \
+#   $(PTHREAD_CFLAGS) $(AM_CFLAGS)
+# test_quiesce_stream_http2_direct_LDADD = \
+#   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+#   $(PTHREAD_LIBS) @LIBCURL@
 
 test_callback_http2_direct_SOURCES = \
   test_callback.c

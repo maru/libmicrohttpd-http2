@@ -557,7 +557,7 @@ enum MHD_TLS_CONN_STATE
 /**
  * Should all state transitions be printed to stderr?
  */
-#define DEBUG_STATES MHD_YES
+#define DEBUG_STATES MHD_NO
 
 
 #ifdef HAVE_MESSAGES

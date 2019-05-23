@@ -103,30 +103,35 @@ h2_do_h2_upgrade (struct MHD_Connection *connection)
   /* Create HTTP/1 response */
   response =
     MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT);
-
   /* Connection: Upgrade */
   MHD_add_response_header (response,
              MHD_HTTP_HEADER_CONNECTION,
              MHD_HTTP_HEADER_UPGRADE);
   /* Upgrade: h2c or h2 */
   MHD_add_response_header (response, MHD_HTTP_HEADER_UPGRADE, protocol);
+
   /* HTTP/1.1 101 Switching Protocols */
+  /* Response must be destroyed twice because there are 2 reference counts:
+   * (1) MHD_create_response_from_buffer, (2) MHD_queue_response.
+   */
   struct MHD_Connection tmp_conn;
   util_copy_connection_response (connection, &tmp_conn);
-
-  if (MHD_YES != MHD_queue_response (connection,
-                                   MHD_HTTP_SWITCHING_PROTOCOLS, response))
+  ret = MHD_queue_response (connection, MHD_HTTP_SWITCHING_PROTOCOLS, response);
+  MHD_destroy_response (response); /* 1/2 */
+  if (MHD_YES != ret)
     {
       return MHD_NO;
     }
-  MHD_destroy_response (response);
-  if (MHD_YES != build_header_response (connection))
+  /* Build headers, destroy response for connection */
+  ret = build_header_response (connection);
+  MHD_destroy_response (response); /* 2/2 */
+  if (MHD_YES != ret)
     {
       connection_close_error (connection,
              _("Closing connection (failed to create response header)\n"));
       return MHD_NO;
     }
-ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
+// ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
 
   /***************************************************************************/
   util_copy_connection_buffers (connection, &tmp_conn);
@@ -148,7 +153,7 @@ ENTER("[%d] build_header_response: write_size=%d offset=%d", __LINE__, connectio
   /* Upgrade to HTTP/2 connection */
   ret = h2_session_upgrade (connection->h2, settings, tmp_conn.method);
 
-  ENTER("[%d] h2_set_h2_callbacks: write_size=%d offset=%d", __LINE__, connection->write_buffer_size, connection->write_buffer_append_offset);
+  ENTER("[%d] h2_set_h2_callbacks: read_size=%d write_size=%d offset=%d", __LINE__, connection->read_buffer_size, connection->write_buffer_size, connection->write_buffer_append_offset);
 
   /***************************************************************************/
   ENTER("%d) h2_stream_create", i++);

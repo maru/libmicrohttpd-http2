@@ -1,46 +1,15 @@
 language: c
 compiler: gcc
-sudo: false
+services:
+  - docker
+
 env:
   NGHTTP2_VERSION=1.37.0
   CURL_VERSION=7.64.1
   PREFIX_DIR=/usr/local
-addons:
-  apt:
-    packages:
-      - autopoint
-      - zzuf
-      - socat
-install:
-  - |
-    cd ~/build/ &&
-    curl -L https://github.com/nghttp2/nghttp2/releases/download/v${NGHTTP2_VERSION}/nghttp2-${NGHTTP2_VERSION}.tar.xz |
-    tar Jxf - &&
-    cd nghttp2-${NGHTTP2_VERSION} &&
-    CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --enable-lib-only &&
-    make && sudo make install
-  - |
-    cd ~/build/ &&
-    curl -L https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz |
-    tar zxf - &&
-    cd curl-${CURL_VERSION} &&
-    CXX="g++-4.8" ./configure --prefix=${PREFIX_DIR} --with-nghttp2=${PREFIX_DIR} --without-ssl --with-gnutls &&
-    make && sudo make install
-  - cd ~/build/maru/libmicrohttpd-http2/
-before_script:
-  - ./bootstrap
+# pwd=/home/travis/build/maru/libmicrohttpd-http2
+
+before_install:
+  - docker pull marub/libmicrohttpd-http2
 script:
-  - export LD_LIBRARY_PATH=${PREFIX_DIR}/lib
-  - |
-    ./configure --prefix=${PREFIX_DIR} --enable-https --disable-doc --enable-silent-rules --enable-asserts &&
-    echo '#undef HAVE_INET6' >> MHD_config.h &&
-    make && make check
-  - |
-    ./configure --prefix=${PREFIX_DIR} --enable-https --enable-http2 --with-nghttp2=${PREFIX_DIR} --disable-doc --enable-silent-rules --enable-asserts &&
-    echo '#undef HAVE_INET6' >> MHD_config.h &&
-    make && make check
-after_failure:
-  - cat ./src/microhttpd/test-suite.log
-  - cat ./src/testcurl/test-suite.log
-  - cat ./src/testcurl/https/test-suite.log
-  - cat ./src/testzzuf/test-suite.log
+  - docker run --rm -it -v $(pwd):/tmp/mhd2 marub/libmicrohttpd-http2

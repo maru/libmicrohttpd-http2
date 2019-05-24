@@ -63,9 +63,6 @@ Development Status
 This is a beta release for libmicrohttpd.  Before declaring the
 library stable, we should have testcases for the following features:
 
-- HTTP/1.1 pipelining (need to figure out how to ensure curl pipelines 
-  -- and it seems libcurl has issues with pipelining, 
-  see http://curl.haxx.se/mail/lib-2007-12/0248.html)
 - resource limit enforcement
 - client queuing early response, suppressing 100 CONTINUE
 - chunked encoding to validate handling of footers

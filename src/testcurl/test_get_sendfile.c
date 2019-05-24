@@ -573,8 +573,7 @@ main (int argc, char *const *argv)
             "%s/%s%s",
             tmp,
             "test-mhd-sendfile",
-            (http_version == CURL_HTTP_VERSION_1_1)  ? "11" :
-              (http_version == CURL_HTTP_VERSION_1_0)  ? "" : "http2");
+            use_http_version);
   f = fopen (sourcefile, "w");
   if (NULL == f)
     {

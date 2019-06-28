@@ -88,7 +88,7 @@ kill_curl (pid_t pid)
 {
   int status;
 
-  //fprintf (stderr, "Killing curl\n");
+  /* fprintf (stderr, "Killing curl\n"); */
   kill (pid, SIGTERM);
   waitpid (pid, &status, 0);
 }
@@ -111,7 +111,7 @@ push_free_callback (void *cls)
 {
   int *ok = cls;
 
-  //fprintf (stderr, "Cleanup callback called!\n");
+  /* fprintf (stderr, "Cleanup callback called!\n"); */
   *ok = 0;
 }
 
@@ -132,7 +132,7 @@ ahc_echo (void *cls,
   (void)url;(void)version;                      /* Unused. Silent compiler warning. */
   (void)upload_data;(void)upload_data_size;     /* Unused. Silent compiler warning. */
 
-  //fprintf (stderr, "In CB: %s!\n", method);
+  /* fprintf (stderr, "In CB: %s!\n", method); */
   if (0 != strcmp (me, method))
     return MHD_NO;              /* unexpected method */
   if (&ptr != *unused)
@@ -236,7 +236,7 @@ testMultithreadedGet ()
             sizeof (url),
             "http://127.0.0.1:%d/",
             port);
-  //fprintf (stderr, "Forking cURL!\n");
+  /* fprintf (stderr, "Forking cURL!\n"); */
   curl = fork_curl (url);
   (void)sleep (1);
   kill_curl (curl);
@@ -251,7 +251,7 @@ testMultithreadedGet ()
     }
   kill_curl (curl);
   (void)sleep (1);
-  //fprintf (stderr, "Stopping daemon!\n");
+  /* fprintf (stderr, "Stopping daemon!\n"); */
   MHD_stop_daemon (d);
   if (ok != 0)
     return 32;
@@ -299,7 +299,7 @@ testMultithreadedPoolGet ()
   (void)sleep (1);
   kill_curl (curl);
   (void)sleep (1);
-  //fprintf (stderr, "Stopping daemon!\n");
+  /* fprintf (stderr, "Stopping daemon!\n"); */
   MHD_stop_daemon (d);
   if (ok != 0)
     return 128;
